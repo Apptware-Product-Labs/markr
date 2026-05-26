@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <!-- Background gradient: deep navy to dark purple -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0d0b1e"/>
+      <stop offset="100%" stop-color="#1a1040"/>
+    </linearGradient>
+    <!-- M stroke gradient: indigo → violet → fuchsia -->
+    <linearGradient id="mg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#818cf8"/>
+      <stop offset="50%"  stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+    <!-- Radial glow behind M -->
+    <radialGradient id="glow-bg" cx="50%" cy="56%" r="42%">
+      <stop offset="0%"   stop-color="#4c1d95" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#0d0b1e" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Dot gradient -->
+    <linearGradient id="dg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <!-- Glow filter for the M stroke -->
+    <filter id="stroke-glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <!-- Glow filter for dots -->
+    <filter id="dot-glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- ── Background ──────────────────────────────────────────────────────── -->
+  <rect width="128" height="128" rx="24" fill="url(#bg)"/>
+  <rect width="128" height="128" rx="24" fill="url(#glow-bg)"/>
+
+  <!-- ── AI/tech corner dot clusters ─────────────────────────────────────── -->
+  <g opacity="0.3" fill="url(#dg)">
+    <!-- top-left -->
+    <circle cx="14" cy="14" r="2.2"/>
+    <circle cx="22" cy="14" r="1.3"/>
+    <circle cx="14" cy="22" r="1.3"/>
+    <!-- top-right -->
+    <circle cx="114" cy="14" r="2.2"/>
+    <circle cx="106" cy="14" r="1.3"/>
+    <circle cx="114" cy="22" r="1.3"/>
+    <!-- bottom-left -->
+    <circle cx="14" cy="114" r="2.2"/>
+    <circle cx="22" cy="114" r="1.3"/>
+    <circle cx="14" cy="106" r="1.3"/>
+    <!-- bottom-right -->
+    <circle cx="114" cy="114" r="2.2"/>
+    <circle cx="106" cy="114" r="1.3"/>
+    <circle cx="114" cy="106" r="1.3"/>
+  </g>
+
+  <!-- ── Subtle connecting lines (circuit vibe) ───────────────────────────── -->
+  <g opacity="0.12" stroke="#818cf8" stroke-width="0.8" fill="none">
+    <line x1="14" y1="14" x2="22" y2="34"/>
+    <line x1="114" y1="14" x2="106" y2="34"/>
+    <line x1="14" y1="114" x2="22" y2="94"/>
+    <line x1="114" y1="114" x2="106" y2="94"/>
+  </g>
+
+  <!-- ── The M — main mark ─────────────────────────────────────────────────── -->
+  <!-- Shadow layer for depth -->
+  <path d="M22 94 L22 34 L64 68 L106 34 L106 94"
+    fill="none"
+    stroke="#6d28d9"
+    stroke-width="13"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.4"/>
+  <!-- Main stroke with gradient glow -->
+  <path d="M22 94 L22 34 L64 68 L106 34 L106 94"
+    fill="none"
+    stroke="url(#mg)"
+    stroke-width="9"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    filter="url(#stroke-glow)"/>
+
+  <!-- ── Glowing vertex nodes ───────────────────────────────────────────────── -->
+  <!-- node glow halos -->
+  <circle cx="22"  cy="34" r="9" fill="#c084fc" opacity="0.18" filter="url(#dot-glow)"/>
+  <circle cx="106" cy="34" r="9" fill="#818cf8" opacity="0.18" filter="url(#dot-glow)"/>
+  <circle cx="64"  cy="68" r="9" fill="#a78bfa" opacity="0.18" filter="url(#dot-glow)"/>
+  <!-- node cores -->
+  <circle cx="22"  cy="34" r="5" fill="#c084fc" filter="url(#dot-glow)"/>
+  <circle cx="106" cy="34" r="5" fill="#818cf8" filter="url(#dot-glow)"/>
+  <circle cx="64"  cy="68" r="5" fill="#a78bfa" filter="url(#dot-glow)"/>
+  <!-- node bright centres -->
+  <circle cx="22"  cy="34" r="2" fill="#f0abfc" opacity="0.9"/>
+  <circle cx="106" cy="34" r="2" fill="#c7d2fe" opacity="0.9"/>
+  <circle cx="64"  cy="68" r="2" fill="#ddd6fe" opacity="0.9"/>
+
+  <!-- ── Small "r" mark bottom-right (the brand suffix) ─────────────────── -->
+  <text x="90" y="108"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
+    font-size="20"
+    font-weight="800"
+    font-style="italic"
+    fill="#a78bfa"
+    opacity="0.6">r</text>
+</svg>

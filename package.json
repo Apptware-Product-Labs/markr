@@ -1,0 +1,116 @@
+{
+  "name": "markr",
+  "displayName": "Markr",
+  "description": "Beautiful GitHub-style Markdown preview — live TOC, syntax highlighting, Mermaid diagrams, copy buttons, scroll sync, focus mode & more",
+  "version": "2.0.0",
+  "publisher": "sumitpatil",
+  "author": {
+    "name": "Sumit Patil",
+    "email": "sumit.patil@apptware.com",
+    "url": "https://apptware.com"
+  },
+  "icon": "icon.png",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Apptware-Product-Labs/markr"
+  },
+  "bugs": { "url": "https://github.com/Apptware-Product-Labs/markr/issues" },
+  "homepage": "https://github.com/Apptware-Product-Labs/markr#readme",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "markdown",
+    "preview",
+    "reader",
+    "viewer",
+    "github",
+    "markr",
+    "md",
+    "mermaid",
+    "toc"
+  ],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "markr.openPreview",
+        "title": "Open Markr Preview",
+        "category": "Markr",
+        "icon": "$(open-preview)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "markr.openPreview",
+          "when": "editorLangId == markdown",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "markr.openPreview",
+          "when": "resourceExtname == .md",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "markr.openPreview",
+          "when": "editorLangId == markdown",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "markr.openPreview",
+        "key": "ctrl+shift+m",
+        "mac": "cmd+shift+m",
+        "when": "editorLangId == markdown"
+      }
+    ],
+    "configuration": {
+      "title": "Markr",
+      "properties": {
+        "markr.scrollSync": {
+          "type": "boolean",
+          "default": true,
+          "description": "Sync preview scroll position with editor cursor position"
+        },
+        "markr.showTOC": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Table of Contents panel by default"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "node esbuild.js --minify",
+    "build": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "npx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.80.0",
+    "esbuild": "^0.19.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "highlight.js": "^11.9.0",
+    "marked": "^9.0.0",
+    "marked-highlight": "^2.0.0"
+  }
+}
