@@ -1,107 +1,133 @@
-# Markr — Markdown Preview for VS Code
+<div align="center">
 
-**Beautiful, GitHub-style Markdown preview with a live Table of Contents, syntax highlighting, Mermaid diagrams, scroll sync, focus mode, and more.**
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/release/v2.0/icon.png" width="96" alt="Markr" />
 
-Open any `.md` file and press `Cmd+Shift+M` (Mac) or `Ctrl+Shift+M` (Windows/Linux).
+# Markr
 
----
+### The Markdown preview VS Code deserves.
 
-## Features
+**GitHub-accurate rendering · Live TOC · Syntax highlighting · Mermaid · Scroll sync · Focus mode**
 
-### Live Preview
-Renders your Markdown instantly as you type — no save needed.
+[![Version](https://img.shields.io/visual-studio-marketplace/v/Apptware-Product-Lab.markr?color=F97316&label=version&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/Apptware-Product-Lab.markr?color=EF4444&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr)
+[![License: MIT](https://img.shields.io/badge/license-MIT-orange.svg?style=flat-square)](LICENSE)
+[![Made by Apptware](https://img.shields.io/badge/made%20by-Apptware-F97316?style=flat-square)](https://apptware.com)
 
-### GitHub-Style Rendering
-Clean, familiar typography that matches GitHub's Markdown output exactly — headings, tables, blockquotes, task lists, strikethrough, and more.
-
-### Syntax Highlighting
-190+ programming languages highlighted with accurate GitHub color themes that automatically switch between light and dark mode.
-
-### Table of Contents
-Auto-generated TOC sidebar from your headings with:
-- **Scroll spy** — active section highlights as you read
-- **Smooth scroll** — click any heading to jump there
-- **Collapsible** — toggle with the `≡` toolbar button
-
-### Copy Buttons on Code Blocks
-Hover any code block to reveal a **Copy** button. One click copies the raw code.
-
-### Heading Anchor Links
-Hover any heading to reveal a `#` anchor — click to copy a deep link to that section.
-
-### Scroll Sync
-As your cursor moves in the editor, the preview automatically scrolls to the nearest heading. Works silently in the background.
-
-### Focus Mode
-Hide the TOC and widen the content area for distraction-free reading. Toggle with the `⊡` button.
-
-### Copy Markdown / Copy HTML
-Toolbar buttons to copy the raw Markdown source or the fully rendered HTML — useful for pasting into CMS editors, emails, or docs.
-
-### Print Support
-Clean print layout — toolbar and TOC are hidden, content fills the page. Use `⎙ Print` in the toolbar.
-
-### Mermaid Diagrams
-Renders ` ```mermaid ` code blocks as interactive diagrams (requires internet for CDN load).
-
-### Dark & Light Mode
-Automatically detects your VS Code theme and switches between GitHub Light and GitHub Dark color schemes — no configuration needed.
+</div>
 
 ---
 
-## Usage
+## Open any `.md` file. Press `Cmd+Shift+M`. That's it.
 
-| Action | Shortcut |
-|--------|----------|
-| Open Markr preview | `Cmd+Shift+M` / `Ctrl+Shift+M` |
-| Toggle TOC | Click `≡` in toolbar |
-| Enter Focus mode | Click `⊡` in toolbar |
-| Copy raw Markdown | Click `MD` in toolbar |
-| Copy rendered HTML | Click `</>` in toolbar |
-| Print | Click `⎙ Print` in toolbar |
-| Copy code block | Hover block → click `Copy` |
-| Copy heading link | Hover heading → click `#` |
-
-You can also right-click any `.md` file in the **Explorer** and choose **Open Markr Preview**.
+Markr renders your Markdown exactly like GitHub — clean typography, accurate colors, beautiful tables — with a full suite of power features built in. No configuration. No fuss.
 
 ---
 
-## Settings
+## ✦ What makes Markr different
+
+| | Built-in VS Code Preview | Markr |
+|---|---|---|
+| GitHub-accurate styling | Partial | ✅ Pixel-perfect |
+| Table of Contents | ✗ | ✅ Live, collapsible |
+| Scroll spy | ✗ | ✅ Active section tracking |
+| Copy code buttons | ✗ | ✅ Hover to reveal |
+| Mermaid diagrams | ✗ | ✅ Flowcharts, Gantt & more |
+| Heading anchor links | ✗ | ✅ Click to copy |
+| Word count + reading time | ✗ | ✅ Always visible |
+| Copy HTML output | ✗ | ✅ One click |
+| Focus / reading mode | ✗ | ✅ Distraction-free |
+| Print-ready layout | ✗ | ✅ Toolbar/TOC hidden |
+
+---
+
+## ✦ Features
+
+### 📄 GitHub-Style Rendering
+Headings, tables, blockquotes, task lists, strikethrough, footnotes, inline code, fenced code blocks — all rendered exactly as GitHub does it. Switch between light and dark mode automatically with your VS Code theme.
+
+### 📑 Live Table of Contents
+Auto-generated from your headings the moment you open the preview. Scroll spy highlights the active section in real time. Click any item to jump there with smooth scrolling. Collapse it anytime with a single button.
+
+### 🎨 Syntax Highlighting — 190+ Languages
+TypeScript, Python, Go, Rust, Java, SQL, YAML, Bash, Dockerfile — every language highlighted with GitHub's exact color tokens, in both light and dark themes.
+
+### 🔀 Mermaid Diagrams
+Drop a `mermaid` block in your Markdown and Markr renders it live:
+
+```
+graph LR
+  Write --> Preview --> Ship
+```
+
+Flowcharts, sequence diagrams, Gantt charts, class diagrams, pie charts — all supported.
+
+### ⚡ Scroll Sync
+Move your cursor in the editor — the preview scrolls to match. Always in context, never lost.
+
+### 📋 Copy Buttons on Every Code Block
+Hover any code block → a **Copy** button appears → click → done.
+
+### 🔗 Heading Anchor Links
+Hover any heading → a `#` link appears → click to copy a deep link to that section. Perfect for sharing.
+
+### 🛠 Toolbar — Everything Within Reach
+
+```
+◈ Markr  ·  filename.md          3 min read · 580 words    [MD] [</>] [Print] [≡] [⊡]
+```
+
+| Button | What it does |
+|--------|--------------|
+| `MD` | Copy raw Markdown source to clipboard |
+| `</>` | Copy fully rendered HTML to clipboard |
+| `Print` | Print-optimized layout — no chrome, just content |
+| `≡` | Toggle the TOC sidebar |
+| `⊡` | Focus mode — wider content, bigger type, no sidebar |
+
+### 🎯 Focus Mode
+One click hides the TOC, widens the content to 720px, bumps the font size, and increases line-height. Pure reading flow. Toggle back anytime.
+
+### ↑ Back to Top
+A floating button appears after you scroll down. One click, back to the top.
+
+---
+
+## ⌨️ Shortcuts
+
+| Action | Mac | Windows / Linux |
+|--------|-----|-----------------|
+| Open preview | `Cmd+Shift+M` | `Ctrl+Shift+M` |
+
+Also available via:
+- The **preview icon** in the editor title bar (when a `.md` file is open)
+- Right-click a `.md` file in the Explorer → **Open Markr Preview**
+
+---
+
+## ⚙️ Settings
 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `markr.scrollSync` | `true` | Sync preview scroll with editor cursor |
-| `markr.showTOC` | `true` | Show TOC panel by default |
+| `markr.showTOC` | `true` | Show TOC sidebar when preview opens |
 
 ---
 
-## Mermaid Example
-
-````markdown
-```mermaid
-graph TD
-  A[Write Markdown] --> B{Preview with Markr}
-  B --> C[Looks great!]
-  B --> D[Tweak & repeat]
-  D --> A
-```
-````
-
----
-
-## Requirements
+## 📦 Requirements
 
 - VS Code `1.80.0` or higher
-- Internet connection for Mermaid diagram rendering (other features work offline)
+- Internet connection for Mermaid rendering *(all other features work offline)*
 
 ---
 
-## Contributing
+## 🐛 Issues & Feedback
 
-Found a bug or have a feature idea? Open an issue on [GitHub](https://github.com/Apptware-Product-Labs/markr).
+Something broken? Feature idea? → [Open an issue on GitHub](https://github.com/Apptware-Product-Labs/markr/issues)
 
 ---
 
-## License
+<div align="center">
 
-MIT © [Sumit Patil](https://apptware.com) @ [Apptware](https://apptware.com)
+Built by [Sumit Patil](https://apptware.com) · [Apptware](https://apptware.com) · MIT License
+
+</div>
