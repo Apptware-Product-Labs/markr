@@ -1,8 +1,8 @@
 {
   "name": "markr",
   "displayName": "Markr",
-  "description": "Beautiful GitHub-style Markdown preview — live TOC, syntax highlighting, Mermaid diagrams, copy buttons, scroll sync, focus mode & more",
-  "version": "2.0.0",
+  "description": "Markdown notebook for VS Code — file browser, live preview, split editor, formatting toolbar, TOC, Mermaid, syntax highlighting & more",
+  "version": "3.0.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Sumit Patil",
@@ -27,9 +27,10 @@
   "keywords": [
     "markdown",
     "preview",
+    "notebook",
     "reader",
     "viewer",
-    "github",
+    "editor",
     "markr",
     "md",
     "mermaid",

@@ -36,6 +36,13 @@ export function activate(context: vscode.ExtensionContext) {
       }
     }),
   );
+
+  // Watch workspace for .md file additions/deletions → refresh file panel
+  const watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
+  const refresh = () => MarkdownPreviewPanel.refreshFiles();
+  watcher.onDidCreate(refresh);
+  watcher.onDidDelete(refresh);
+  context.subscriptions.push(watcher);
 }
 
 export function deactivate() {}
