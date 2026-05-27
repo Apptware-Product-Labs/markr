@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr",
   "description": "Markdown notebook for VS Code — file browser, live preview, split editor, formatting toolbar, TOC, Mermaid, syntax highlighting & more",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Sumit Patil",
