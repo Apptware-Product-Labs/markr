@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/release/v2.0/icon.png" width="96" alt="Markr" />
-
 # Markr
 
 ### The Markdown preview VS Code deserves.
