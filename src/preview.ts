@@ -978,15 +978,15 @@ const SCRIPT = /* javascript */`
     const start = ta.selectionStart, end = ta.selectionEnd, val = ta.value, sel = val.slice(start, end);
     function wrap(before, after, ph) {
       const inner = sel || ph || '';
-      ta.value = val.slice(0, start) + before + inner + after + val.slice(end);
-      ta.selectionStart = start + before.length; ta.selectionEnd = start + before.length + inner.length;
+      ta.setRangeText(before + inner + after, start, end, 'preserve');
+      ta.setSelectionRange(start + before.length, start + before.length + inner.length);
       ta.focus(); triggerEdit();
     }
     function linePrefix(prefix) {
       const ls = val.lastIndexOf('\\n', start - 1) + 1, line = val.slice(ls, end);
       const clean = line.replace(/^#{1,6}\\s/, '').replace(/^>\\s?/, '').replace(/^-\\s/, '').replace(/^\\d+\\.\\s/, '');
-      ta.value = val.slice(0, ls) + prefix + clean + val.slice(end);
-      ta.selectionStart = ta.selectionEnd = ls + prefix.length + clean.length;
+      ta.setRangeText(prefix + clean, ls, end, 'preserve');
+      ta.setSelectionRange(ls + prefix.length + clean.length, ls + prefix.length + clean.length);
       ta.focus(); triggerEdit();
     }
     switch (action) {
@@ -1006,14 +1006,14 @@ const SCRIPT = /* javascript */`
       case 'task':      return linePrefix('- [ ] ');
       case 'hr': {
         const ins = '\\n\\n---\\n\\n';
-        ta.value = val.slice(0, start) + ins + val.slice(end);
-        ta.selectionStart = ta.selectionEnd = start + ins.length;
+        ta.setRangeText(ins, start, end, 'preserve');
+        ta.setSelectionRange(start + ins.length, start + ins.length);
         ta.focus(); triggerEdit(); break;
       }
       case 'table': {
         const tbl = '\\n| Column 1 | Column 2 | Column 3 |\\n|----------|----------|----------|\\n| Cell     | Cell     | Cell     |\\n';
-        ta.value = val.slice(0, start) + tbl + val.slice(end);
-        ta.selectionStart = ta.selectionEnd = start + tbl.length;
+        ta.setRangeText(tbl, start, end, 'preserve');
+        ta.setSelectionRange(start + tbl.length, start + tbl.length);
         ta.focus(); triggerEdit(); break;
       }
     }
@@ -1044,8 +1044,8 @@ const SCRIPT = /* javascript */`
   qs('#edit-area')?.addEventListener('keydown', e => {
     const ta = e.target, start = ta.selectionStart, end = ta.selectionEnd, val = ta.value, mod = e.metaKey || e.ctrlKey;
     if (e.key === 'Tab' && !e.shiftKey) {
-      e.preventDefault(); ta.value = val.slice(0, start) + '  ' + val.slice(end);
-      ta.selectionStart = ta.selectionEnd = start + 2; triggerEdit(); return;
+      e.preventDefault(); ta.setRangeText('  ', start, end, 'preserve');
+      ta.setSelectionRange(start + 2, start + 2); triggerEdit(); return;
     }
     if (mod && e.key === 'b') { e.preventDefault(); applyFormat('bold'); return; }
     if (mod && e.key === 'i') { e.preventDefault(); applyFormat('italic'); return; }
@@ -1064,16 +1064,16 @@ const SCRIPT = /* javascript */`
         const content = line.slice(match[0].length);
         if (!content.trim()) {
           e.preventDefault();
-          ta.value = val.slice(0, ls) + '\\n' + val.slice(start);
-          ta.selectionStart = ta.selectionEnd = ls + 1; triggerEdit(); return;
+          ta.setRangeText('\\n', ls, start, 'preserve');
+          ta.setSelectionRange(ls + 1, ls + 1); triggerEdit(); return;
         }
         e.preventDefault();
         let insert = '';
         if (taskM)      insert = '\\n' + taskM[1] + taskM[2] + ' [ ] ';
         else if (bullM) insert = '\\n' + bullM[1] + bullM[2] + ' ';
         else if (numM)  insert = '\\n' + numM[1] + (parseInt(numM[2]) + 1) + '. ';
-        ta.value = val.slice(0, start) + insert + val.slice(end);
-        ta.selectionStart = ta.selectionEnd = start + insert.length; triggerEdit();
+        ta.setRangeText(insert, start, end, 'preserve');
+        ta.setSelectionRange(start + insert.length, start + insert.length); triggerEdit();
       }
     }
   });
@@ -1296,8 +1296,8 @@ const SCRIPT = /* javascript */`
       const ta = qs('#edit-area'); if (!ta) return;
       const start  = ta.selectionStart;
       const insert = '![](' + msg.path + ')';
-      ta.value = ta.value.slice(0, start) + insert + ta.value.slice(start);
-      ta.selectionStart = start + 2; ta.selectionEnd = start + 2;
+      ta.setRangeText(insert, start, start, 'preserve');
+      ta.setSelectionRange(start + 2, start + 2);
       ta.focus(); triggerEdit();
     }
   });
@@ -1472,6 +1472,7 @@ export class MarkdownPreviewPanel {
         const edit = new vscode.WorkspaceEdit();
         edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), msg.content);
         await vscode.workspace.applyEdit(edit);
+        await vscode.workspace.save(doc.uri);   // write to disk → removes unsaved dot
         const html = applyGithubAlerts(marked.parse(msg.content) as string);
         this._panel.webview.postMessage({ type: 'updateSplitPreview', html });
         this._panel.webview.postMessage({ type: 'saved' });
