@@ -1,8 +1,8 @@
 {
   "name": "markr",
   "displayName": "Markr",
-  "description": "Markdown notebook for VS Code — file browser, live preview, split editor, formatting toolbar, TOC, Mermaid, syntax highlighting & more",
-  "version": "3.2.1",
+  "description": "Fast Markdown preview for VS Code with workspace navigation, GitHub-style rendering, Mermaid diagrams, split editing, themes, and export tools",
+  "version": "3.2.2",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Sumit Patil",
@@ -10,12 +10,18 @@
     "url": "https://apptware.com"
   },
   "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#1c1a17",
+    "theme": "dark"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/Apptware-Product-Labs/markr"
   },
-  "bugs": { "url": "https://github.com/Apptware-Product-Labs/markr/issues" },
+  "bugs": {
+    "url": "https://github.com/Apptware-Product-Labs/markr/issues"
+  },
   "homepage": "https://github.com/Apptware-Product-Labs/markr#readme",
   "engines": {
     "vscode": "^1.80.0"
@@ -26,6 +32,9 @@
   ],
   "keywords": [
     "markdown",
+    "markdown-preview",
+    "github-markdown",
+    "documentation",
     "preview",
     "notebook",
     "reader",
@@ -92,6 +101,13 @@
           "type": "boolean",
           "default": true,
           "description": "Show Table of Contents panel by default"
+        },
+        "markr.maxWorkspaceFiles": {
+          "type": "number",
+          "default": 500,
+          "minimum": 50,
+          "maximum": 5000,
+          "description": "Maximum number of Markdown files to show in the Markr workspace file panel"
         }
       }
     }

@@ -39,7 +39,11 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Watch workspace for .md file additions/deletions → refresh file panel
   const watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
-  const refresh = () => MarkdownPreviewPanel.refreshFiles();
+  let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  const refresh = () => {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => MarkdownPreviewPanel.refreshFiles(), 250);
+  };
   watcher.onDidCreate(refresh);
   watcher.onDidDelete(refresh);
   context.subscriptions.push(watcher);

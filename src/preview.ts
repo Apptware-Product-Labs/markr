@@ -824,6 +824,7 @@ const SCRIPT = /* javascript */`
 
   let currentMarkdown = (typeof __MD__ !== 'undefined') ? __MD__ : '';
   let filesCache  = (typeof __FILES__ !== 'undefined') ? [...__FILES__] : [];
+  let filesLoading = (typeof __FILES_LOADING__ !== 'undefined') ? __FILES_LOADING__ : false;
   let editMode    = false;
   let wordWrap    = true;
   let editTimer, saveTimer;
@@ -874,6 +875,10 @@ const SCRIPT = /* javascript */`
   function renderFileList(files) {
     const container = qs('#files-list');
     if (!container) return;
+    if (filesLoading) {
+      container.innerHTML = '<div style="padding:8px 14px;font-size:11.5px;color:var(--text-faint)">Loading workspace files…</div>';
+      return;
+    }
     if (!files || !files.length) {
       container.innerHTML = '<div style="padding:8px 14px;font-size:11.5px;color:var(--text-faint)">No .md files in workspace</div>';
       return;
@@ -1359,7 +1364,11 @@ const SCRIPT = /* javascript */`
       const sp = qs('#split-preview .markdown-body'); if (sp) sp.innerHTML = msg.html;
     }
     if (msg.type === 'saved') { showSaved(); }
-    if (msg.type === 'updateFiles') { filesCache = msg.files; renderFileList(msg.files); }
+    if (msg.type === 'updateFiles') {
+      filesLoading = false;
+      filesCache = msg.files || [];
+      renderFileList(filesCache);
+    }
     if (msg.type === 'imagePasted') {
       const ta = qs('#edit-area'); if (!ta) return;
       const start  = ta.selectionStart;
@@ -1486,6 +1495,8 @@ export class MarkdownPreviewPanel {
   private _editMode = false;
   private _filesCache: FileEntry[] = [];
   private _filesCacheValid = false;
+  private _renderTimer: ReturnType<typeof setTimeout> | undefined;
+  private _filesScanPromise: Promise<FileEntry[]> | undefined;
 
   public static createOrShow(document: vscode.TextDocument): void {
     const column = vscode.window.activeTextEditor ? vscode.ViewColumn.Beside : vscode.ViewColumn.One;
@@ -1503,9 +1514,9 @@ export class MarkdownPreviewPanel {
   public static update(document: vscode.TextDocument): void {
     const p = MarkdownPreviewPanel.currentPanel;
     if (!p) return;
-    p._document = document;
+    if (p._document.uri.toString() !== document.uri.toString()) return;
     if (p._editMode) return;
-    p._render();
+    p._scheduleRender();
   }
 
   public static syncScroll(document: vscode.TextDocument, line: number): void {
@@ -1593,6 +1604,10 @@ export class MarkdownPreviewPanel {
   }
 
   private _render(): void {
+    if (this._renderTimer) {
+      clearTimeout(this._renderTimer);
+      this._renderTimer = undefined;
+    }
     const rawText = this._document.getText();
     const { meta, body: mdBody } = extractFrontmatter(rawText);
     const rendered = applyGithubAlerts(marked.parse(mdBody) as string);
@@ -1600,30 +1615,49 @@ export class MarkdownPreviewPanel {
     const stats    = docStats(rawText);
     const filename = this._document.uri.path.split('/').pop() ?? 'preview';
     this._panel.title = `Markr — ${filename}`;
-    this._getWorkspaceFiles().then(files => {
-      this._panel.webview.html = this._buildPage(frontmatterHtml + rendered, filename, stats, rawText, files);
-    });
+    const files = this._filesCacheValid ? this._filesCache : [];
+    this._panel.webview.html = this._buildPage(frontmatterHtml + rendered, filename, stats, rawText, files, !this._filesCacheValid);
+    if (!this._filesCacheValid) {
+      this._getWorkspaceFiles().then(files => {
+        this._panel.webview.postMessage({ type: 'updateFiles', files });
+      });
+    }
+  }
+
+  private _scheduleRender(): void {
+    if (this._renderTimer) clearTimeout(this._renderTimer);
+    this._renderTimer = setTimeout(() => this._render(), 120);
   }
 
   private async _getWorkspaceFiles(): Promise<FileEntry[]> {
     if (!this._filesCacheValid) {
       try {
-        const uris = await vscode.workspace.findFiles(
-          '**/*.md',
-          '{**/node_modules/**,**/.git/**,**/.vscode/**,**/.next/**,**/out/**,**/dist/**}',
-          500
-        );
-        this._filesCache = uris
-          .sort((a, b) => vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)))
-          .map(uri => {
-            const relPath = vscode.workspace.asRelativePath(uri);
-            const parts   = relPath.split('/');
-            const label   = parts[parts.length - 1];
-            const dir     = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-            return { label, relPath, uri: uri.toString(), active: false, dir, isAiConfig: isAiConfig(label) };
-          });
-        this._filesCacheValid = true;
+        if (this._filesScanPromise) {
+          await this._filesScanPromise;
+        } else {
+          this._filesScanPromise = (async () => {
+            const maxFiles = vscode.workspace.getConfiguration('markr').get<number>('maxWorkspaceFiles', 500);
+            const uris = await vscode.workspace.findFiles(
+              '**/*.md',
+              '{**/node_modules/**,**/.git/**,**/.vscode/**,**/.next/**,**/out/**,**/dist/**}',
+              maxFiles
+            );
+            this._filesCache = uris
+              .sort((a, b) => vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)))
+              .map(uri => {
+                const relPath = vscode.workspace.asRelativePath(uri);
+                const parts   = relPath.split('/');
+                const label   = parts[parts.length - 1];
+                const dir     = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+                return { label, relPath, uri: uri.toString(), active: false, dir, isAiConfig: isAiConfig(label) };
+              });
+            this._filesCacheValid = true;
+            return this._filesCache;
+          })();
+          await this._filesScanPromise;
+        }
       } catch { this._filesCache = []; }
+      finally { this._filesScanPromise = undefined; }
     }
     // Update active flag in-place (no allocation)
     const currentUri = this._document.uri.toString();
@@ -1766,7 +1800,7 @@ export class MarkdownPreviewPanel {
     });
   }
 
-  private _buildPage(body: string, filename: string, stats: ReturnType<typeof docStats>, text: string, files: FileEntry[]): string {
+  private _buildPage(body: string, filename: string, stats: ReturnType<typeof docStats>, text: string, files: FileEntry[], filesLoading: boolean): string {
     const nonce      = getNonce();
     const theme      = vscode.window.activeColorTheme;
     const isDark     = theme.kind === vscode.ColorThemeKind.Dark || theme.kind === vscode.ColorThemeKind.HighContrast;
@@ -1775,6 +1809,7 @@ export class MarkdownPreviewPanel {
     const showTOC    = cfg.get<boolean>('showTOC', true);
     const mdJson     = JSON.stringify(text);
     const filesJson  = JSON.stringify(files);
+    const filesLoadingJson = JSON.stringify(filesLoading);
     const autoEdit   = isAiConfig(filename);
     const tokStr     = tokenEstimate(stats.chars);
     const statsTitle = `${stats.words.toLocaleString()} words · ${stats.headings} heading${stats.headings !== 1 ? 's' : ''} · ${stats.codeBlocks} code block${stats.codeBlocks !== 1 ? 's' : ''}`;
@@ -1966,6 +2001,7 @@ export class MarkdownPreviewPanel {
 <script nonce="${nonce}">
   const __MD__       = ${mdJson};
   const __FILES__    = ${filesJson};
+  const __FILES_LOADING__ = ${filesLoadingJson};
   const __AUTOEDIT__ = ${autoEdit};
 </script>
 <script nonce="${nonce}">${SCRIPT}</script>
