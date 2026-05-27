@@ -848,10 +848,21 @@ const SCRIPT = /* javascript */`
     qsa('.file-item', container).forEach(el => {
       el.addEventListener('click', () => {
         const uri = el.getAttribute('data-uri');
-        if (uri) vsc.postMessage({ type: 'openFile', uri });
+        if (!uri) return;
+        // If already loaded in a tab, switch instantly — no extension round-trip
+        if (tabs.find(t => t.uri === uri)) { switchToTab(uri); return; }
+        vsc.postMessage({ type: 'openFile', uri });
       });
     });
   }
+  // Fast active-indicator update — no DOM rebuild, just toggle a class
+  function updateFileListActive(uri) {
+    filesCache.forEach(f => { f.active = f.uri === uri; });
+    qsa('.file-item', qs('#files-list')).forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-uri') === uri);
+    });
+  }
+
   function fileItemHtml(f) {
     const icon = f.isAiConfig
       ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>'
@@ -1281,9 +1292,10 @@ const SCRIPT = /* javascript */`
       if (msg.isAiConfig) { if (!editMode) enterEditMode(); }
       else { if (editMode) exitEditMode(); }
       qs('#scroller').scrollTop = 0;
-      buildTOC(); addCopyButtons(); setupHeadingAnchors(); setupMermaid();
+      buildTOC(); addCopyButtons(); setupHeadingAnchors();
+      if (qs('#scroller .language-mermaid')) setupMermaid();
       renderTabBar();
-      if (msg.files) renderFileList(msg.files);
+      updateFileListActive(msg.uri);
     }
     if (msg.type === 'scrollToHeading') {
       const el = document.getElementById(msg.id); if (!el) return;
@@ -1365,8 +1377,10 @@ const SCRIPT = /* javascript */`
     if (tab.isAiConfig) { if (!editMode) enterEditMode(); }
     else { if (editMode) exitEditMode(); }
     setTimeout(() => { if (qs('#scroller')) qs('#scroller').scrollTop = tab.scrollTop || 0; }, 40);
-    buildTOC(); addCopyButtons(); setupHeadingAnchors(); setupMermaid();
+    buildTOC(); addCopyButtons(); setupHeadingAnchors();
+    if (qs('#scroller .language-mermaid')) setupMermaid();
     renderTabBar();
+    updateFileListActive(uri);
     vsc.postMessage({ type: 'setActiveDoc', uri });
   }
 
@@ -1418,6 +1432,8 @@ export class MarkdownPreviewPanel {
   private _document: vscode.TextDocument;
   private readonly _disposables: vscode.Disposable[] = [];
   private _editMode = false;
+  private _filesCache: FileEntry[] = [];
+  private _filesCacheValid = false;
 
   public static createOrShow(document: vscode.TextDocument): void {
     const column = vscode.window.activeTextEditor ? vscode.ViewColumn.Beside : vscode.ViewColumn.One;
@@ -1451,6 +1467,7 @@ export class MarkdownPreviewPanel {
   public static async refreshFiles(): Promise<void> {
     const p = MarkdownPreviewPanel.currentPanel;
     if (!p) return;
+    p._filesCacheValid = false; // force re-scan when files actually change on disk
     const files = await p._getWorkspaceFiles();
     p._panel.webview.postMessage({ type: 'updateFiles', files });
   }
@@ -1488,14 +1505,14 @@ export class MarkdownPreviewPanel {
         if (msg.mode === 'preview') this._render();
       }
       if (msg.type === 'openFile') {
-        vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri)).then(async doc => {
+        vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri)).then(doc => {
           this._document = doc;
           const rawText = doc.getText();
           const filename = doc.uri.path.split('/').pop() ?? 'untitled';
           const { meta, body } = extractFrontmatter(rawText);
           const rendered = applyGithubAlerts(marked.parse(body) as string);
           const stats = docStats(rawText);
-          const files = await this._getWorkspaceFiles();
+          // No `files` here — webview updates active state from msg.uri (no full list re-render)
           this._panel.webview.postMessage({
             type: 'fileLoaded',
             uri: doc.uri.toString(),
@@ -1507,7 +1524,6 @@ export class MarkdownPreviewPanel {
             statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
             words: stats.words,
             readMins: Math.max(1, Math.ceil(stats.words / 200)),
-            files,
           });
         });
       }
@@ -1538,23 +1554,29 @@ export class MarkdownPreviewPanel {
   }
 
   private async _getWorkspaceFiles(): Promise<FileEntry[]> {
-    try {
-      const uris = await vscode.workspace.findFiles(
-        '**/*.md',
-        '{**/node_modules/**,**/.git/**,**/.vscode/**,**/.next/**,**/out/**,**/dist/**}',
-        200
-      );
-      const currentUri = this._document.uri.toString();
-      return uris
-        .sort((a, b) => vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)))
-        .map(uri => {
-          const relPath = vscode.workspace.asRelativePath(uri);
-          const parts   = relPath.split('/');
-          const label   = parts[parts.length - 1];
-          const dir     = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-          return { label, relPath, uri: uri.toString(), active: uri.toString() === currentUri, dir, isAiConfig: isAiConfig(label) };
-        });
-    } catch { return []; }
+    if (!this._filesCacheValid) {
+      try {
+        const uris = await vscode.workspace.findFiles(
+          '**/*.md',
+          '{**/node_modules/**,**/.git/**,**/.vscode/**,**/.next/**,**/out/**,**/dist/**}',
+          500
+        );
+        this._filesCache = uris
+          .sort((a, b) => vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)))
+          .map(uri => {
+            const relPath = vscode.workspace.asRelativePath(uri);
+            const parts   = relPath.split('/');
+            const label   = parts[parts.length - 1];
+            const dir     = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+            return { label, relPath, uri: uri.toString(), active: false, dir, isAiConfig: isAiConfig(label) };
+          });
+        this._filesCacheValid = true;
+      } catch { this._filesCache = []; }
+    }
+    // Update active flag in-place (no allocation)
+    const currentUri = this._document.uri.toString();
+    this._filesCache.forEach(f => { f.active = f.uri === currentUri; });
+    return this._filesCache;
   }
 
   private async _handleImagePaste(base64: string, ext: string): Promise<void> {
