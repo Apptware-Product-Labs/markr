@@ -267,6 +267,35 @@ const CSS = /* css */`
   --hl-add-bg: #f0fff4; --hl-del-bg: #ffeef0; --hl-add-fg: #22863a; --hl-del-fg: #b31d28;
 }
 
+/* === Notion (clean white) ===================================================*/
+[data-m="notion"] {
+  --accent:       #F97316;  --accent-dim:   #C2570A;  --accent-bg:    rgba(249,115,22,0.06);
+  --text:         #37352f;  --text-2:       #55534e;  --text-muted:   #9b9a97;  --text-faint:   #c7c6c3;
+  --bg:           #ffffff;  --bg-panel:     #f7f6f3;  --bg-hover:     #efefef;  --bg-subtle:    #f7f6f3;
+  --border:       #e9e9e7;  --border-faint: #f1f0ef;  --code-bg:      #f7f6f3;
+  --link:         #0b6e99;  --link-hv:      #0550ae;  --success:      #0f7b6c;
+  --fg:           #37352f;  --fg-muted:     #9b9a97;  --code-inline:  rgba(135,131,120,0.15);
+  --hr:           #e9e9e7;  --table-alt:    #f7f6f3;  --brd-muted:    #e9e9e7;
+  --hl: #37352f; --hl-kw: #d73a49; --hl-fn: #6f42c1; --hl-lit: #005cc5;
+  --hl-str: #032f62; --hl-bi: #e36209; --hl-cm: #9b9a97; --hl-tag: #22863a;
+  --hl-add-bg: #f0fff4; --hl-del-bg: #ffeef0; --hl-add-fg: #22863a; --hl-del-fg: #b31d28;
+}
+
+/* === Linear (cool dark) =====================================================*/
+[data-m="linear"] {
+  --accent:       #5e6ad2;  --accent-dim:   #4956c3;  --accent-bg:    rgba(94,106,210,0.13);
+  --text:         #e2e2e6;  --text-2:       #b0b0b8;  --text-muted:   #72727a;  --text-faint:   #3a3a42;
+  --bg:           #0d0d10;  --bg-panel:     #131318;  --bg-hover:     #1b1b22;  --bg-subtle:    #111116;
+  --border:       #1e1e28;  --border-faint: #17171e;  --code-bg:      #0a0a0d;
+  --link:         #818cf8;  --link-hv:      #a5b4fc;  --success:      #4ade80;
+  --fg:           #e2e2e6;  --fg-muted:     #72727a;  --code-inline:  rgba(255,255,255,0.07);
+  --hr:           #1e1e28;  --table-alt:    #111116;  --brd-muted:    #1e1e28;
+  --hl: #e2e2e6; --hl-kw: #ff7b72; --hl-fn: #c9a7ff; --hl-lit: #79c0ff;
+  --hl-str: #a5d6ff; --hl-bi: #ffa657; --hl-cm: #72727a; --hl-tag: #7ee787;
+  --hl-add-bg: rgba(46,160,67,0.15); --hl-del-bg: rgba(248,81,73,0.15);
+  --hl-add-fg: #aff5b4; --hl-del-fg: #ffdcd7;
+}
+
 /* === Tokens (Dark) =========================================================*/
 [data-m="dark"] {
   --accent:       #FB923C;
@@ -656,6 +685,25 @@ body.focus-mode .markdown-body { max-width: 720px; font-size: 16.5px; line-heigh
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* === Theme Picker ===========================================================*/
+.theme-picker-wrap { position: relative; }
+#theme-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 500;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.22); padding: 6px; min-width: 154px;
+  display: none; flex-direction: column; gap: 1px;
+}
+#theme-menu.open { display: flex; }
+.theme-opt {
+  display: flex; align-items: center; gap: 8px; padding: 7px 10px;
+  border: none; border-radius: 6px; font-size: 12.5px; font-family: inherit;
+  cursor: pointer; color: var(--text-muted); background: transparent;
+  text-align: left; width: 100%; transition: background 0.1s, color 0.1s;
+}
+.theme-opt:hover { background: var(--bg-hover); color: var(--text); }
+.theme-opt.active { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.theme-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
 /* === Print =================================================================*/
 @media print {
@@ -1092,14 +1140,32 @@ const SCRIPT = /* javascript */`
     setTimeout(() => { btn.innerHTML = prev; }, 2000);
   });
 
-  qs('#btn-export')?.addEventListener('click', () => {
-    const html = (qs('#scroller .markdown-body') || qs('.markdown-body'))?.innerHTML || '';
-    vsc.postMessage({ type: 'exportHtml', html });
+  qs('#btn-export')?.addEventListener('click', () => vsc.postMessage({ type: 'exportHtml' }));
+  qs('#btn-pdf')?.addEventListener('click',    () => vsc.postMessage({ type: 'exportPdf' }));
+  qs('#btn-print')?.addEventListener('click',  () => vsc.postMessage({ type: 'print' }));
+
+  // ── Theme picker ───────────────────────────────────────────────────────────
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-m', t);
+    try { localStorage.setItem('markr-theme', t); } catch {}
+    qsa('.theme-opt').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-theme') === t));
+    qs('#theme-menu')?.classList.remove('open');
+  }
+  qs('#btn-theme')?.addEventListener('click', e => {
+    e.stopPropagation();
+    qs('#theme-menu')?.classList.toggle('open');
+    const cur = document.documentElement.getAttribute('data-m');
+    qsa('.theme-opt').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-theme') === cur));
   });
-
-  qs('#btn-pdf')?.addEventListener('click', () => vsc.postMessage({ type: 'exportPdf' }));
-
-  qs('#btn-print')?.addEventListener('click', () => window.print());
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.theme-picker-wrap')) qs('#theme-menu')?.classList.remove('open');
+  });
+  qsa('.theme-opt').forEach(btn => btn.addEventListener('click', () => {
+    const t = btn.getAttribute('data-theme'); if (t) applyTheme(t);
+  }));
+  (function() {
+    try { const s = localStorage.getItem('markr-theme'); if (s) applyTheme(s); } catch {}
+  })();
 
   let sidebarOpen = true;
   qs('#btn-sidebar')?.addEventListener('click', () => {
@@ -1172,7 +1238,6 @@ const SCRIPT = /* javascript */`
       ta.selectionStart = start + 2; ta.selectionEnd = start + 2;
       ta.focus(); triggerEdit();
     }
-    if (msg.type === 'printForPdf') { window.print(); }
   });
 
   // ── Init ───────────────────────────────────────────────────────────────────
@@ -1199,6 +1264,7 @@ const ICON = {
   ol: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 7h1V4" stroke-linecap="round"/><path d="M3 11h2v1H3v1h2" stroke-linecap="round"/></svg>`,
   export: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
   pdf: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>`,
+  palette: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>`,
 };
 
 // ─── Panel ───────────────────────────────────────────────────────────────────
@@ -1282,8 +1348,9 @@ export class MarkdownPreviewPanel {
       }
       if (msg.type === 'newFile') { vscode.commands.executeCommand('workbench.action.files.newUntitledFile'); }
       if (msg.type === 'pasteImage') { await this._handleImagePaste(msg.base64, msg.ext); }
-      if (msg.type === 'exportHtml') { await this._handleExportHtml(msg.html); }
+      if (msg.type === 'exportHtml') { await this._handleExportHtml(); }
       if (msg.type === 'exportPdf')  { await this._handleExportPdf(); }
+      if (msg.type === 'print')      { await this._handlePrint(); }
     }, null, this._disposables);
   }
 
@@ -1336,7 +1403,10 @@ export class MarkdownPreviewPanel {
     }
   }
 
-  private async _handleExportHtml(content: string): Promise<void> {
+  private async _handleExportHtml(): Promise<void> {
+    const rawText  = this._document.getText();
+    const { meta, body } = extractFrontmatter(rawText);
+    const content  = (meta ? renderFrontmatter(meta) : '') + applyGithubAlerts(marked.parse(body) as string);
     const filename = this._document.uri.path.split('/').pop()?.replace(/\.md$/i, '.html') ?? 'export.html';
     const dir      = this._document.uri.with({ path: this._document.uri.path.replace(/[^/]*$/, '') });
     const saveUri  = await vscode.window.showSaveDialog({
@@ -1344,32 +1414,21 @@ export class MarkdownPreviewPanel {
       filters: { 'HTML files': ['html'] },
     });
     if (!saveUri) return;
-    const fullHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${filename.replace('.html', '')}</title>
-<style>
-body { max-width: 800px; margin: 40px auto; padding: 0 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 16px; line-height: 1.7; color: #1c1a17; }
-h1,h2,h3,h4,h5,h6 { font-weight: 700; margin-top: 1.5em; margin-bottom: .4em; }
-h2 { border-bottom: 1px solid #e5e0d8; padding-bottom: .35em; }
-pre { background: #ede9e2; border: 1px solid #e5e0d8; border-radius: 6px; padding: 16px; overflow: auto; font-size: 14px; }
-code { background: rgba(110,104,96,.12); padding: .2em .4em; border-radius: 4px; font-size: 85%; font-family: monospace; }
-pre code { background: transparent; padding: 0; }
-blockquote { border-left: 3px solid #F97316; background: rgba(249,115,22,.08); margin: 0 0 16px; padding: 10px 16px; border-radius: 0 6px 6px 0; color: #888178; }
-table { border-collapse: collapse; width: 100%; margin-bottom: 16px; border-radius: 6px; border: 1px solid #e5e0d8; }
-th { border-bottom: 2px solid #e5e0d8; padding: 8px 14px; text-align: left; background: #f3f0eb; }
-td { border-bottom: 1px solid #ede9e2; padding: 7px 14px; }
-img { max-width: 100%; border-radius: 6px; }
-a { color: #0b6e99; }
-hr { height: 1px; border: 0; background: #e5e0d8; margin: 24px 0; }
-</style>
-</head>
-<body>${content}</body>
-</html>`;
-    await vscode.workspace.fs.writeFile(saveUri, Buffer.from(fullHtml, 'utf-8'));
+    await vscode.workspace.fs.writeFile(saveUri, Buffer.from(buildPdfHtml(content, filename.replace('.html', '')), 'utf-8'));
     vscode.window.showInformationMessage(`Markr: exported ${saveUri.fsPath.split('/').pop()}`);
+  }
+
+  private async _handlePrint(): Promise<void> {
+    const rawText = this._document.getText();
+    const { meta, body } = extractFrontmatter(rawText);
+    const fullHtml = buildPdfHtml(
+      (meta ? renderFrontmatter(meta) : '') + applyGithubAlerts(marked.parse(body) as string),
+      this._document.uri.path.split('/').pop()?.replace(/\.md$/i, '') ?? 'document'
+    );
+    const tmpFile = nodePath.join(os.tmpdir(), `markr-print-${Date.now()}.html`);
+    fs.writeFileSync(tmpFile, fullHtml, 'utf-8');
+    vscode.env.openExternal(vscode.Uri.file(tmpFile));
+    vscode.window.setStatusBarMessage('$(check) Markr: opened in browser — use Cmd+P to print', 4000);
   }
 
   private _findChrome(): string | null {
@@ -1395,10 +1454,9 @@ hr { height: 1px; border: 0; background: #e5e0d8; margin: 24px 0; }
   }
 
   private async _handleExportPdf(): Promise<void> {
-    const chromePath = this._findChrome();
-    const rawText    = this._document.getText();
-    const filename   = this._document.uri.path.split('/').pop()?.replace(/\.md$/i, '.pdf') ?? 'export.pdf';
-    const dir        = this._document.uri.with({ path: this._document.uri.path.replace(/[^/]*$/, '') });
+    const rawText  = this._document.getText();
+    const filename = this._document.uri.path.split('/').pop()?.replace(/\.md$/i, '.pdf') ?? 'export.pdf';
+    const dir      = this._document.uri.with({ path: this._document.uri.path.replace(/[^/]*$/, '') });
 
     const saveUri = await vscode.window.showSaveDialog({
       defaultUri: dir.with({ path: dir.path + filename }),
@@ -1406,53 +1464,61 @@ hr { height: 1px; border: 0; background: #e5e0d8; margin: 24px 0; }
     });
     if (!saveUri) return;
 
+    const { meta, body } = extractFrontmatter(rawText);
+    const fullHtml = buildPdfHtml(
+      (meta ? renderFrontmatter(meta) : '') + applyGithubAlerts(marked.parse(body) as string),
+      filename.replace('.pdf', '')
+    );
+
+    const chromePath = this._findChrome();
     if (!chromePath) {
-      vscode.window.showWarningMessage(
-        'Markr: Chrome/Edge not found. Use the Print button → "Save as PDF" in the dialog.'
-      );
-      this._panel.webview.postMessage({ type: 'printForPdf' });
+      // No Chrome — write HTML, open in browser, user can Cmd+P → Save as PDF
+      const tmpFile = nodePath.join(os.tmpdir(), `markr-print-${Date.now()}.html`);
+      fs.writeFileSync(tmpFile, fullHtml, 'utf-8');
+      vscode.env.openExternal(vscode.Uri.file(tmpFile));
+      vscode.window.showInformationMessage('Chrome not found — file opened in browser. Use Cmd+P → Save as PDF.');
       return;
     }
 
-    const { meta, body } = extractFrontmatter(rawText);
-    const htmlContent    = applyGithubAlerts(marked.parse(body) as string);
-    const fullHtml       = buildPdfHtml((meta ? renderFrontmatter(meta) : '') + htmlContent, filename.replace('.pdf', ''));
-
     const tmpFile = nodePath.join(os.tmpdir(), `markr-pdf-${Date.now()}.html`);
     fs.writeFileSync(tmpFile, fullHtml, 'utf-8');
+    const fileUrl = `file://${tmpFile.replace(/\\/g, '/')}`;
 
     const statusHandle = vscode.window.setStatusBarMessage('$(loading~spin) Markr: generating PDF…', 60000);
 
-    await new Promise<void>(resolve => {
-      const args = [
-        '--headless',
-        '--no-sandbox',
-        '--disable-gpu',
-        '--disable-dev-shm-usage',
-        `--print-to-pdf=${saveUri.fsPath}`,
-        '--print-to-pdf-no-header',
-        tmpFile,
-      ];
-      const proc = cp.spawn(chromePath, args);
-      proc.on('close', code => {
-        try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
-        statusHandle.dispose();
-        if (code === 0) {
-          vscode.window.showInformationMessage(`Markr: PDF saved → ${saveUri.fsPath.split('/').pop()}`);
-          vscode.window.setStatusBarMessage('$(check) Markr: PDF exported', 3000);
-        } else {
-          vscode.window.showErrorMessage('Markr: PDF generation failed. Try Print → Save as PDF.');
-          this._panel.webview.postMessage({ type: 'printForPdf' });
-        }
-        resolve();
+    const tryChrome = (headlessFlag: string): Promise<boolean> =>
+      new Promise(resolve => {
+        const args = [
+          headlessFlag,
+          '--no-sandbox',
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+          `--print-to-pdf=${saveUri.fsPath}`,
+          '--no-pdf-header-footer',
+          fileUrl,
+        ];
+        const proc = cp.spawn(chromePath, args);
+        proc.on('close', code => resolve(code === 0));
+        proc.on('error', () => resolve(false));
       });
-      proc.on('error', () => {
-        try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
-        statusHandle.dispose();
-        vscode.window.showErrorMessage('Markr: Could not launch Chrome. Try Print → Save as PDF.');
-        this._panel.webview.postMessage({ type: 'printForPdf' });
-        resolve();
-      });
+
+    await new Promise<void>(async resolve => {
+      let ok = await tryChrome('--headless=new');
+      if (!ok) ok = await tryChrome('--headless');
+
+      try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+      statusHandle.dispose();
+
+      if (ok) {
+        vscode.window.showInformationMessage(`Markr: PDF saved → ${saveUri.fsPath.split('/').pop()}`);
+        vscode.window.setStatusBarMessage('$(check) Markr: PDF exported', 3000);
+      } else {
+        vscode.window.showWarningMessage('Markr: Chrome PDF failed — opening in browser for manual Save as PDF.');
+        const fallback = nodePath.join(os.tmpdir(), `markr-print-${Date.now()}.html`);
+        fs.writeFileSync(fallback, fullHtml, 'utf-8');
+        vscode.env.openExternal(vscode.Uri.file(fallback));
+      }
+      resolve();
     });
   }
 
@@ -1506,9 +1572,19 @@ hr { height: 1px; border: 0; background: #e5e0d8; margin: 24px 0; }
     <div class="sep-v"></div>
     <button id="btn-copy-md"   class="tb-btn" title="Copy Markdown">${ICON.copyMd} MD</button>
     <button id="btn-copy-html" class="tb-btn" title="Copy HTML">${ICON.copyHtml} HTML</button>
-    <button id="btn-export"    class="tb-btn" title="Export to .html file">${ICON.export}</button>
+    <button id="btn-export"    class="tb-btn" title="Export to .html file">${ICON.export} HTML</button>
     <button id="btn-pdf"       class="tb-btn" title="Export to PDF">${ICON.pdf} PDF</button>
-    <button id="btn-print"     class="tb-btn" title="Print">${ICON.print}</button>
+    <button id="btn-print"     class="tb-btn" title="Print / Save as PDF">${ICON.print}</button>
+    <div class="sep-v"></div>
+    <div class="theme-picker-wrap">
+      <button id="btn-theme" class="tb-btn" title="Switch theme">${ICON.palette}</button>
+      <div id="theme-menu">
+        <button class="theme-opt" data-theme="light"><span class="theme-dot" style="background:linear-gradient(135deg,#F97316,#EF4444)"></span>Markr Light</button>
+        <button class="theme-opt" data-theme="dark"><span class="theme-dot" style="background:#2a2520;border:1px solid #48443e"></span>Markr Dark</button>
+        <button class="theme-opt" data-theme="notion"><span class="theme-dot" style="background:#fff;border:1px solid #e9e9e7"></span>Notion</button>
+        <button class="theme-opt" data-theme="linear"><span class="theme-dot" style="background:#5e6ad2"></span>Linear</button>
+      </div>
+    </div>
     <div class="sep-v"></div>
     <button id="btn-focus" class="tb-btn" title="Focus mode">${ICON.focus}</button>
   </div>
