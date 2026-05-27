@@ -2,6 +2,10 @@ import * as vscode from 'vscode';
 import { marked, Renderer } from 'marked';
 import { markedHighlight } from 'marked-highlight';
 import hljs from 'highlight.js';
+import * as cp from 'child_process';
+import * as os from 'os';
+import * as nodePath from 'path';
+import * as fs from 'fs';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -138,6 +142,94 @@ function renderFrontmatter(meta: Record<string, string>): string {
     .map(([k, v]) => `<span class="fm-item"><span class="fm-key">${k}</span><span class="fm-colon">:</span><span class="fm-val">${v}</span></span>`)
     .join('');
   return `<div class="fm-panel">${items}</div>`;
+}
+
+function buildPdfHtml(content: string, title: string): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>${title}</title>
+<style>
+  :root {
+    --hl-kw:#d73a49;--hl-fn:#6f42c1;--hl-lit:#005cc5;--hl-str:#032f62;
+    --hl-bi:#e36209;--hl-cm:#6a737d;--hl-tag:#22863a;--hl-fg:#24292e;
+    --hl-add-bg:#f0fff4;--hl-del-bg:#ffeef0;--hl-add-fg:#22863a;--hl-del-fg:#b31d28;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 48px 48px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 15px; line-height: 1.75; color: #24292e; background: #fff;
+    max-width: 860px; margin: 0 auto;
+  }
+  h1,h2,h3,h4,h5,h6 { font-weight: 700; margin-top: 1.5em; margin-bottom: .4em; line-height: 1.25; page-break-after: avoid; }
+  h1:first-child,h2:first-child,h3:first-child { margin-top: 0; }
+  h1 { font-size: 2em; }
+  h2 { font-size: 1.5em; border-bottom: 1px solid #e5e0d8; padding-bottom: .35em; }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  h5 { font-size: .875em; } h6 { font-size: .85em; color: #6a737d; }
+  p { margin: 0 0 16px; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+  del { text-decoration: line-through; color: #6a737d; }
+  a { color: #0b6e99; text-decoration: none; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 85%; padding: .2em .4em; background: rgba(110,104,96,.12); border-radius: 4px; }
+  pre { position: relative; margin: 0 0 16px; padding: 16px; overflow: auto; font-size: 13px; line-height: 1.65; background: #f6f8fa; border-radius: 6px; border: 1px solid #e1e4e8; page-break-inside: avoid; }
+  pre code { padding: 0; background: transparent; border-radius: 0; font-size: 100%; }
+  blockquote { margin: 0 0 16px; padding: 10px 16px; color: #6a737d; border-left: 3px solid #F97316; background: rgba(249,115,22,.07); border-radius: 0 6px 6px 0; }
+  blockquote > :first-child { margin-top: 0; } blockquote > :last-child { margin-bottom: 0; }
+  ul,ol { margin: 0 0 16px; padding-left: 2em; }
+  ul ul,ul ol,ol ul,ol ol { margin: 0; }
+  li + li { margin-top: .25em; }
+  .task-list-item { list-style-type: none; }
+  .task-list-item input[type="checkbox"] { margin: 0 .5em 0 -1.6em; vertical-align: middle; }
+  img { max-width: 100%; border-radius: 6px; }
+  hr { height: 1px; padding: 0; margin: 24px 0; background: #e1e4e8; border: 0; }
+  table { border-spacing: 0; border-collapse: collapse; display: block; width: max-content; max-width: 100%; overflow: auto; margin-bottom: 16px; border: 1px solid #e1e4e8; border-radius: 6px; page-break-inside: avoid; }
+  th { font-weight: 600; padding: 8px 14px; border-bottom: 2px solid #e1e4e8; text-align: left; background: #f6f8fa; }
+  td { padding: 7px 14px; border-bottom: 1px solid #eaecef; }
+  tr:last-child td { border-bottom: none; }
+  tr:nth-child(2n) td { background: #f6f8fa; }
+  kbd { display: inline-block; padding: 3px 5px; font-family: ui-monospace, monospace; font-size: 11px; background: #fafbfc; border: 1px solid #e1e4e8; border-radius: 3px; }
+  details { display: block; margin-bottom: 16px; }
+  details summary { cursor: pointer; font-weight: 600; }
+  .h-anchor { display: none; }
+  .copy-btn { display: none; }
+  .fm-panel { background: #f6f8fa; border: 1px solid #e1e4e8; border-radius: 8px; padding: 10px 14px; margin-bottom: 24px; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; font-family: ui-monospace, monospace; }
+  .fm-item { display: flex; gap: 3px; }
+  .fm-key { color: #6a737d; } .fm-colon { color: #bbb; } .fm-val { color: #24292e; }
+  .gh-alert { padding: 12px 16px; margin: 0 0 16px; border-radius: 6px; border-left: 4px solid; page-break-inside: avoid; }
+  .gh-alert-title { font-weight: 600; font-size: 13.5px; margin: 0 0 8px; }
+  .gh-alert.note { background: rgba(9,105,218,.07); border-color: #0969da; }
+  .gh-alert.note .gh-alert-title { color: #0969da; }
+  .gh-alert.tip { background: rgba(26,127,55,.07); border-color: #1a7f37; }
+  .gh-alert.tip .gh-alert-title { color: #1a7f37; }
+  .gh-alert.important { background: rgba(130,80,223,.07); border-color: #8250df; }
+  .gh-alert.important .gh-alert-title { color: #8250df; }
+  .gh-alert.warning { background: rgba(154,103,0,.07); border-color: #9a6700; }
+  .gh-alert.warning .gh-alert-title { color: #9a6700; }
+  .gh-alert.caution { background: rgba(207,34,46,.07); border-color: #cf222e; }
+  .gh-alert.caution .gh-alert-title { color: #cf222e; }
+  .hljs { color: var(--hl-fg); background: transparent; }
+  .hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.language_ { color: var(--hl-kw); }
+  .hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_ { color: var(--hl-fn); }
+  .hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-variable,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id { color: var(--hl-lit); }
+  .hljs-regexp,.hljs-string,.hljs-meta .hljs-string { color: var(--hl-str); }
+  .hljs-built_in,.hljs-symbol { color: var(--hl-bi); }
+  .hljs-comment,.hljs-code,.hljs-formula { color: var(--hl-cm); font-style: italic; }
+  .hljs-name,.hljs-quote,.hljs-selector-tag,.hljs-selector-pseudo { color: var(--hl-tag); }
+  .hljs-addition { color: var(--hl-add-fg); background: var(--hl-add-bg); }
+  .hljs-deletion { color: var(--hl-del-fg); background: var(--hl-del-bg); }
+  .hljs-emphasis { font-style: italic; }
+  .hljs-strong { font-weight: bold; }
+  @page { margin: 20mm 18mm; }
+  @media print { body { padding: 0; } }
+</style>
+</head>
+<body>${content}</body>
+</html>`;
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -1003,6 +1095,8 @@ const SCRIPT = /* javascript */`
     vsc.postMessage({ type: 'exportHtml', html });
   });
 
+  qs('#btn-pdf')?.addEventListener('click', () => vsc.postMessage({ type: 'exportPdf' }));
+
   qs('#btn-print')?.addEventListener('click', () => window.print());
 
   let sidebarOpen = true;
@@ -1076,6 +1170,7 @@ const SCRIPT = /* javascript */`
       ta.selectionStart = start + 2; ta.selectionEnd = start + 2;
       ta.focus(); triggerEdit();
     }
+    if (msg.type === 'printForPdf') { window.print(); }
   });
 
   // ── Init ───────────────────────────────────────────────────────────────────
@@ -1101,6 +1196,7 @@ const ICON = {
   ul: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>`,
   ol: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 7h1V4" stroke-linecap="round"/><path d="M3 11h2v1H3v1h2" stroke-linecap="round"/></svg>`,
   export: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
+  pdf: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>`,
 };
 
 // ─── Panel ───────────────────────────────────────────────────────────────────
@@ -1185,6 +1281,7 @@ export class MarkdownPreviewPanel {
       if (msg.type === 'newFile') { vscode.commands.executeCommand('workbench.action.files.newUntitledFile'); }
       if (msg.type === 'pasteImage') { await this._handleImagePaste(msg.base64, msg.ext); }
       if (msg.type === 'exportHtml') { await this._handleExportHtml(msg.html); }
+      if (msg.type === 'exportPdf')  { await this._handleExportPdf(); }
     }, null, this._disposables);
   }
 
@@ -1273,6 +1370,90 @@ hr { height: 1px; border: 0; background: #e5e0d8; margin: 24px 0; }
     vscode.window.showInformationMessage(`Markr: exported ${saveUri.fsPath.split('/').pop()}`);
   }
 
+  private _findChrome(): string | null {
+    const candidates = process.platform === 'win32' ? [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    ] : process.platform === 'darwin' ? [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    ] : [
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium',
+      '/snap/bin/chromium',
+    ];
+    for (const p of candidates) {
+      try { if (fs.existsSync(p)) return p; } catch { /* skip */ }
+    }
+    return null;
+  }
+
+  private async _handleExportPdf(): Promise<void> {
+    const chromePath = this._findChrome();
+    const rawText    = this._document.getText();
+    const filename   = this._document.uri.path.split('/').pop()?.replace(/\.md$/i, '.pdf') ?? 'export.pdf';
+    const dir        = this._document.uri.with({ path: this._document.uri.path.replace(/[^/]*$/, '') });
+
+    const saveUri = await vscode.window.showSaveDialog({
+      defaultUri: dir.with({ path: dir.path + filename }),
+      filters: { 'PDF files': ['pdf'] },
+    });
+    if (!saveUri) return;
+
+    if (!chromePath) {
+      vscode.window.showWarningMessage(
+        'Markr: Chrome/Edge not found. Use the Print button → "Save as PDF" in the dialog.'
+      );
+      this._panel.webview.postMessage({ type: 'printForPdf' });
+      return;
+    }
+
+    const { meta, body } = extractFrontmatter(rawText);
+    const htmlContent    = applyGithubAlerts(marked.parse(body) as string);
+    const fullHtml       = buildPdfHtml((meta ? renderFrontmatter(meta) : '') + htmlContent, filename.replace('.pdf', ''));
+
+    const tmpFile = nodePath.join(os.tmpdir(), `markr-pdf-${Date.now()}.html`);
+    fs.writeFileSync(tmpFile, fullHtml, 'utf-8');
+
+    const statusHandle = vscode.window.setStatusBarMessage('$(loading~spin) Markr: generating PDF…', 60000);
+
+    await new Promise<void>(resolve => {
+      const args = [
+        '--headless',
+        '--no-sandbox',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        `--print-to-pdf=${saveUri.fsPath}`,
+        '--print-to-pdf-no-header',
+        tmpFile,
+      ];
+      const proc = cp.spawn(chromePath, args);
+      proc.on('close', code => {
+        try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+        statusHandle.dispose();
+        if (code === 0) {
+          vscode.window.showInformationMessage(`Markr: PDF saved → ${saveUri.fsPath.split('/').pop()}`);
+          vscode.window.setStatusBarMessage('$(check) Markr: PDF exported', 3000);
+        } else {
+          vscode.window.showErrorMessage('Markr: PDF generation failed. Try Print → Save as PDF.');
+          this._panel.webview.postMessage({ type: 'printForPdf' });
+        }
+        resolve();
+      });
+      proc.on('error', () => {
+        try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
+        statusHandle.dispose();
+        vscode.window.showErrorMessage('Markr: Could not launch Chrome. Try Print → Save as PDF.');
+        this._panel.webview.postMessage({ type: 'printForPdf' });
+        resolve();
+      });
+    });
+  }
+
   private _buildPage(body: string, filename: string, stats: ReturnType<typeof docStats>, text: string, files: FileEntry[]): string {
     const nonce      = getNonce();
     const theme      = vscode.window.activeColorTheme;
@@ -1324,6 +1505,7 @@ hr { height: 1px; border: 0; background: #e5e0d8; margin: 24px 0; }
     <button id="btn-copy-md"   class="tb-btn" title="Copy Markdown">${ICON.copyMd} MD</button>
     <button id="btn-copy-html" class="tb-btn" title="Copy HTML">${ICON.copyHtml} HTML</button>
     <button id="btn-export"    class="tb-btn" title="Export to .html file">${ICON.export}</button>
+    <button id="btn-pdf"       class="tb-btn" title="Export to PDF">${ICON.pdf} PDF</button>
     <button id="btn-print"     class="tb-btn" title="Print">${ICON.print}</button>
     <div class="sep-v"></div>
     <button id="btn-focus" class="tb-btn" title="Focus mode">${ICON.focus}</button>
@@ -1437,7 +1619,8 @@ hr { height: 1px; border: 0; background: #e5e0d8; margin: 24px 0; }
       <div class="sp-row"><span class="sp-desc">Copy raw Markdown</span><div class="sp-keys"><span class="sp-key">MD button</span></div></div>
       <div class="sp-row"><span class="sp-desc">Copy rendered HTML</span><div class="sp-keys"><span class="sp-key">HTML button</span></div></div>
       <div class="sp-row"><span class="sp-desc">Export to .html file</span><div class="sp-keys"><span class="sp-key">↓ button</span></div></div>
-      <div class="sp-row"><span class="sp-desc">Print / PDF</span><div class="sp-keys"><span class="sp-key">Print button</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Export to PDF (needs Chrome)</span><div class="sp-keys"><span class="sp-key">PDF button</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Print / Save as PDF</span><div class="sp-keys"><span class="sp-key">Print button</span></div></div>
       <div class="sp-row"><span class="sp-desc">Focus / reading mode</span><div class="sp-keys"><span class="sp-key">⊡ button</span></div></div>
     </div>
     <div class="sp-section">
