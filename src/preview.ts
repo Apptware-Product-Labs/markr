@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { marked, Renderer } from 'marked';
+import { marked, Renderer, type MarkedExtension } from 'marked';
 import { markedHighlight } from 'marked-highlight';
 import hljs from 'highlight.js';
 import * as cp from 'child_process';
@@ -50,18 +50,17 @@ function aiDocKind(label: string, relPath = ''): string {
 
 // ─── Marked setup ────────────────────────────────────────────────────────────
 
-marked.use(
-  markedHighlight({
+const highlightExtension = markedHighlight({
     langPrefix: 'hljs language-',
     highlight(code, lang) {
       const language = hljs.getLanguage(lang) ? lang : 'plaintext';
       return hljs.highlight(code, { language }).value;
     },
-  })
-);
+  }) as unknown as MarkedExtension;
+marked.use(highlightExtension);
 
 const renderer = new Renderer();
-renderer.heading = function ({ text, depth }) {
+renderer.heading = function (text: string, depth: number) {
   const t  = text ?? '';
   const id = slugify(t);
   return `<h${depth} id="${id}">${t}<a class="h-anchor" href="#${id}" title="Copy link">#</a></h${depth}>\n`;
@@ -1600,9 +1599,14 @@ export class MarkdownPreviewPanel {
       }
       if (msg.type === 'edit') {
         this._editMode = true;
-        const doc = msg.uri
-            ? (await vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri)).catch(() => this._document))
-            : this._document;
+        let doc = this._document;
+        if (msg.uri) {
+          try {
+            doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri));
+          } catch {
+            doc = this._document;
+          }
+        }
         this._document = doc;
         const edit = new vscode.WorkspaceEdit();
         edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), msg.content);
