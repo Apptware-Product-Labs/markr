@@ -686,9 +686,14 @@ body.focus-mode .markdown-body { max-width: 720px; font-size: 16.5px; line-heigh
 
 /* === Scrollbar =============================================================*/
 ::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: var(--sb-track, transparent); }
+::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hv); }
+#sidebar ::-webkit-scrollbar-track,
+#toc-body::-webkit-scrollbar-track { background: var(--bg-panel); }
+#edit-area::-webkit-scrollbar-track  { background: var(--bg); }
+pre::-webkit-scrollbar-track { background: var(--code-bg); }
+pre::-webkit-scrollbar { height: 4px; }
 
 /* === Theme Picker ===========================================================*/
 .theme-picker-wrap { position: relative; }
@@ -843,10 +848,21 @@ const SCRIPT = /* javascript */`
     qsa('.file-item', container).forEach(el => {
       el.addEventListener('click', () => {
         const uri = el.getAttribute('data-uri');
-        if (uri) vsc.postMessage({ type: 'openFile', uri });
+        if (!uri) return;
+        // If already loaded in a tab, switch instantly — no extension round-trip
+        if (tabs.find(t => t.uri === uri)) { switchToTab(uri); return; }
+        vsc.postMessage({ type: 'openFile', uri });
       });
     });
   }
+  // Fast active-indicator update — no DOM rebuild, just toggle a class
+  function updateFileListActive(uri) {
+    filesCache.forEach(f => { f.active = f.uri === uri; });
+    qsa('.file-item', qs('#files-list')).forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-uri') === uri);
+    });
+  }
+
   function fileItemHtml(f) {
     const icon = f.isAiConfig
       ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>'
@@ -973,15 +989,15 @@ const SCRIPT = /* javascript */`
     const start = ta.selectionStart, end = ta.selectionEnd, val = ta.value, sel = val.slice(start, end);
     function wrap(before, after, ph) {
       const inner = sel || ph || '';
-      ta.value = val.slice(0, start) + before + inner + after + val.slice(end);
-      ta.selectionStart = start + before.length; ta.selectionEnd = start + before.length + inner.length;
+      ta.setRangeText(before + inner + after, start, end, 'preserve');
+      ta.setSelectionRange(start + before.length, start + before.length + inner.length);
       ta.focus(); triggerEdit();
     }
     function linePrefix(prefix) {
       const ls = val.lastIndexOf('\\n', start - 1) + 1, line = val.slice(ls, end);
       const clean = line.replace(/^#{1,6}\\s/, '').replace(/^>\\s?/, '').replace(/^-\\s/, '').replace(/^\\d+\\.\\s/, '');
-      ta.value = val.slice(0, ls) + prefix + clean + val.slice(end);
-      ta.selectionStart = ta.selectionEnd = ls + prefix.length + clean.length;
+      ta.setRangeText(prefix + clean, ls, end, 'preserve');
+      ta.setSelectionRange(ls + prefix.length + clean.length, ls + prefix.length + clean.length);
       ta.focus(); triggerEdit();
     }
     switch (action) {
@@ -1001,19 +1017,23 @@ const SCRIPT = /* javascript */`
       case 'task':      return linePrefix('- [ ] ');
       case 'hr': {
         const ins = '\\n\\n---\\n\\n';
-        ta.value = val.slice(0, start) + ins + val.slice(end);
-        ta.selectionStart = ta.selectionEnd = start + ins.length;
+        ta.setRangeText(ins, start, end, 'preserve');
+        ta.setSelectionRange(start + ins.length, start + ins.length);
         ta.focus(); triggerEdit(); break;
       }
       case 'table': {
         const tbl = '\\n| Column 1 | Column 2 | Column 3 |\\n|----------|----------|----------|\\n| Cell     | Cell     | Cell     |\\n';
-        ta.value = val.slice(0, start) + tbl + val.slice(end);
-        ta.selectionStart = ta.selectionEnd = start + tbl.length;
+        ta.setRangeText(tbl, start, end, 'preserve');
+        ta.setSelectionRange(start + tbl.length, start + tbl.length);
         ta.focus(); triggerEdit(); break;
       }
     }
   }
   qsa('.fmt-btn').forEach(btn => { btn.addEventListener('click', () => { const a = btn.getAttribute('data-action'); if (a) applyFormat(a); }); });
+
+  // Undo / Redo
+  qs('#btn-undo')?.addEventListener('click', () => { qs('#edit-area')?.focus(); document.execCommand('undo'); triggerEdit(); });
+  qs('#btn-redo')?.addEventListener('click', () => { qs('#edit-area')?.focus(); document.execCommand('redo'); triggerEdit(); });
 
   // Word wrap toggle
   qs('#btn-wrap')?.addEventListener('click', () => {
@@ -1039,8 +1059,8 @@ const SCRIPT = /* javascript */`
   qs('#edit-area')?.addEventListener('keydown', e => {
     const ta = e.target, start = ta.selectionStart, end = ta.selectionEnd, val = ta.value, mod = e.metaKey || e.ctrlKey;
     if (e.key === 'Tab' && !e.shiftKey) {
-      e.preventDefault(); ta.value = val.slice(0, start) + '  ' + val.slice(end);
-      ta.selectionStart = ta.selectionEnd = start + 2; triggerEdit(); return;
+      e.preventDefault(); ta.setRangeText('  ', start, end, 'preserve');
+      ta.setSelectionRange(start + 2, start + 2); triggerEdit(); return;
     }
     if (mod && e.key === 'b') { e.preventDefault(); applyFormat('bold'); return; }
     if (mod && e.key === 'i') { e.preventDefault(); applyFormat('italic'); return; }
@@ -1059,16 +1079,16 @@ const SCRIPT = /* javascript */`
         const content = line.slice(match[0].length);
         if (!content.trim()) {
           e.preventDefault();
-          ta.value = val.slice(0, ls) + '\\n' + val.slice(start);
-          ta.selectionStart = ta.selectionEnd = ls + 1; triggerEdit(); return;
+          ta.setRangeText('\\n', ls, start, 'preserve');
+          ta.setSelectionRange(ls + 1, ls + 1); triggerEdit(); return;
         }
         e.preventDefault();
         let insert = '';
         if (taskM)      insert = '\\n' + taskM[1] + taskM[2] + ' [ ] ';
         else if (bullM) insert = '\\n' + bullM[1] + bullM[2] + ' ';
         else if (numM)  insert = '\\n' + numM[1] + (parseInt(numM[2]) + 1) + '. ';
-        ta.value = val.slice(0, start) + insert + val.slice(end);
-        ta.selectionStart = ta.selectionEnd = start + insert.length; triggerEdit();
+        ta.setRangeText(insert, start, end, 'preserve');
+        ta.setSelectionRange(start + insert.length, start + insert.length); triggerEdit();
       }
     }
   });
@@ -1272,9 +1292,10 @@ const SCRIPT = /* javascript */`
       if (msg.isAiConfig) { if (!editMode) enterEditMode(); }
       else { if (editMode) exitEditMode(); }
       qs('#scroller').scrollTop = 0;
-      buildTOC(); addCopyButtons(); setupHeadingAnchors(); setupMermaid();
+      buildTOC(); addCopyButtons(); setupHeadingAnchors();
+      if (qs('#scroller .language-mermaid')) setupMermaid();
       renderTabBar();
-      if (msg.files) renderFileList(msg.files);
+      updateFileListActive(msg.uri);
     }
     if (msg.type === 'scrollToHeading') {
       const el = document.getElementById(msg.id); if (!el) return;
@@ -1291,8 +1312,8 @@ const SCRIPT = /* javascript */`
       const ta = qs('#edit-area'); if (!ta) return;
       const start  = ta.selectionStart;
       const insert = '![](' + msg.path + ')';
-      ta.value = ta.value.slice(0, start) + insert + ta.value.slice(start);
-      ta.selectionStart = start + 2; ta.selectionEnd = start + 2;
+      ta.setRangeText(insert, start, start, 'preserve');
+      ta.setSelectionRange(start + 2, start + 2);
       ta.focus(); triggerEdit();
     }
   });
@@ -1356,8 +1377,10 @@ const SCRIPT = /* javascript */`
     if (tab.isAiConfig) { if (!editMode) enterEditMode(); }
     else { if (editMode) exitEditMode(); }
     setTimeout(() => { if (qs('#scroller')) qs('#scroller').scrollTop = tab.scrollTop || 0; }, 40);
-    buildTOC(); addCopyButtons(); setupHeadingAnchors(); setupMermaid();
+    buildTOC(); addCopyButtons(); setupHeadingAnchors();
+    if (qs('#scroller .language-mermaid')) setupMermaid();
     renderTabBar();
+    updateFileListActive(uri);
     vsc.postMessage({ type: 'setActiveDoc', uri });
   }
 
@@ -1397,6 +1420,8 @@ const ICON = {
   export: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
   pdf: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>`,
   palette: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>`,
+  undo: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>`,
+  redo: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>`,
 };
 
 // ─── Panel ───────────────────────────────────────────────────────────────────
@@ -1407,6 +1432,8 @@ export class MarkdownPreviewPanel {
   private _document: vscode.TextDocument;
   private readonly _disposables: vscode.Disposable[] = [];
   private _editMode = false;
+  private _filesCache: FileEntry[] = [];
+  private _filesCacheValid = false;
 
   public static createOrShow(document: vscode.TextDocument): void {
     const column = vscode.window.activeTextEditor ? vscode.ViewColumn.Beside : vscode.ViewColumn.One;
@@ -1440,6 +1467,7 @@ export class MarkdownPreviewPanel {
   public static async refreshFiles(): Promise<void> {
     const p = MarkdownPreviewPanel.currentPanel;
     if (!p) return;
+    p._filesCacheValid = false; // force re-scan when files actually change on disk
     const files = await p._getWorkspaceFiles();
     p._panel.webview.postMessage({ type: 'updateFiles', files });
   }
@@ -1467,6 +1495,7 @@ export class MarkdownPreviewPanel {
         const edit = new vscode.WorkspaceEdit();
         edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), msg.content);
         await vscode.workspace.applyEdit(edit);
+        await vscode.workspace.save(doc.uri);   // write to disk → removes unsaved dot
         const html = applyGithubAlerts(marked.parse(msg.content) as string);
         this._panel.webview.postMessage({ type: 'updateSplitPreview', html });
         this._panel.webview.postMessage({ type: 'saved' });
@@ -1476,14 +1505,14 @@ export class MarkdownPreviewPanel {
         if (msg.mode === 'preview') this._render();
       }
       if (msg.type === 'openFile') {
-        vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri)).then(async doc => {
+        vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri)).then(doc => {
           this._document = doc;
           const rawText = doc.getText();
           const filename = doc.uri.path.split('/').pop() ?? 'untitled';
           const { meta, body } = extractFrontmatter(rawText);
           const rendered = applyGithubAlerts(marked.parse(body) as string);
           const stats = docStats(rawText);
-          const files = await this._getWorkspaceFiles();
+          // No `files` here — webview updates active state from msg.uri (no full list re-render)
           this._panel.webview.postMessage({
             type: 'fileLoaded',
             uri: doc.uri.toString(),
@@ -1495,7 +1524,6 @@ export class MarkdownPreviewPanel {
             statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
             words: stats.words,
             readMins: Math.max(1, Math.ceil(stats.words / 200)),
-            files,
           });
         });
       }
@@ -1526,23 +1554,29 @@ export class MarkdownPreviewPanel {
   }
 
   private async _getWorkspaceFiles(): Promise<FileEntry[]> {
-    try {
-      const uris = await vscode.workspace.findFiles(
-        '**/*.md',
-        '{**/node_modules/**,**/.git/**,**/.vscode/**,**/.next/**,**/out/**,**/dist/**}',
-        200
-      );
-      const currentUri = this._document.uri.toString();
-      return uris
-        .sort((a, b) => vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)))
-        .map(uri => {
-          const relPath = vscode.workspace.asRelativePath(uri);
-          const parts   = relPath.split('/');
-          const label   = parts[parts.length - 1];
-          const dir     = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-          return { label, relPath, uri: uri.toString(), active: uri.toString() === currentUri, dir, isAiConfig: isAiConfig(label) };
-        });
-    } catch { return []; }
+    if (!this._filesCacheValid) {
+      try {
+        const uris = await vscode.workspace.findFiles(
+          '**/*.md',
+          '{**/node_modules/**,**/.git/**,**/.vscode/**,**/.next/**,**/out/**,**/dist/**}',
+          500
+        );
+        this._filesCache = uris
+          .sort((a, b) => vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)))
+          .map(uri => {
+            const relPath = vscode.workspace.asRelativePath(uri);
+            const parts   = relPath.split('/');
+            const label   = parts[parts.length - 1];
+            const dir     = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+            return { label, relPath, uri: uri.toString(), active: false, dir, isAiConfig: isAiConfig(label) };
+          });
+        this._filesCacheValid = true;
+      } catch { this._filesCache = []; }
+    }
+    // Update active flag in-place (no allocation)
+    const currentUri = this._document.uri.toString();
+    this._filesCache.forEach(f => { f.active = f.uri === currentUri; });
+    return this._filesCache;
   }
 
   private async _handleImagePaste(base64: string, ext: string): Promise<void> {
@@ -1752,6 +1786,11 @@ export class MarkdownPreviewPanel {
 
 <!-- Format Toolbar (edit mode) -->
 <div id="fmt-toolbar">
+  <div class="fmt-group">
+    <button class="fmt-btn" id="btn-undo" title="Undo (⌘Z)">${ICON.undo}</button>
+    <button class="fmt-btn" id="btn-redo" title="Redo (⌘⇧Z)">${ICON.redo}</button>
+  </div>
+  <div class="fmt-sep"></div>
   <div class="fmt-group">
     <button class="fmt-btn" data-action="bold"  title="Bold (⌘B)"><b>B</b></button>
     <button class="fmt-btn" data-action="italic" title="Italic (⌘I)"><i>I</i></button>
