@@ -46,14 +46,16 @@ marked.use(
 
 const renderer = new Renderer();
 renderer.heading = function ({ text, depth }) {
-  const id = slugify(text);
-  return `<h${depth} id="${id}">${text}<a class="h-anchor" href="#${id}" title="Copy link">#</a></h${depth}>\n`;
+  const t  = text ?? '';
+  const id = slugify(t);
+  return `<h${depth} id="${id}">${t}<a class="h-anchor" href="#${id}" title="Copy link">#</a></h${depth}>\n`;
 };
 marked.use({ gfm: true, breaks: false, renderer });
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function slugify(text: string): string {
+  if (!text) return '';
   return text
     .toLowerCase()
     .replace(/<[^>]+>/g, '')
