@@ -686,9 +686,14 @@ body.focus-mode .markdown-body { max-width: 720px; font-size: 16.5px; line-heigh
 
 /* === Scrollbar =============================================================*/
 ::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: var(--sb-track, transparent); }
+::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hv); }
+#sidebar ::-webkit-scrollbar-track,
+#toc-body::-webkit-scrollbar-track { background: var(--bg-panel); }
+#edit-area::-webkit-scrollbar-track  { background: var(--bg); }
+pre::-webkit-scrollbar-track { background: var(--code-bg); }
+pre::-webkit-scrollbar { height: 4px; }
 
 /* === Theme Picker ===========================================================*/
 .theme-picker-wrap { position: relative; }
