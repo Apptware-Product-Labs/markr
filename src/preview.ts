@@ -315,6 +315,16 @@ const CSS = /* css */`
 [data-m="notion"] .tab.active {
   color: var(--text); border-color: transparent; background: var(--accent-bg);
 }
+[data-m="notion"] .tb-btn {
+  color: var(--text); background: rgba(55,53,47,0.06); border-color: rgba(55,53,47,0.18);
+}
+[data-m="notion"] .tb-btn:hover {
+  background: rgba(55,53,47,0.1); border-color: rgba(55,53,47,0.24);
+  box-shadow: inset 0 0 0 1px rgba(55,53,47,0.08);
+}
+[data-m="notion"] .tb-btn.on {
+  color: var(--text); background: rgba(55,53,47,0.1); border-color: rgba(55,53,47,0.2);
+}
 [data-m="notion"] .markdown-body blockquote {
   color: var(--text-2); background: transparent; border-left-color: rgba(55,53,47,0.24);
 }
@@ -497,6 +507,9 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 #sidebar.hidden { width: 0; min-width: 0; opacity: 0; overflow: hidden; }
 .sb-section { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0; }
 .sb-section.flex-fill { flex: 1; overflow: hidden; }
+#sec-files { flex: 0 1 52%; min-height: 138px; overflow: hidden; }
+#sec-toc { flex: 1 1 48%; min-height: 150px; overflow: hidden; }
+#sidebar.no-toc #sec-files { flex: 1 1 auto; }
 .sb-header {
   display: flex; align-items: center; padding: 0 10px 0 12px; height: 32px;
   gap: 4px; flex-shrink: 0; cursor: pointer; user-select: none;
@@ -999,7 +1012,15 @@ const SCRIPT = /* javascript */`
     const hs = qsa('.markdown-body h1,h2,h3,h4,h5,h6');
     const body = qs('#toc-body');
     if (!body) return;
-    if (!hs.length) { const s = qs('#sec-toc'); if (s) s.style.display = 'none'; return; }
+    const sidebar = qs('#sidebar');
+    const section = qs('#sec-toc');
+    if (!hs.length) {
+      if (section) section.style.display = 'none';
+      sidebar?.classList.add('no-toc');
+      return;
+    }
+    if (section) section.style.display = '';
+    sidebar?.classList.remove('no-toc');
     body.innerHTML = '';
     hs.forEach(h => {
       const li = document.createElement('li');
@@ -1048,10 +1069,22 @@ const SCRIPT = /* javascript */`
   }
 
   // ── Scroll sync editor→preview ─────────────────────────────────────────────
+  let splitScrollSyncing = false;
   qs('#edit-area')?.addEventListener('scroll', () => {
+    if (splitScrollSyncing) return;
     const ta = qs('#edit-area'), sp = qs('#split-preview'); if (!ta || !sp) return;
     const max = ta.scrollHeight - ta.clientHeight; if (max <= 0) return;
+    splitScrollSyncing = true;
     sp.scrollTop = (ta.scrollTop / max) * (sp.scrollHeight - sp.clientHeight);
+    requestAnimationFrame(() => { splitScrollSyncing = false; });
+  });
+  qs('#split-preview')?.addEventListener('scroll', () => {
+    if (splitScrollSyncing) return;
+    const ta = qs('#edit-area'), sp = qs('#split-preview'); if (!ta || !sp) return;
+    const max = sp.scrollHeight - sp.clientHeight; if (max <= 0) return;
+    splitScrollSyncing = true;
+    ta.scrollTop = (sp.scrollTop / max) * (ta.scrollHeight - ta.clientHeight);
+    requestAnimationFrame(() => { splitScrollSyncing = false; });
   });
 
   // ── Split resize / preview focus ───────────────────────────────────────────
@@ -1484,6 +1517,12 @@ const SCRIPT = /* javascript */`
     }
     if (msg.type === 'updateSplitPreview') {
       const sp = qs('#split-preview .markdown-body'); if (sp) sp.innerHTML = msg.html;
+      if (!editMode) {
+        const body = qs('#scroller .markdown-body');
+        if (body) body.innerHTML = msg.html;
+        buildTOC(); addCopyButtons(); setupHeadingAnchors();
+        if (qs('#scroller .language-mermaid')) setupMermaid();
+      }
     }
     if (msg.type === 'saved') { showSaved(); }
     if (msg.type === 'updateFiles') {
@@ -1707,7 +1746,6 @@ export class MarkdownPreviewPanel {
       }
       if (msg.type === 'modeChange') {
         this._editMode = msg.mode === 'edit';
-        if (msg.mode === 'preview') this._render();
       }
       if (msg.type === 'openFile') {
         vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri)).then(doc => {
@@ -2064,7 +2102,7 @@ export class MarkdownPreviewPanel {
 <!-- Layout -->
 <div id="outer-layout">
   <div id="sidebar">
-    <div class="sb-section">
+    <div class="sb-section" id="sec-files">
       <div class="sb-header">
         <span class="sb-title">Notebooks</span>
         <button class="sb-action" id="btn-new-file" title="New file">+</button>
