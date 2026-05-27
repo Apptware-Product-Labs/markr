@@ -79,9 +79,9 @@ function tokenEstimate(chars: number): string {
 }
 
 function docStats(text: string) {
-  const words     = wordCount(text);
-  const chars     = text.length;
-  const headings  = (text.match(/^#{1,6}\s/gm) ?? []).length;
+  const words      = wordCount(text);
+  const chars      = text.length;
+  const headings   = (text.match(/^#{1,6}\s/gm) ?? []).length;
   const codeBlocks = Math.floor(((text.match(/^```/gm) ?? []).length) / 2);
   return { words, chars, headings, codeBlocks };
 }
@@ -98,6 +98,46 @@ function nearestHeading(text: string, line: number): string | null {
     if (m) return slugify(m[1]);
   }
   return null;
+}
+
+// Transforms > [!NOTE/WARNING/TIP/IMPORTANT/CAUTION] blockquotes into styled alerts
+function applyGithubAlerts(html: string): string {
+  const cfg: Record<string, [string, string]> = {
+    NOTE:      ['ℹ',  'Note'],
+    TIP:       ['◆',  'Tip'],
+    IMPORTANT: ['★',  'Important'],
+    WARNING:   ['⚠',  'Warning'],
+    CAUTION:   ['⛔', 'Caution'],
+  };
+  return html.replace(
+    /<blockquote>\n?<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\n?([\s\S]*?)<\/blockquote>/g,
+    (_, type: string, body: string) => {
+      const [icon, label] = cfg[type];
+      return `<div class="gh-alert ${type.toLowerCase()}"><p class="gh-alert-title">${icon} ${label}</p><p>${body}</div>`;
+    }
+  );
+}
+
+// Parses YAML frontmatter at start of document
+function extractFrontmatter(text: string): { meta: Record<string, string> | null; body: string } {
+  const m = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  if (!m) return { meta: null, body: text };
+  const meta: Record<string, string> = {};
+  m[1].split('\n').forEach(line => {
+    const colon = line.indexOf(':');
+    if (colon < 1) return;
+    const key = line.slice(0, colon).trim();
+    const val = line.slice(colon + 1).trim().replace(/^["']|["']$/g, '');
+    if (key) meta[key] = val;
+  });
+  return { meta, body: m[2] };
+}
+
+function renderFrontmatter(meta: Record<string, string>): string {
+  const items = Object.entries(meta)
+    .map(([k, v]) => `<span class="fm-item"><span class="fm-key">${k}</span><span class="fm-colon">:</span><span class="fm-val">${v}</span></span>`)
+    .join('');
+  return `<div class="fm-panel">${items}</div>`;
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -119,29 +159,18 @@ const CSS = /* css */`
   --border:       #e5e0d8;
   --border-faint: #ede9e2;
   --code-bg:      #ede9e2;
-  --quote-brd:    #d7d2c8;
   --link:         #0b6e99;
   --link-hv:      #0550ae;
   --success:      #0f7b6c;
   --fg:           #1c1a17;
   --fg-muted:     #888178;
   --code-inline:  rgba(110,104,96,0.13);
-  --code-block:   #ede9e2;
   --hr:           #e5e0d8;
   --table-alt:    #f3f0eb;
   --brd-muted:    #e5e0d8;
-  --hl:           #1c1a17;
-  --hl-kw:        #d73a49;
-  --hl-fn:        #6f42c1;
-  --hl-lit:       #005cc5;
-  --hl-str:       #032f62;
-  --hl-bi:        #e36209;
-  --hl-cm:        #888178;
-  --hl-tag:       #22863a;
-  --hl-add-bg:    #f0fff4;
-  --hl-del-bg:    #ffeef0;
-  --hl-add-fg:    #22863a;
-  --hl-del-fg:    #b31d28;
+  --hl: #1c1a17; --hl-kw: #d73a49; --hl-fn: #6f42c1; --hl-lit: #005cc5;
+  --hl-str: #032f62; --hl-bi: #e36209; --hl-cm: #888178; --hl-tag: #22863a;
+  --hl-add-bg: #f0fff4; --hl-del-bg: #ffeef0; --hl-add-fg: #22863a; --hl-del-fg: #b31d28;
 }
 
 /* === Tokens (Dark) =========================================================*/
@@ -160,29 +189,19 @@ const CSS = /* css */`
   --border:       #2e2a26;
   --border-faint: #232018;
   --code-bg:      #1e1c18;
-  --quote-brd:    #3b3630;
   --link:         #61afef;
   --link-hv:      #7ec8e3;
   --success:      #4dac97;
   --fg:           #e8e3dc;
   --fg-muted:     #7e7970;
   --code-inline:  rgba(140,134,124,0.18);
-  --code-block:   #1e1c18;
   --hr:           #2e2a26;
   --table-alt:    #1e1c18;
   --brd-muted:    #2e2a26;
-  --hl:           #e8e3dc;
-  --hl-kw:        #ff7b72;
-  --hl-fn:        #d2a8ff;
-  --hl-lit:       #79c0ff;
-  --hl-str:       #a5d6ff;
-  --hl-bi:        #ffa657;
-  --hl-cm:        #7e7970;
-  --hl-tag:       #7ee787;
-  --hl-add-bg:    rgba(46,160,67,0.15);
-  --hl-del-bg:    rgba(248,81,73,0.15);
-  --hl-add-fg:    #aff5b4;
-  --hl-del-fg:    #ffdcd7;
+  --hl: #e8e3dc; --hl-kw: #ff7b72; --hl-fn: #d2a8ff; --hl-lit: #79c0ff;
+  --hl-str: #a5d6ff; --hl-bi: #ffa657; --hl-cm: #7e7970; --hl-tag: #7ee787;
+  --hl-add-bg: rgba(46,160,67,0.15); --hl-del-bg: rgba(248,81,73,0.15);
+  --hl-add-fg: #aff5b4; --hl-del-fg: #ffdcd7;
 }
 
 /* === Reset =================================================================*/
@@ -190,119 +209,60 @@ const CSS = /* css */`
 html { scroll-behavior: smooth; }
 body {
   margin: 0; padding: 0;
-  background: var(--bg);
-  color: var(--text);
+  background: var(--bg); color: var(--text);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  font-size: 15px;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-  overflow: hidden;
+  font-size: 15px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased; overflow: hidden;
 }
 
 /* === Main Toolbar ==========================================================*/
 #toolbar {
-  position: fixed;
-  inset: 0 0 auto 0;
-  height: 42px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  position: fixed; inset: 0 0 auto 0; height: 42px;
+  display: flex; align-items: center; justify-content: space-between;
   padding: 0 8px;
   background: var(--vscode-editor-background, var(--bg));
-  border-bottom: 1px solid var(--border);
-  z-index: 300;
-  gap: 4px;
-  user-select: none;
+  border-bottom: 1px solid var(--border); z-index: 300; gap: 4px; user-select: none;
 }
 .tl { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
 .tr { display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
-
 .logo-mark {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: -0.3px;
-  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-weight: 700; font-size: 13px; letter-spacing: -0.3px; white-space: nowrap;
   background: linear-gradient(120deg, #F97316 0%, #EF4444 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  flex-shrink: 0;
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; flex-shrink: 0;
 }
 .logo-mark svg { flex-shrink: 0; filter: none; -webkit-text-fill-color: initial; }
-
 .sep-dot { color: var(--border); font-size: 16px; flex-shrink: 0; line-height: 1; }
 .fname {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 11.5px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 200px;
+  font-size: 11.5px; color: var(--text-muted); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 200px;
 }
-/* AI config badge next to filename */
 .ai-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 1px solid var(--accent);
-  border-radius: 3px;
-  padding: 1px 4px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  opacity: 0.85;
+  display: inline-flex; align-items: center; gap: 2px; font-size: 9.5px;
+  font-weight: 700; letter-spacing: 0.05em; color: var(--accent);
+  background: var(--accent-bg); border: 1px solid var(--accent);
+  border-radius: 3px; padding: 1px 4px; white-space: nowrap; flex-shrink: 0; opacity: 0.85;
 }
-
 .stats {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 11px;
-  color: var(--text-muted);
-  white-space: nowrap;
-  padding: 0 2px;
-  cursor: default;
+  font-size: 11px; color: var(--text-muted); white-space: nowrap; padding: 0 2px; cursor: default;
 }
-.stats-highlight { color: var(--accent); }
-
-/* Save status indicator */
+.stats-accent { color: var(--accent); }
 .save-status {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 11px;
-  color: var(--success);
-  opacity: 0;
-  transition: opacity 0.25s;
-  white-space: nowrap;
-  flex-shrink: 0;
+  font-size: 11px; color: var(--success); opacity: 0; transition: opacity 0.25s;
+  white-space: nowrap; flex-shrink: 0;
 }
 .save-status.visible { opacity: 1; }
 .save-status.saving { color: var(--text-muted); opacity: 1; }
-
 .sep-v { width: 1px; height: 16px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
-
 .tb-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 7px;
-  border: none;
-  border-radius: 4px;
-  font-size: 11.5px;
-  font-family: inherit;
-  cursor: pointer;
-  color: var(--vscode-foreground, var(--text));
-  background: transparent;
-  white-space: nowrap;
-  transition: background 0.1s, color 0.1s;
-  line-height: 1;
-  height: 26px;
-  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px;
+  border: none; border-radius: 4px; font-size: 11.5px; font-family: inherit;
+  cursor: pointer; color: var(--vscode-foreground, var(--text)); background: transparent;
+  white-space: nowrap; transition: background 0.1s, color 0.1s; line-height: 1; height: 26px; flex-shrink: 0;
 }
 .tb-btn:hover { background: var(--vscode-toolbar-hoverBackground, var(--bg-hover)); }
 .tb-btn.on { background: var(--accent-bg); color: var(--accent); }
@@ -312,243 +272,204 @@ body {
 
 /* === Format Toolbar ========================================================*/
 #fmt-toolbar {
-  position: fixed;
-  inset: 42px 0 auto 0;
-  height: 36px;
-  display: none;
-  align-items: center;
-  padding: 0 8px;
-  gap: 1px;
-  background: var(--bg-panel);
-  border-bottom: 1px solid var(--border);
-  z-index: 290;
-  overflow-x: auto;
-  overflow-y: hidden;
+  position: fixed; inset: 42px 0 auto 0; height: 36px; display: none;
+  align-items: center; padding: 0 8px; gap: 1px;
+  background: var(--bg-panel); border-bottom: 1px solid var(--border); z-index: 290;
+  overflow-x: auto; overflow-y: hidden;
 }
 body.edit-mode #fmt-toolbar { display: flex; }
-
 .fmt-group { display: flex; align-items: center; gap: 1px; }
 .fmt-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
-
 .fmt-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 26px;
-  padding: 0 5px;
-  border: none;
-  border-radius: 4px;
-  font-size: 11.5px;
-  font-family: inherit;
-  cursor: pointer;
-  color: var(--text-muted);
-  background: transparent;
-  transition: background 0.1s, color 0.1s;
-  white-space: nowrap;
-  flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; height: 26px; padding: 0 5px; border: none; border-radius: 4px;
+  font-size: 11.5px; font-family: inherit; cursor: pointer;
+  color: var(--text-muted); background: transparent;
+  transition: background 0.1s, color 0.1s; white-space: nowrap; flex-shrink: 0;
 }
 .fmt-btn:hover { background: var(--bg-hover); color: var(--text); }
+.fmt-btn.on { background: var(--accent-bg); color: var(--accent); }
 .fmt-btn b { font-weight: 800; font-size: 13px; }
 .fmt-btn i { font-style: italic; font-size: 13px; }
 .fmt-btn s { font-size: 12px; }
 .fmt-btn.h-btn { font-family: ui-monospace, monospace; font-size: 11px; font-weight: 700; letter-spacing: -0.5px; }
 .fmt-btn svg { flex-shrink: 0; }
 
-/* === Outer layout ==========================================================*/
-#outer-layout {
-  display: flex;
-  margin-top: 42px;
-  height: calc(100vh - 42px);
-  overflow: hidden;
-}
-body.edit-mode #outer-layout {
-  margin-top: 78px;
-  height: calc(100vh - 78px);
-}
+/* === Layout ================================================================*/
+#outer-layout { display: flex; margin-top: 42px; height: calc(100vh - 42px); overflow: hidden; }
+body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 
 /* === Sidebar ===============================================================*/
 #sidebar {
-  width: 240px;
-  min-width: 240px;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-panel);
-  border-right: 1px solid var(--border);
-  overflow: hidden;
-  transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease;
-  flex-shrink: 0;
+  width: 240px; min-width: 240px; display: flex; flex-direction: column;
+  background: var(--bg-panel); border-right: 1px solid var(--border);
+  overflow: hidden; transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease; flex-shrink: 0;
 }
 #sidebar.hidden { width: 0; min-width: 0; opacity: 0; overflow: hidden; }
-
-.sb-section {
-  display: flex;
-  flex-direction: column;
-  border-bottom: 1px solid var(--border);
-  min-height: 0;
-}
+.sb-section { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0; }
 .sb-section.flex-fill { flex: 1; overflow: hidden; }
-
 .sb-header {
-  display: flex;
-  align-items: center;
-  padding: 0 10px 0 12px;
-  height: 32px;
-  gap: 4px;
-  flex-shrink: 0;
-  cursor: pointer;
-  user-select: none;
+  display: flex; align-items: center; padding: 0 10px 0 12px; height: 32px;
+  gap: 4px; flex-shrink: 0; cursor: pointer; user-select: none;
 }
 .sb-header:hover { background: var(--bg-hover); }
-.sb-title {
-  flex: 1;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
+.sb-title { flex: 1; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); white-space: nowrap; }
 .sb-action {
-  width: 20px; height: 20px;
-  display: flex; align-items: center; justify-content: center;
-  border: none; border-radius: 3px;
-  font-size: 16px; line-height: 1;
-  color: var(--text-muted);
-  background: transparent;
-  cursor: pointer;
-  transition: background 0.1s, color 0.1s;
-  flex-shrink: 0;
+  width: 20px; height: 20px; display: flex; align-items: center; justify-content: center;
+  border: none; border-radius: 3px; font-size: 16px; line-height: 1;
+  color: var(--text-muted); background: transparent; cursor: pointer; transition: background 0.1s, color 0.1s; flex-shrink: 0;
 }
 .sb-action:hover { background: var(--bg-hover); color: var(--accent); }
-.sb-chevron {
-  width: 16px; height: 16px;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--text-faint);
-  transition: transform 0.15s;
-  flex-shrink: 0;
-}
+.sb-chevron { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; color: var(--text-faint); transition: transform 0.15s; flex-shrink: 0; }
 .sb-section.collapsed .sb-chevron { transform: rotate(-90deg); }
 .sb-body { overflow-y: auto; overflow-x: hidden; padding: 2px 0 8px; }
 .sb-section.collapsed .sb-body { display: none; }
-
-/* AI section in sidebar */
-.sb-ai-label {
-  padding: 6px 12px 2px;
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--accent);
-  opacity: 0.7;
-  font-family: ui-monospace, monospace;
-}
-
-/* File items */
-.file-dir {
-  padding: 6px 12px 2px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.sb-ai-label { padding: 6px 12px 2px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); opacity: 0.7; font-family: ui-monospace, monospace; }
+.file-dir { padding: 6px 12px 2px; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); font-family: ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .file-item {
-  display: flex;
-  align-items: center;
-  padding: 4px 10px 4px 12px;
-  gap: 6px;
-  font-size: 12px;
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-left: 2px solid transparent;
+  display: flex; align-items: center; padding: 4px 10px 4px 12px; gap: 6px;
+  font-size: 12px; font-family: ui-monospace, monospace; color: var(--text-muted);
+  cursor: pointer; border-left: 2px solid transparent;
   transition: background 0.1s, color 0.1s, border-color 0.1s;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  user-select: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: none;
 }
 .file-item:hover { background: var(--bg-hover); color: var(--text); }
-.file-item.active {
-  color: var(--accent);
-  border-left-color: var(--accent);
-  background: var(--accent-bg);
-}
+.file-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-bg); }
 .file-item.ai svg { color: var(--accent); opacity: 0.8; }
 .file-item svg { flex-shrink: 0; opacity: 0.45; }
 .file-item.active svg { opacity: 1; }
 .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* TOC in sidebar */
 .toc-item { list-style: none; margin: 0; padding: 0; }
 .toc-item a {
-  display: block;
-  padding: 3px 12px 3px 10px;
-  color: var(--text-muted);
-  text-decoration: none;
-  border-left: 2px solid transparent;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: color 0.1s, background 0.1s, border-color 0.1s;
-  line-height: 1.5;
-  font-size: 12.5px;
+  display: block; padding: 3px 12px 3px 10px; color: var(--text-muted); text-decoration: none;
+  border-left: 2px solid transparent; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: color 0.1s, background 0.1s, border-color 0.1s; line-height: 1.5; font-size: 12.5px;
 }
 .toc-item a:hover { color: var(--text); background: var(--bg-hover); }
 .toc-item a.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-bg); }
-.toc-item.h1 a { padding-left: 10px; font-weight: 600; font-size: 12.5px; }
+.toc-item.h1 a { padding-left: 10px; font-weight: 600; }
 .toc-item.h2 a { padding-left: 18px; }
 .toc-item.h3 a { padding-left: 28px; font-size: 12px; }
 .toc-item.h4 a { padding-left: 36px; font-size: 11.5px; }
 .toc-item.h5 a, .toc-item.h6 a { padding-left: 44px; font-size: 11px; }
 
-/* === Main column ===========================================================*/
+/* === Main / Edit ===========================================================*/
 #main-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 #main { flex: 1; display: flex; overflow: hidden; }
 #scroller { flex: 1; overflow-y: auto; overflow-x: hidden; }
-
-/* === Edit area =============================================================*/
 #edit-area, #split-preview { display: none; }
-
 body.edit-mode #scroller { display: none; }
 body.edit-mode #edit-area {
-  display: block;
-  flex: 1;
-  padding: 24px 28px;
+  display: block; flex: 1; padding: 24px 28px;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 13.5px;
-  line-height: 1.8;
-  color: var(--text);
-  background: var(--bg);
-  border: none;
-  border-right: 1px solid var(--border);
-  outline: none;
-  resize: none;
-  overflow-y: auto;
-  tab-size: 2;
-  caret-color: var(--accent);
+  font-size: 13.5px; line-height: 1.8; color: var(--text); background: var(--bg);
+  border: none; border-right: 1px solid var(--border); outline: none; resize: none;
+  overflow-y: auto; tab-size: 2; caret-color: var(--accent); white-space: pre-wrap;
 }
 body.edit-mode #split-preview { display: block; flex: 1; overflow-y: auto; }
 
-/* === Markdown body =========================================================*/
-.markdown-body {
-  max-width: 780px;
-  margin: 0 auto;
-  padding: 32px 36px 100px;
-  word-wrap: break-word;
+/* === Frontmatter ============================================================*/
+.fm-panel {
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 24px; display: flex; flex-wrap: wrap; gap: 4px 16px;
+  font-size: 12px; font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
+.fm-item { display: flex; gap: 3px; }
+.fm-key { color: var(--text-muted); }
+.fm-colon { color: var(--text-faint); }
+.fm-val { color: var(--text); }
 
-/* Headings */
+/* === GitHub Alerts =========================================================*/
+.gh-alert { padding: 12px 16px; margin: 0 0 16px; border-radius: 6px; border-left: 4px solid; }
+.gh-alert-title { font-weight: 600; font-size: 13.5px; margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+.gh-alert p { color: var(--text); margin: 0 0 8px; }
+.gh-alert p:last-child { margin-bottom: 0; }
+.gh-alert.note      { background: rgba(9,105,218,.07);  border-color: #0969da; }
+.gh-alert.note .gh-alert-title { color: #0969da; }
+.gh-alert.tip       { background: rgba(26,127,55,.07);  border-color: #1a7f37; }
+.gh-alert.tip .gh-alert-title { color: #1a7f37; }
+.gh-alert.important { background: rgba(130,80,223,.07); border-color: #8250df; }
+.gh-alert.important .gh-alert-title { color: #8250df; }
+.gh-alert.warning   { background: rgba(154,103,0,.07);  border-color: #9a6700; }
+.gh-alert.warning .gh-alert-title { color: #9a6700; }
+.gh-alert.caution   { background: rgba(207,34,46,.07);  border-color: #cf222e; }
+.gh-alert.caution .gh-alert-title { color: #cf222e; }
+[data-m="dark"] .gh-alert.note      { background: rgba(31,111,235,.12);  border-color: #1f6feb; }
+[data-m="dark"] .gh-alert.note .gh-alert-title { color: #58a6ff; }
+[data-m="dark"] .gh-alert.tip       { background: rgba(63,185,80,.12);   border-color: #3fb950; }
+[data-m="dark"] .gh-alert.tip .gh-alert-title { color: #3fb950; }
+[data-m="dark"] .gh-alert.important { background: rgba(163,113,247,.12); border-color: #a371f7; }
+[data-m="dark"] .gh-alert.important .gh-alert-title { color: #a371f7; }
+[data-m="dark"] .gh-alert.warning   { background: rgba(210,153,34,.12);  border-color: #d29922; }
+[data-m="dark"] .gh-alert.warning .gh-alert-title { color: #d29922; }
+[data-m="dark"] .gh-alert.caution   { background: rgba(248,81,73,.12);   border-color: #f85149; }
+[data-m="dark"] .gh-alert.caution .gh-alert-title { color: #f85149; }
+
+/* === Quick Open (Cmd+K) ====================================================*/
+#quick-open {
+  position: fixed; inset: 0; z-index: 600; display: none;
+  align-items: flex-start; justify-content: center; padding-top: 72px;
+}
+#quick-open.open { display: flex; }
+.qo-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.38); backdrop-filter: blur(3px); }
+.qo-panel {
+  position: relative; width: 520px; max-height: 400px;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.32); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+#qo-input {
+  width: 100%; padding: 14px 16px; font-size: 13.5px; font-family: inherit;
+  border: none; border-bottom: 1px solid var(--border);
+  background: transparent; color: var(--text); outline: none;
+}
+#qo-input::placeholder { color: var(--text-faint); }
+.qo-hint {
+  padding: 6px 16px 0; font-size: 10.5px; color: var(--text-faint);
+  font-family: ui-monospace, monospace;
+}
+.qo-results { overflow-y: auto; padding: 6px; flex: 1; }
+.qo-item {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+  border-radius: 6px; cursor: pointer; color: var(--text-muted);
+  font-size: 12px; font-family: ui-monospace, monospace; transition: background 0.08s;
+}
+.qo-item:hover, .qo-item.selected { background: var(--accent-bg); color: var(--text); }
+.qo-item.ai { }
+.qo-item.ai .qo-name, .qo-item.selected .qo-name { color: var(--text); }
+.qo-name { font-weight: 500; }
+.qo-path { opacity: 0.55; font-size: 11px; flex: 1; text-align: right; }
+.qo-empty { padding: 24px; text-align: center; color: var(--text-faint); font-size: 13px; }
+
+/* === Keyboard Shortcuts Panel ==============================================*/
+#shortcuts-panel {
+  position: fixed; inset: 0; z-index: 600; display: none;
+  align-items: center; justify-content: center;
+}
+#shortcuts-panel.open { display: flex; }
+.sp-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(3px); }
+.sp-card {
+  position: relative; width: 540px; max-height: 72vh;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.32); overflow-y: auto; padding: 24px 28px;
+}
+.sp-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.sp-title { font-size: 15px; font-weight: 700; margin: 0; }
+.sp-close { border: none; background: transparent; cursor: pointer; color: var(--text-muted); font-size: 18px; line-height: 1; padding: 2px 6px; border-radius: 4px; }
+.sp-close:hover { background: var(--bg-hover); color: var(--text); }
+.sp-section { margin-bottom: 18px; }
+.sp-section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin: 0 0 8px; }
+.sp-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border-faint); font-size: 13px; }
+.sp-row:last-child { border-bottom: none; }
+.sp-keys { display: flex; gap: 3px; }
+.sp-key { font-family: ui-monospace, monospace; font-size: 11px; padding: 2px 6px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 4px; color: var(--text); white-space: nowrap; }
+.sp-desc { color: var(--text-muted); }
+
+/* === Markdown body =========================================================*/
+.markdown-body { max-width: 780px; margin: 0 auto; padding: 32px 36px 100px; word-wrap: break-word; }
 .markdown-body h1,.markdown-body h2,.markdown-body h3,
 .markdown-body h4,.markdown-body h5,.markdown-body h6 {
-  margin-top: 1.5em; margin-bottom: .4em;
-  font-weight: 700; line-height: 1.25; color: var(--text);
-  position: relative;
+  margin-top: 1.5em; margin-bottom: .4em; font-weight: 700; line-height: 1.25; color: var(--text); position: relative;
 }
 .markdown-body h1:first-child,.markdown-body h2:first-child,.markdown-body h3:first-child { margin-top: 0; }
 .markdown-body h1 { font-size: 2em; }
@@ -557,175 +478,77 @@ body.edit-mode #split-preview { display: block; flex: 1; overflow-y: auto; }
 .markdown-body h4 { font-size: 1em; }
 .markdown-body h5 { font-size: .875em; }
 .markdown-body h6 { font-size: .85em; color: var(--text-muted); }
-
 .h-anchor {
-  opacity: 0;
-  font-size: .65em;
-  font-weight: 400;
-  margin-left: 8px;
-  color: var(--text-faint);
-  text-decoration: none;
-  transition: opacity 0.15s, color 0.15s;
-  vertical-align: middle;
+  opacity: 0; font-size: .65em; font-weight: 400; margin-left: 8px;
+  color: var(--text-faint); text-decoration: none; transition: opacity 0.15s; vertical-align: middle;
 }
 h1:hover .h-anchor,h2:hover .h-anchor,h3:hover .h-anchor,
 h4:hover .h-anchor,h5:hover .h-anchor,h6:hover .h-anchor { opacity: 1; }
 .h-anchor:hover { color: var(--accent); }
-
-/* Body text */
 .markdown-body p { margin-top: 0; margin-bottom: 16px; line-height: 1.75; }
 .markdown-body strong { font-weight: 600; }
 .markdown-body em { font-style: italic; }
 .markdown-body del { text-decoration: line-through; color: var(--text-muted); }
-
-/* Links */
 .markdown-body a { color: var(--link); text-decoration: none; }
 .markdown-body a:hover { color: var(--link-hv); text-decoration: underline; }
-
-/* Inline code */
-.markdown-body code {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 85%;
-  padding: .2em .4em;
-  background: var(--code-inline);
-  border-radius: 4px;
-}
-
-/* Code blocks */
-.markdown-body pre {
-  position: relative;
-  margin: 0 0 16px;
-  padding: 16px;
-  overflow: auto;
-  font-size: 84%;
-  line-height: 1.65;
-  background: var(--code-bg);
-  border-radius: 8px;
-  border: 1px solid var(--border);
-}
-.markdown-body pre code {
-  padding: 0; margin: 0; background: transparent; border-radius: 0;
-  font-size: 100%; white-space: pre; word-break: normal; overflow-wrap: normal; color: inherit;
-}
-
-/* Copy button */
+.markdown-body code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 85%; padding: .2em .4em; background: var(--code-inline); border-radius: 4px; }
+.markdown-body pre { position: relative; margin: 0 0 16px; padding: 16px; overflow: auto; font-size: 84%; line-height: 1.65; background: var(--code-bg); border-radius: 8px; border: 1px solid var(--border); }
+.markdown-body pre code { padding: 0; margin: 0; background: transparent; border-radius: 0; font-size: 100%; white-space: pre; word-break: normal; overflow-wrap: normal; color: inherit; }
 .copy-btn {
-  position: absolute; top: 7px; right: 7px;
-  padding: 3px 6px;
-  font-size: 11px; font-family: inherit;
-  border: none; border-radius: 4px;
-  background: transparent; color: var(--text-muted);
-  cursor: pointer; opacity: 0;
-  transition: opacity 0.15s, color 0.15s, background 0.15s;
+  position: absolute; top: 7px; right: 7px; padding: 3px 6px; font-size: 11px; font-family: inherit;
+  border: none; border-radius: 4px; background: transparent; color: var(--text-muted);
+  cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s, background 0.15s;
   display: flex; align-items: center; gap: 3px; line-height: 1.5;
 }
 pre:hover .copy-btn { opacity: 1; }
 .copy-btn:hover { color: var(--text); background: var(--bg-hover); }
 .copy-btn.done { color: var(--success); opacity: 1; }
-
-/* Blockquote */
-.markdown-body blockquote {
-  margin: 0 0 16px;
-  padding: 10px 16px;
-  color: var(--text-muted);
-  border-left: 3px solid var(--accent);
-  background: var(--accent-bg);
-  border-radius: 0 6px 6px 0;
-}
+.markdown-body blockquote { margin: 0 0 16px; padding: 10px 16px; color: var(--text-muted); border-left: 3px solid var(--accent); background: var(--accent-bg); border-radius: 0 6px 6px 0; }
 .markdown-body blockquote > :first-child { margin-top: 0; }
 .markdown-body blockquote > :last-child { margin-bottom: 0; }
-
-/* Lists */
 .markdown-body ul,.markdown-body ol { margin-top: 0; margin-bottom: 16px; padding-left: 2em; }
 .markdown-body ul ul,.markdown-body ul ol,.markdown-body ol ul,.markdown-body ol ol { margin: 0; }
 .markdown-body li { word-wrap: break-all; }
 .markdown-body li + li { margin-top: .25em; }
 .markdown-body li > p { margin-top: 16px; }
 .markdown-body .task-list-item { list-style-type: none; }
-.markdown-body .task-list-item input[type="checkbox"] {
-  margin: 0 .5em 0 -1.6em; vertical-align: middle; accent-color: var(--accent);
-}
-
-/* Images */
+.markdown-body .task-list-item input[type="checkbox"] { margin: 0 .5em 0 -1.6em; vertical-align: middle; accent-color: var(--accent); }
 .markdown-body img { max-width: 100%; border-style: none; border-radius: 6px; }
-
-/* HR */
 .markdown-body hr { height: 1px; padding: 0; margin: 24px 0; background: var(--border); border: 0; }
-
-/* Tables */
-.markdown-body table {
-  border-spacing: 0; border-collapse: collapse;
-  display: block; width: max-content; max-width: 100%;
-  overflow: auto; margin-bottom: 16px;
-  border-radius: 6px; border: 1px solid var(--border);
-}
-.markdown-body table th {
-  font-weight: 600; padding: 8px 14px;
-  border-bottom: 2px solid var(--border); text-align: left; background: var(--bg-subtle);
-}
+.markdown-body table { border-spacing: 0; border-collapse: collapse; display: block; width: max-content; max-width: 100%; overflow: auto; margin-bottom: 16px; border-radius: 6px; border: 1px solid var(--border); }
+.markdown-body table th { font-weight: 600; padding: 8px 14px; border-bottom: 2px solid var(--border); text-align: left; background: var(--bg-subtle); }
 .markdown-body table td { padding: 7px 14px; border-bottom: 1px solid var(--border-faint); }
 .markdown-body table tr:last-child td { border-bottom: none; }
 .markdown-body table tr:nth-child(2n) td { background: var(--bg-subtle); }
-
-/* Keyboard */
-.markdown-body kbd {
-  display: inline-block; padding: 3px 5px;
-  font-family: ui-monospace, monospace; font-size: 11px; line-height: 10px;
-  color: var(--text); vertical-align: middle;
-  background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px;
-  box-shadow: inset 0 -1px 0 var(--border);
-}
-
-/* Details */
+.markdown-body kbd { display: inline-block; padding: 3px 5px; font-family: ui-monospace, monospace; font-size: 11px; line-height: 10px; color: var(--text); vertical-align: middle; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px; box-shadow: inset 0 -1px 0 var(--border); }
 .markdown-body details { display: block; margin-bottom: 16px; }
 .markdown-body details summary { display: list-item; cursor: pointer; font-weight: 600; }
-
-/* Mermaid */
 .mermaid-wrap { margin-bottom: 16px; }
 .mermaid { text-align: center; overflow-x: auto; }
-.mermaid-error {
-  padding: 12px 16px; border-radius: 6px;
-  background: var(--code-bg); border: 1px solid var(--border);
-  color: var(--text-muted); font-size: 13px; font-style: italic;
-}
 
 /* === Highlight.js ==========================================================*/
-.hljs                              { color: var(--hl); background: transparent; }
-.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,
-.hljs-template-tag,.hljs-template-variable,
-.hljs-type,.hljs-variable.language_ { color: var(--hl-kw); }
-.hljs-title,.hljs-title.class_,
-.hljs-title.class_.inherited__,
-.hljs-title.function_              { color: var(--hl-fn); }
-.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,
-.hljs-number,.hljs-operator,.hljs-variable,
-.hljs-selector-attr,.hljs-selector-class,
-.hljs-selector-id                  { color: var(--hl-lit); }
+.hljs { color: var(--hl); background: transparent; }
+.hljs-doctag,.hljs-keyword,.hljs-meta .hljs-keyword,.hljs-template-tag,.hljs-template-variable,.hljs-type,.hljs-variable.language_ { color: var(--hl-kw); }
+.hljs-title,.hljs-title.class_,.hljs-title.class_.inherited__,.hljs-title.function_ { color: var(--hl-fn); }
+.hljs-attr,.hljs-attribute,.hljs-literal,.hljs-meta,.hljs-number,.hljs-operator,.hljs-variable,.hljs-selector-attr,.hljs-selector-class,.hljs-selector-id { color: var(--hl-lit); }
 .hljs-regexp,.hljs-string,.hljs-meta .hljs-string { color: var(--hl-str); }
-.hljs-built_in,.hljs-symbol        { color: var(--hl-bi); }
+.hljs-built_in,.hljs-symbol { color: var(--hl-bi); }
 .hljs-comment,.hljs-code,.hljs-formula { color: var(--hl-cm); font-style: italic; }
-.hljs-name,.hljs-quote,.hljs-selector-tag,
-.hljs-selector-pseudo              { color: var(--hl-tag); }
-.hljs-subst                        { color: var(--hl); }
-.hljs-section                      { color: var(--hl-lit); font-weight: bold; }
-.hljs-bullet                       { color: var(--hl-bi); }
-.hljs-emphasis                     { font-style: italic; }
-.hljs-strong                       { font-weight: bold; }
+.hljs-name,.hljs-quote,.hljs-selector-tag,.hljs-selector-pseudo { color: var(--hl-tag); }
+.hljs-subst { color: var(--hl); }
+.hljs-section { color: var(--hl-lit); font-weight: bold; }
+.hljs-bullet { color: var(--hl-bi); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: bold; }
 .hljs-addition { color: var(--hl-add-fg); background: var(--hl-add-bg); }
 .hljs-deletion { color: var(--hl-del-fg); background: var(--hl-del-bg); }
 
 /* === Back to top ===========================================================*/
 #top-btn {
-  position: fixed; bottom: 24px; right: 20px;
-  width: 34px; height: 34px;
-  border-radius: 50%; border: 1px solid var(--border);
-  background: var(--bg); color: var(--text-muted);
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  opacity: 0; transform: translateY(10px);
-  transition: opacity 0.2s, transform 0.2s, background 0.15s;
-  z-index: 100;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  position: fixed; bottom: 24px; right: 20px; width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text-muted); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; opacity: 0; transform: translateY(10px);
+  transition: opacity 0.2s, transform 0.2s, background 0.15s; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }
 #top-btn.show { opacity: 1; transform: translateY(0); }
 #top-btn:hover { background: var(--accent-bg); color: var(--accent); border-color: var(--accent); }
@@ -735,10 +558,10 @@ body.focus-mode #sidebar { width: 0; min-width: 0; opacity: 0; overflow: hidden;
 body.focus-mode .markdown-body { max-width: 720px; font-size: 16.5px; line-height: 1.85; }
 
 /* === Scrollbar =============================================================*/
-::-webkit-scrollbar              { width: 6px; height: 6px; }
-::-webkit-scrollbar-track        { background: transparent; }
-::-webkit-scrollbar-thumb        { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover  { background: var(--text-muted); }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* === Print =================================================================*/
 @media print {
@@ -764,20 +587,18 @@ const SCRIPT = /* javascript */`
   const vsc = acquireVsCodeApi();
 
   let currentMarkdown = (typeof __MD__ !== 'undefined') ? __MD__ : '';
-  let editMode = false;
-  let editTimer;
-  let saveTimer;
-  let syncScroll = true; // scroll editor → preview in split mode
+  let filesCache  = (typeof __FILES__ !== 'undefined') ? [...__FILES__] : [];
+  let editMode    = false;
+  let wordWrap    = true;
+  let editTimer, saveTimer;
 
-  function qs(s, c) { return (c || document).querySelector(s); }
+  function qs(s, c)  { return (c || document).querySelector(s); }
   function qsa(s, c) { return [...(c || document).querySelectorAll(s)]; }
   function escHtml(s) {
-    return String(s)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // ── Live stats counter ─────────────────────────────────────────────────────
+  // ── Live stats ─────────────────────────────────────────────────────────────
   function countWords(text) {
     return text
       .replace(/\`\`\`[\s\S]*?\`\`\`/g, ' ')
@@ -787,16 +608,13 @@ const SCRIPT = /* javascript */`
       .replace(/[*_~>|\\\\]/g, ' ')
       .split(/\\s+/).filter(w => w.trim().length > 0).length;
   }
-
   function updateStats(text) {
     const words  = countWords(text);
     const chars  = text.length;
     const mins   = Math.max(1, Math.ceil(words / 200));
     const tokens = Math.round(chars / 4);
     const tokStr = tokens < 1000 ? tokens + ' tok' : '~' + (tokens/1000).toFixed(1) + 'K tok';
-    const wEl    = qs('#stat-words');
-    const tEl    = qs('#stat-time');
-    const cEl    = qs('#stat-tok');
+    const wEl = qs('#stat-words'), tEl = qs('#stat-time'), cEl = qs('#stat-tok');
     if (wEl) wEl.textContent = words.toLocaleString();
     if (tEl) tEl.textContent = mins;
     if (cEl) { cEl.textContent = tokStr; cEl.title = chars.toLocaleString() + ' characters'; }
@@ -827,29 +645,21 @@ const SCRIPT = /* javascript */`
     const aiFiles    = files.filter(f => f.isAiConfig);
     const otherFiles = files.filter(f => !f.isAiConfig);
     let html = '';
-
     if (aiFiles.length) {
       html += '<div class="sb-ai-label">✦ AI Config</div>';
-      aiFiles.forEach(f => html += fileItemHtml(f));
+      aiFiles.forEach(f => { html += fileItemHtml(f); });
     }
-
-    // Group others by dir
     const groups = {};
-    otherFiles.forEach(f => {
-      const key = f.dir || '';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(f);
-    });
+    otherFiles.forEach(f => { const k = f.dir || ''; if (!groups[k]) groups[k] = []; groups[k].push(f); });
     const rootFiles = groups[''] || [];
     if (rootFiles.length) {
       if (aiFiles.length) html += '<div class="sb-ai-label" style="margin-top:4px;color:var(--text-faint)">Other</div>';
-      rootFiles.forEach(f => html += fileItemHtml(f));
+      rootFiles.forEach(f => { html += fileItemHtml(f); });
     }
     Object.keys(groups).filter(k => k).sort().forEach(dir => {
       html += '<div class="file-dir">' + escHtml(dir) + '</div>';
-      groups[dir].forEach(f => html += fileItemHtml(f));
+      groups[dir].forEach(f => { html += fileItemHtml(f); });
     });
-
     container.innerHTML = html;
     qsa('.file-item', container).forEach(el => {
       el.addEventListener('click', () => {
@@ -858,102 +668,73 @@ const SCRIPT = /* javascript */`
       });
     });
   }
-
   function fileItemHtml(f) {
-    const aiCls = f.isAiConfig ? ' ai' : '';
     const icon = f.isAiConfig
       ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>'
       : '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h8l4 4v8H2V2z" opacity=".4"/><path d="M10 2v4h4"/></svg>';
-    return '<div class="file-item' + (f.active ? ' active' : '') + aiCls
+    return '<div class="file-item' + (f.active ? ' active' : '') + (f.isAiConfig ? ' ai' : '')
       + '" data-uri="' + escHtml(f.uri) + '" title="' + escHtml(f.relPath) + '">'
-      + icon
-      + '<span class="file-name">' + escHtml(f.label) + '</span>'
-      + '</div>';
+      + icon + '<span class="file-name">' + escHtml(f.label) + '</span></div>';
   }
 
   // ── TOC ────────────────────────────────────────────────────────────────────
   function buildTOC() {
-    const hs   = qsa('.markdown-body h1,h2,h3,h4,h5,h6');
+    const hs = qsa('.markdown-body h1,h2,h3,h4,h5,h6');
     const body = qs('#toc-body');
     if (!body) return;
     if (!hs.length) { const s = qs('#sec-toc'); if (s) s.style.display = 'none'; return; }
     body.innerHTML = '';
     hs.forEach(h => {
-      const level = parseInt(h.tagName[1]);
-      const li    = document.createElement('li');
-      li.className = 'toc-item h' + level;
+      const li = document.createElement('li');
+      li.className = 'toc-item h' + h.tagName[1];
       const a = document.createElement('a');
       a.href = '#' + h.id;
       a.textContent = (h.textContent || '').replace(/#\\s*$/, '').trim();
       a.addEventListener('click', e => {
         e.preventDefault();
-        if (editMode) {
-          // In split mode → scroll the editor to that heading
-          scrollEditorToId(h.id);
-        } else {
-          h.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        if (editMode) { scrollEditorToId(h.id); }
+        else { h.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
       });
       li.appendChild(a);
       body.appendChild(li);
     });
   }
-
-  // Scroll editor textarea to the line matching a heading id
   function scrollEditorToId(id) {
-    const ta = qs('#edit-area');
-    if (!ta) return;
+    const ta = qs('#edit-area'); if (!ta) return;
     const lines = ta.value.split('\\n');
     for (let i = 0; i < lines.length; i++) {
-      const m = lines[i].match(/^#{1,6}\\s+(.+)/);
-      if (!m) continue;
-      const lineSlug = m[1].toLowerCase()
-        .replace(/<[^>]+>/g, '')
-        .replace(/[^\\w\\s-]/g, '')
-        .replace(/[\\s_]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      if (lineSlug === id) {
-        const lineH = parseFloat(getComputedStyle(ta).lineHeight) || 24;
-        ta.scrollTop = Math.max(0, (i - 3) * lineH);
-        const pos = lines.slice(0, i).reduce((a, l) => a + l.length + 1, 0);
-        ta.focus();
-        ta.setSelectionRange(pos, pos + lines[i].length);
-        return;
-      }
+      const m = lines[i].match(/^#{1,6}\\s+(.+)/); if (!m) continue;
+      const slug = m[1].toLowerCase().replace(/<[^>]+>/g,'').replace(/[^\\w\\s-]/g,'').replace(/[\\s_]+/g,'-').replace(/^-+|-+$/g,'');
+      if (slug !== id) continue;
+      const lineH = parseFloat(getComputedStyle(ta).lineHeight) || 24;
+      ta.scrollTop = Math.max(0, (i - 3) * lineH);
+      const pos = lines.slice(0, i).reduce((a, l) => a + l.length + 1, 0);
+      ta.focus(); ta.setSelectionRange(pos, pos + lines[i].length);
+      return;
     }
   }
 
-  // ── Scroll spy (preview mode) ──────────────────────────────────────────────
+  // ── Scroll spy ─────────────────────────────────────────────────────────────
   function setupScrollSpy() {
-    const scroller = qs('#scroller');
-    if (!scroller) return;
-    const hs = qsa('.markdown-body h1,h2,h3,h4,h5,h6');
-    if (!hs.length) return;
+    const scroller = qs('#scroller'); if (!scroller) return;
+    const hs = qsa('.markdown-body h1,h2,h3,h4,h5,h6'); if (!hs.length) return;
     const obs = new IntersectionObserver(entries => {
       entries.forEach(entry => {
-        const link = qs('#toc-body a[href="#' + entry.target.id + '"]');
-        if (!link) return;
+        const link = qs('#toc-body a[href="#' + entry.target.id + '"]'); if (!link) return;
         if (entry.isIntersecting) {
           qsa('#toc-body a').forEach(a => a.classList.remove('active'));
-          link.classList.add('active');
-          link.scrollIntoView({ block: 'nearest' });
+          link.classList.add('active'); link.scrollIntoView({ block: 'nearest' });
         }
       });
     }, { root: scroller, rootMargin: '-10% 0% -70% 0%', threshold: 0 });
     hs.forEach(h => obs.observe(h));
   }
 
-  // ── Scroll sync: editor → preview ─────────────────────────────────────────
+  // ── Scroll sync editor→preview ─────────────────────────────────────────────
   qs('#edit-area')?.addEventListener('scroll', () => {
-    if (!syncScroll) return;
-    const ta = qs('#edit-area');
-    const sp = qs('#split-preview');
-    if (!ta || !sp) return;
-    const maxSrc = ta.scrollHeight - ta.clientHeight;
-    if (maxSrc <= 0) return;
-    const ratio = ta.scrollTop / maxSrc;
-    const maxDst = sp.scrollHeight - sp.clientHeight;
-    sp.scrollTop = ratio * maxDst;
+    const ta = qs('#edit-area'), sp = qs('#split-preview'); if (!ta || !sp) return;
+    const max = ta.scrollHeight - ta.clientHeight; if (max <= 0) return;
+    sp.scrollTop = (ta.scrollTop / max) * (sp.scrollHeight - sp.clientHeight);
   });
 
   // ── Copy buttons ───────────────────────────────────────────────────────────
@@ -977,25 +758,20 @@ const SCRIPT = /* javascript */`
     });
   }
 
-  // ── Heading anchors ────────────────────────────────────────────────────────
   function setupHeadingAnchors() {
     qsa('.h-anchor').forEach(a => {
       a.addEventListener('click', e => {
         e.preventDefault();
         navigator.clipboard.writeText(window.location.href.split('#')[0] + a.getAttribute('href'));
-        const orig = a.textContent;
-        a.textContent = '✓';
+        const orig = a.textContent; a.textContent = '✓';
         setTimeout(() => { a.textContent = orig; }, 1500);
       });
     });
   }
 
-  // ── Mermaid ────────────────────────────────────────────────────────────────
   function setupMermaid() {
-    const blocks = qsa('pre code.language-mermaid');
-    if (!blocks.length) return;
-    const script = document.createElement('script');
-    script.type = 'module';
+    const blocks = qsa('pre code.language-mermaid'); if (!blocks.length) return;
+    const script = document.createElement('script'); script.type = 'module';
     script.textContent = [
       "import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';",
       "const dark = document.documentElement.getAttribute('data-m') === 'dark';",
@@ -1014,30 +790,21 @@ const SCRIPT = /* javascript */`
 
   // ── Format toolbar ─────────────────────────────────────────────────────────
   function applyFormat(action) {
-    const ta    = qs('#edit-area');
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end   = ta.selectionEnd;
-    const val   = ta.value;
-    const sel   = val.slice(start, end);
-
+    const ta = qs('#edit-area'); if (!ta) return;
+    const start = ta.selectionStart, end = ta.selectionEnd, val = ta.value, sel = val.slice(start, end);
     function wrap(before, after, ph) {
       const inner = sel || ph || '';
       ta.value = val.slice(0, start) + before + inner + after + val.slice(end);
-      ta.selectionStart = start + before.length;
-      ta.selectionEnd   = start + before.length + inner.length;
+      ta.selectionStart = start + before.length; ta.selectionEnd = start + before.length + inner.length;
       ta.focus(); triggerEdit();
     }
     function linePrefix(prefix) {
-      const ls   = val.lastIndexOf('\\n', start - 1) + 1;
-      const line = val.slice(ls, end);
-      const clean = line.replace(/^#{1,6}\\s/, '').replace(/^>\\s?/, '')
-        .replace(/^-\\s/, '').replace(/^\\d+\\.\\s/, '');
+      const ls = val.lastIndexOf('\\n', start - 1) + 1, line = val.slice(ls, end);
+      const clean = line.replace(/^#{1,6}\\s/, '').replace(/^>\\s?/, '').replace(/^-\\s/, '').replace(/^\\d+\\.\\s/, '');
       ta.value = val.slice(0, ls) + prefix + clean + val.slice(end);
       ta.selectionStart = ta.selectionEnd = ls + prefix.length + clean.length;
       ta.focus(); triggerEdit();
     }
-
     switch (action) {
       case 'bold':      return wrap('**', '**', 'bold text');
       case 'italic':    return wrap('*', '*', 'italic text');
@@ -1067,18 +834,19 @@ const SCRIPT = /* javascript */`
       }
     }
   }
+  qsa('.fmt-btn').forEach(btn => { btn.addEventListener('click', () => { const a = btn.getAttribute('data-action'); if (a) applyFormat(a); }); });
 
-  qsa('.fmt-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const a = btn.getAttribute('data-action');
-      if (a) applyFormat(a);
-    });
+  // Word wrap toggle
+  qs('#btn-wrap')?.addEventListener('click', () => {
+    wordWrap = !wordWrap;
+    const ta = qs('#edit-area');
+    if (ta) ta.style.whiteSpace = wordWrap ? 'pre-wrap' : 'pre';
+    qs('#btn-wrap')?.classList.toggle('on', wordWrap);
   });
 
-  // ── Smart editor keyboard ──────────────────────────────────────────────────
+  // ── Smart editor ───────────────────────────────────────────────────────────
   function triggerEdit() {
-    const ta = qs('#edit-area');
-    if (!ta) return;
+    const ta = qs('#edit-area'); if (!ta) return;
     const content = ta.value;
     currentMarkdown = content;
     updateStats(content);
@@ -1087,20 +855,13 @@ const SCRIPT = /* javascript */`
     editTimer = setTimeout(() => vsc.postMessage({ type: 'edit', content }), 250);
   }
 
-  qs('#edit-area')?.addEventListener('input', e => triggerEdit());
+  qs('#edit-area')?.addEventListener('input', () => triggerEdit());
 
   qs('#edit-area')?.addEventListener('keydown', e => {
-    const ta    = e.target;
-    const start = ta.selectionStart;
-    const end   = ta.selectionEnd;
-    const val   = ta.value;
-    const mod   = e.metaKey || e.ctrlKey;
-
+    const ta = e.target, start = ta.selectionStart, end = ta.selectionEnd, val = ta.value, mod = e.metaKey || e.ctrlKey;
     if (e.key === 'Tab' && !e.shiftKey) {
-      e.preventDefault();
-      ta.value = val.slice(0, start) + '  ' + val.slice(end);
-      ta.selectionStart = ta.selectionEnd = start + 2;
-      triggerEdit(); return;
+      e.preventDefault(); ta.value = val.slice(0, start) + '  ' + val.slice(end);
+      ta.selectionStart = ta.selectionEnd = start + 2; triggerEdit(); return;
     }
     if (mod && e.key === 'b') { e.preventDefault(); applyFormat('bold'); return; }
     if (mod && e.key === 'i') { e.preventDefault(); applyFormat('italic'); return; }
@@ -1109,43 +870,120 @@ const SCRIPT = /* javascript */`
     if (mod && e.shiftKey && e.key === '1') { e.preventDefault(); applyFormat('h1'); return; }
     if (mod && e.shiftKey && e.key === '2') { e.preventDefault(); applyFormat('h2'); return; }
     if (mod && e.shiftKey && e.key === '3') { e.preventDefault(); applyFormat('h3'); return; }
-
-    // Smart Enter: continue lists
     if (e.key === 'Enter') {
-      const ls     = val.lastIndexOf('\\n', start - 1) + 1;
-      const line   = val.slice(ls, start);
-      const taskM  = line.match(/^(\\s*)([-*])\\s\\[[ x]\\]\\s/);
-      const bullM  = line.match(/^(\\s*)([-*])\\s/);
-      const numM   = line.match(/^(\\s*)(\\d+)\\.\\s/);
-      const match  = taskM || bullM || numM;
+      const ls = val.lastIndexOf('\\n', start - 1) + 1, line = val.slice(ls, start);
+      const taskM = line.match(/^(\\s*)([-*])\\s\\[[ x]\\]\\s/);
+      const bullM = line.match(/^(\\s*)([-*])\\s/);
+      const numM  = line.match(/^(\\s*)(\\d+)\\.\\s/);
+      const match = taskM || bullM || numM;
       if (match) {
         const content = line.slice(match[0].length);
         if (!content.trim()) {
           e.preventDefault();
           ta.value = val.slice(0, ls) + '\\n' + val.slice(start);
-          ta.selectionStart = ta.selectionEnd = ls + 1;
-          triggerEdit(); return;
+          ta.selectionStart = ta.selectionEnd = ls + 1; triggerEdit(); return;
         }
         e.preventDefault();
-        let insert;
+        let insert = '';
         if (taskM)      insert = '\\n' + taskM[1] + taskM[2] + ' [ ] ';
         else if (bullM) insert = '\\n' + bullM[1] + bullM[2] + ' ';
         else if (numM)  insert = '\\n' + numM[1] + (parseInt(numM[2]) + 1) + '. ';
         ta.value = val.slice(0, start) + insert + val.slice(end);
-        ta.selectionStart = ta.selectionEnd = start + insert.length;
-        triggerEdit();
+        ta.selectionStart = ta.selectionEnd = start + insert.length; triggerEdit();
       }
     }
   });
 
+  // ── Image paste ────────────────────────────────────────────────────────────
+  qs('#edit-area')?.addEventListener('paste', e => {
+    const items = [...(e.clipboardData?.items || [])];
+    const img   = items.find(item => item.type.startsWith('image/'));
+    if (!img) return;
+    e.preventDefault();
+    const file = img.getAsFile(); if (!file) return;
+    const ext  = file.type.split('/')[1] || 'png';
+    const reader = new FileReader();
+    reader.onload = () => {
+      const b64 = reader.result.toString().split(',')[1];
+      vsc.postMessage({ type: 'pasteImage', base64: b64, ext });
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // ── Quick Open (Cmd+K) ─────────────────────────────────────────────────────
+  let qoSelected = -1;
+  function openQuickOpen() {
+    qs('#quick-open')?.classList.add('open');
+    const inp = qs('#qo-input');
+    if (inp) { inp.value = ''; inp.focus(); }
+    qoSelected = -1; renderQoResults('');
+  }
+  function closeQuickOpen() { qs('#quick-open')?.classList.remove('open'); }
+  function fuzzyScore(text, query) {
+    const t = text.toLowerCase(), q = query.toLowerCase();
+    if (!q) return 1;
+    let qi = 0, score = 0, last = -1;
+    for (let i = 0; i < t.length && qi < q.length; i++) {
+      if (t[i] === q[qi]) { score += last === i - 1 ? 2 : 1; last = i; qi++; }
+    }
+    return qi === q.length ? score : 0;
+  }
+  function renderQoResults(query) {
+    const container = qs('#qo-results'); if (!container) return;
+    const scored = filesCache
+      .map(f => ({ f, score: fuzzyScore(f.relPath, query) }))
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score || (a.f.isAiConfig ? -1 : 1))
+      .slice(0, 12);
+    if (!scored.length) { container.innerHTML = '<div class="qo-empty">No files found</div>'; return; }
+    container.innerHTML = scored.map((x, i) =>
+      '<div class="qo-item' + (x.f.isAiConfig ? ' ai' : '') + (i === qoSelected ? ' selected' : '')
+      + '" data-uri="' + escHtml(x.f.uri) + '">'
+      + '<span class="qo-name">' + escHtml(x.f.label) + '</span>'
+      + '<span class="qo-path">' + escHtml(x.f.dir || '') + '</span>'
+      + '</div>'
+    ).join('');
+    qsa('.qo-item', container).forEach(el => {
+      el.addEventListener('click', () => {
+        const uri = el.getAttribute('data-uri');
+        if (uri) { vsc.postMessage({ type: 'openFile', uri }); closeQuickOpen(); }
+      });
+    });
+  }
+  qs('#qo-input')?.addEventListener('input', e => { qoSelected = -1; renderQoResults(e.target.value); });
+  qs('#qo-input')?.addEventListener('keydown', e => {
+    const items = qsa('.qo-item', qs('#qo-results'));
+    if (e.key === 'ArrowDown') { e.preventDefault(); qoSelected = Math.min(qoSelected + 1, items.length - 1); renderQoResults(qs('#qo-input').value); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); qoSelected = Math.max(qoSelected - 1, 0); renderQoResults(qs('#qo-input').value); }
+    else if (e.key === 'Enter') { const sel = items[qoSelected] || items[0]; const uri = sel?.getAttribute('data-uri'); if (uri) { vsc.postMessage({ type: 'openFile', uri }); closeQuickOpen(); } }
+  });
+  qs('#qo-backdrop')?.addEventListener('click', closeQuickOpen);
+
+  // ── Keyboard Shortcuts Panel (??) ──────────────────────────────────────────
+  function openShortcuts()  { qs('#shortcuts-panel')?.classList.add('open'); }
+  function closeShortcuts() { qs('#shortcuts-panel')?.classList.remove('open'); }
+  qs('#sp-backdrop')?.addEventListener('click', closeShortcuts);
+  qs('#sp-close')?.addEventListener('click', closeShortcuts);
+
+  // ── Global keyboard ────────────────────────────────────────────────────────
+  document.addEventListener('keydown', e => {
+    const inEditor = document.activeElement === qs('#edit-area');
+    const inQo     = document.activeElement === qs('#qo-input');
+    if (e.key === 'Escape') {
+      if (qs('#quick-open.open'))     { closeQuickOpen();  return; }
+      if (qs('#shortcuts-panel.open')) { closeShortcuts(); return; }
+      if (editMode) { exitEditMode(); return; }
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k' && !inEditor) { e.preventDefault(); openQuickOpen(); return; }
+    if (e.key === '?' && !inEditor && !inQo) { e.preventDefault(); openShortcuts(); return; }
+  });
+
   // ── External links ─────────────────────────────────────────────────────────
   document.addEventListener('click', e => {
-    const link = e.target.closest('a[href]');
-    if (!link) return;
+    const link = e.target.closest('a[href]'); if (!link) return;
     const href = link.getAttribute('href');
     if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-      e.preventDefault();
-      vsc.postMessage({ type: 'openLink', href });
+      e.preventDefault(); vsc.postMessage({ type: 'openLink', href });
     }
   });
 
@@ -1155,17 +993,18 @@ const SCRIPT = /* javascript */`
   qs('#btn-copy-html')?.addEventListener('click', () => {
     const html = qs('.markdown-body')?.innerHTML || '';
     navigator.clipboard.writeText(html);
-    const btn = qs('#btn-copy-html');
-    if (btn) {
-      const prev = btn.innerHTML;
-      btn.textContent = '✓';
-      setTimeout(() => { btn.innerHTML = prev; }, 2000);
-    }
+    const btn = qs('#btn-copy-html'); if (!btn) return;
+    const prev = btn.innerHTML; btn.textContent = '✓';
+    setTimeout(() => { btn.innerHTML = prev; }, 2000);
+  });
+
+  qs('#btn-export')?.addEventListener('click', () => {
+    const html = (qs('#scroller .markdown-body') || qs('.markdown-body'))?.innerHTML || '';
+    vsc.postMessage({ type: 'exportHtml', html });
   });
 
   qs('#btn-print')?.addEventListener('click', () => window.print());
 
-  // Sidebar toggle
   let sidebarOpen = true;
   qs('#btn-sidebar')?.addEventListener('click', () => {
     sidebarOpen = !sidebarOpen;
@@ -1173,7 +1012,6 @@ const SCRIPT = /* javascript */`
     qs('#btn-sidebar')?.classList.toggle('on', sidebarOpen);
   });
 
-  // Section collapse
   qsa('.sb-section').forEach(sec => {
     sec.querySelector('.sb-header')?.addEventListener('click', e => {
       if (e.target.closest('.sb-action')) return;
@@ -1181,13 +1019,8 @@ const SCRIPT = /* javascript */`
     });
   });
 
-  // New file button
-  qs('#btn-new-file')?.addEventListener('click', e => {
-    e.stopPropagation();
-    vsc.postMessage({ type: 'newFile' });
-  });
+  qs('#btn-new-file')?.addEventListener('click', e => { e.stopPropagation(); vsc.postMessage({ type: 'newFile' }); });
 
-  // Focus mode
   let focusMode = false;
   qs('#btn-focus')?.addEventListener('click', () => {
     focusMode = !focusMode;
@@ -1195,84 +1028,64 @@ const SCRIPT = /* javascript */`
     qs('#btn-focus')?.classList.toggle('on', focusMode);
   });
 
-  // ── Edit / Preview toggle ──────────────────────────────────────────────────
+  // ── Edit toggle ────────────────────────────────────────────────────────────
   function enterEditMode() {
     editMode = true;
     document.body.classList.add('edit-mode');
     const ea = qs('#edit-area');
     if (ea) { ea.value = currentMarkdown; ea.focus(); }
-    const btn = qs('#btn-edit');
-    if (btn) btn.textContent = '← Preview';
+    const btn = qs('#btn-edit'); if (btn) btn.textContent = '← Preview';
     vsc.postMessage({ type: 'modeChange', mode: 'edit' });
     updateStats(currentMarkdown);
   }
   function exitEditMode() {
     editMode = false;
     document.body.classList.remove('edit-mode');
-    const btn = qs('#btn-edit');
-    if (btn) btn.textContent = 'Edit';
-    const si = qs('#save-status');
-    if (si) si.className = 'save-status';
+    const btn = qs('#btn-edit'); if (btn) btn.textContent = editMode ? '← Preview' : 'Edit';
+    const si = qs('#save-status'); if (si) si.className = 'save-status';
     vsc.postMessage({ type: 'modeChange', mode: 'preview' });
   }
-
-  qs('#btn-edit')?.addEventListener('click', () => {
-    editMode ? exitEditMode() : enterEditMode();
-  });
-
-  // Auto-open in edit mode for AI config files
-  if (typeof __AUTOEDIT__ !== 'undefined' && __AUTOEDIT__) {
-    setTimeout(enterEditMode, 50);
-  }
+  qs('#btn-edit')?.addEventListener('click', () => { editMode ? exitEditMode() : enterEditMode(); });
+  if (typeof __AUTOEDIT__ !== 'undefined' && __AUTOEDIT__) { setTimeout(enterEditMode, 50); }
 
   // ── Back to top ────────────────────────────────────────────────────────────
   const topBtn   = qs('#top-btn');
   const scroller = qs('#scroller');
-  scroller?.addEventListener('scroll', () => {
-    topBtn?.classList.toggle('show', (scroller.scrollTop || 0) > 300);
-  });
+  scroller?.addEventListener('scroll', () => { topBtn?.classList.toggle('show', (scroller.scrollTop || 0) > 300); });
   topBtn?.addEventListener('click', () => scroller?.scrollTo({ top: 0, behavior: 'smooth' }));
 
   // ── Messages from extension ────────────────────────────────────────────────
   window.addEventListener('message', ev => {
     const msg = ev.data;
-
     if (msg.type === 'scrollToHeading') {
-      const el = document.getElementById(msg.id);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        el.style.transition = 'background 0.3s';
-        el.style.background = 'var(--accent-bg)';
-        setTimeout(() => { el.style.background = ''; }, 1400);
-      }
+      const el = document.getElementById(msg.id); if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      el.style.transition = 'background 0.3s'; el.style.background = 'var(--accent-bg)';
+      setTimeout(() => { el.style.background = ''; }, 1400);
     }
-
     if (msg.type === 'updateSplitPreview') {
-      const sp = qs('#split-preview .markdown-body');
-      if (sp) sp.innerHTML = msg.html;
+      const sp = qs('#split-preview .markdown-body'); if (sp) sp.innerHTML = msg.html;
     }
-
-    if (msg.type === 'saved') {
-      showSaved();
-    }
-
-    if (msg.type === 'updateFiles') {
-      renderFileList(msg.files);
+    if (msg.type === 'saved') { showSaved(); }
+    if (msg.type === 'updateFiles') { filesCache = msg.files; renderFileList(msg.files); }
+    if (msg.type === 'imagePasted') {
+      const ta = qs('#edit-area'); if (!ta) return;
+      const start  = ta.selectionStart;
+      const insert = '![](' + msg.path + ')';
+      ta.value = ta.value.slice(0, start) + insert + ta.value.slice(start);
+      ta.selectionStart = start + 2; ta.selectionEnd = start + 2;
+      ta.focus(); triggerEdit();
     }
   });
 
   // ── Init ───────────────────────────────────────────────────────────────────
   if (typeof __FILES__ !== 'undefined') renderFileList(__FILES__);
-  buildTOC();
-  setupScrollSpy();
-  addCopyButtons();
-  setupHeadingAnchors();
-  setupMermaid();
+  buildTOC(); setupScrollSpy(); addCopyButtons(); setupHeadingAnchors(); setupMermaid();
   qs('#btn-sidebar')?.classList.add('on');
 })();
 `;
 
-// ─── SVG Icons ───────────────────────────────────────────────────────────────
+// ─── Icons ───────────────────────────────────────────────────────────────────
 
 const ICON = {
   logo: `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" style="-webkit-text-fill-color:initial"><rect x="1" y="1" width="14" height="14" rx="3" fill="url(#lgr)"/><path d="M4 5h8M4 8h6M4 11h7" stroke="white" stroke-width="1.5" stroke-linecap="round"/><defs><linearGradient id="lgr" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#F97316"/><stop offset="100%" stop-color="#EF4444"/></linearGradient></defs></svg>`,
@@ -1287,6 +1100,7 @@ const ICON = {
   image: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`,
   ul: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><circle cx="4" cy="18" r="1.5" fill="currentColor"/></svg>`,
   ol: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 7h1V4" stroke-linecap="round"/><path d="M3 11h2v1H3v1h2" stroke-linecap="round"/></svg>`,
+  export: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
 };
 
 // ─── Panel ───────────────────────────────────────────────────────────────────
@@ -1299,10 +1113,7 @@ export class MarkdownPreviewPanel {
   private _editMode = false;
 
   public static createOrShow(document: vscode.TextDocument): void {
-    const column = vscode.window.activeTextEditor
-      ? vscode.ViewColumn.Beside
-      : vscode.ViewColumn.One;
-
+    const column = vscode.window.activeTextEditor ? vscode.ViewColumn.Beside : vscode.ViewColumn.One;
     if (MarkdownPreviewPanel.currentPanel) {
       MarkdownPreviewPanel.currentPanel._panel.reveal(column);
       MarkdownPreviewPanel.currentPanel._document = document;
@@ -1310,10 +1121,7 @@ export class MarkdownPreviewPanel {
       MarkdownPreviewPanel.currentPanel._render();
       return;
     }
-    const panel = vscode.window.createWebviewPanel(
-      'markr', 'Markr', column,
-      { enableScripts: true, retainContextWhenHidden: true }
-    );
+    const panel = vscode.window.createWebviewPanel('markr', 'Markr', column, { enableScripts: true, retainContextWhenHidden: true });
     MarkdownPreviewPanel.currentPanel = new MarkdownPreviewPanel(panel, document);
   }
 
@@ -1347,54 +1155,49 @@ export class MarkdownPreviewPanel {
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
     vscode.window.onDidChangeActiveColorTheme(() => this._render(), null, this._disposables);
 
-    this._panel.webview.onDidReceiveMessage(msg => {
-      if (msg.type === 'openLink') {
-        vscode.env.openExternal(vscode.Uri.parse(msg.href));
-      }
+    this._panel.webview.onDidReceiveMessage(async msg => {
+      if (msg.type === 'openLink') { vscode.env.openExternal(vscode.Uri.parse(msg.href)); }
       if (msg.type === 'copyMarkdown') {
-        vscode.env.clipboard.writeText(this._document.getText()).then(() => {
-          vscode.window.setStatusBarMessage('$(check) Markr: Markdown copied', 3000);
-        });
+        vscode.env.clipboard.writeText(this._document.getText()).then(() =>
+          vscode.window.setStatusBarMessage('$(check) Markr: Markdown copied', 3000)
+        );
       }
       if (msg.type === 'edit') {
         this._editMode = true;
         const doc  = this._document;
         const edit = new vscode.WorkspaceEdit();
-        edit.replace(doc.uri,
-          new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)),
-          msg.content
-        );
-        vscode.workspace.applyEdit(edit).then(() => {
-          const html = marked.parse(msg.content) as string;
-          this._panel.webview.postMessage({ type: 'updateSplitPreview', html });
-          this._panel.webview.postMessage({ type: 'saved' });
-        });
+        edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), msg.content);
+        await vscode.workspace.applyEdit(edit);
+        const html = applyGithubAlerts(marked.parse(msg.content) as string);
+        this._panel.webview.postMessage({ type: 'updateSplitPreview', html });
+        this._panel.webview.postMessage({ type: 'saved' });
       }
       if (msg.type === 'modeChange') {
         this._editMode = msg.mode === 'edit';
         if (msg.mode === 'preview') this._render();
       }
       if (msg.type === 'openFile') {
-        const uri = vscode.Uri.parse(msg.uri);
-        vscode.workspace.openTextDocument(uri).then(doc => {
+        vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri)).then(doc => {
           vscode.window.showTextDocument(doc, { preview: false });
           MarkdownPreviewPanel.createOrShow(doc);
         });
       }
-      if (msg.type === 'newFile') {
-        vscode.commands.executeCommand('workbench.action.files.newUntitledFile');
-      }
+      if (msg.type === 'newFile') { vscode.commands.executeCommand('workbench.action.files.newUntitledFile'); }
+      if (msg.type === 'pasteImage') { await this._handleImagePaste(msg.base64, msg.ext); }
+      if (msg.type === 'exportHtml') { await this._handleExportHtml(msg.html); }
     }, null, this._disposables);
   }
 
   private _render(): void {
-    const text     = this._document.getText();
-    const body     = marked.parse(text) as string;
-    const stats    = docStats(text);
+    const rawText = this._document.getText();
+    const { meta, body: mdBody } = extractFrontmatter(rawText);
+    const rendered = applyGithubAlerts(marked.parse(mdBody) as string);
+    const frontmatterHtml = meta ? renderFrontmatter(meta) : '';
+    const stats    = docStats(rawText);
     const filename = this._document.uri.path.split('/').pop() ?? 'preview';
     this._panel.title = `Markr — ${filename}`;
     this._getWorkspaceFiles().then(files => {
-      this._panel.webview.html = this._buildPage(body, filename, stats, text, files);
+      this._panel.webview.html = this._buildPage(frontmatterHtml + rendered, filename, stats, rawText, files);
     });
   }
 
@@ -1407,45 +1210,81 @@ export class MarkdownPreviewPanel {
       );
       const currentUri = this._document.uri.toString();
       return uris
-        .sort((a, b) =>
-          vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b))
-        )
+        .sort((a, b) => vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)))
         .map(uri => {
           const relPath = vscode.workspace.asRelativePath(uri);
           const parts   = relPath.split('/');
           const label   = parts[parts.length - 1];
           const dir     = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-          return {
-            label, relPath, uri: uri.toString(),
-            active: uri.toString() === currentUri,
-            dir,
-            isAiConfig: isAiConfig(label),
-          };
+          return { label, relPath, uri: uri.toString(), active: uri.toString() === currentUri, dir, isAiConfig: isAiConfig(label) };
         });
-    } catch {
-      return [];
+    } catch { return []; }
+  }
+
+  private async _handleImagePaste(base64: string, ext: string): Promise<void> {
+    const docUri  = this._document.uri;
+    const docDir  = docUri.with({ path: docUri.path.replace(/[^/]*$/, '') });
+    const imgDir  = docDir.with({ path: docDir.path + 'images/' });
+    const fname   = `paste-${Date.now()}.${ext || 'png'}`;
+    const imgUri  = imgDir.with({ path: imgDir.path + fname });
+    try {
+      await vscode.workspace.fs.createDirectory(imgDir);
+      await vscode.workspace.fs.writeFile(imgUri, Buffer.from(base64, 'base64'));
+      this._panel.webview.postMessage({ type: 'imagePasted', path: `./images/${fname}` });
+      vscode.window.setStatusBarMessage(`$(check) Markr: saved images/${fname}`, 3000);
+    } catch (e) {
+      vscode.window.showErrorMessage(`Markr: could not save image — ${String(e)}`);
     }
   }
 
-  private _buildPage(
-    body: string,
-    filename: string,
-    stats: ReturnType<typeof docStats>,
-    text: string,
-    files: FileEntry[]
-  ): string {
-    const nonce       = getNonce();
-    const theme       = vscode.window.activeColorTheme;
-    const isDark      = theme.kind === vscode.ColorThemeKind.Dark || theme.kind === vscode.ColorThemeKind.HighContrast;
-    const mode        = isDark ? 'dark' : 'light';
-    const cfg         = vscode.workspace.getConfiguration('markr');
-    const showTOC     = cfg.get<boolean>('showTOC', true);
-    const mdJson      = JSON.stringify(text);
-    const filesJson   = JSON.stringify(files);
-    const autoEdit    = isAiConfig(filename);
-    const isAI        = autoEdit;
-    const statsTitle  = `${stats.words.toLocaleString()} words · ${stats.headings} heading${stats.headings !== 1 ? 's' : ''} · ${stats.codeBlocks} code block${stats.codeBlocks !== 1 ? 's' : ''}`;
-    const tokStr      = tokenEstimate(stats.chars);
+  private async _handleExportHtml(content: string): Promise<void> {
+    const filename = this._document.uri.path.split('/').pop()?.replace(/\.md$/i, '.html') ?? 'export.html';
+    const dir      = this._document.uri.with({ path: this._document.uri.path.replace(/[^/]*$/, '') });
+    const saveUri  = await vscode.window.showSaveDialog({
+      defaultUri: dir.with({ path: dir.path + filename }),
+      filters: { 'HTML files': ['html'] },
+    });
+    if (!saveUri) return;
+    const fullHtml = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${filename.replace('.html', '')}</title>
+<style>
+body { max-width: 800px; margin: 40px auto; padding: 0 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 16px; line-height: 1.7; color: #1c1a17; }
+h1,h2,h3,h4,h5,h6 { font-weight: 700; margin-top: 1.5em; margin-bottom: .4em; }
+h2 { border-bottom: 1px solid #e5e0d8; padding-bottom: .35em; }
+pre { background: #ede9e2; border: 1px solid #e5e0d8; border-radius: 6px; padding: 16px; overflow: auto; font-size: 14px; }
+code { background: rgba(110,104,96,.12); padding: .2em .4em; border-radius: 4px; font-size: 85%; font-family: monospace; }
+pre code { background: transparent; padding: 0; }
+blockquote { border-left: 3px solid #F97316; background: rgba(249,115,22,.08); margin: 0 0 16px; padding: 10px 16px; border-radius: 0 6px 6px 0; color: #888178; }
+table { border-collapse: collapse; width: 100%; margin-bottom: 16px; border-radius: 6px; border: 1px solid #e5e0d8; }
+th { border-bottom: 2px solid #e5e0d8; padding: 8px 14px; text-align: left; background: #f3f0eb; }
+td { border-bottom: 1px solid #ede9e2; padding: 7px 14px; }
+img { max-width: 100%; border-radius: 6px; }
+a { color: #0b6e99; }
+hr { height: 1px; border: 0; background: #e5e0d8; margin: 24px 0; }
+</style>
+</head>
+<body>${content}</body>
+</html>`;
+    await vscode.workspace.fs.writeFile(saveUri, Buffer.from(fullHtml, 'utf-8'));
+    vscode.window.showInformationMessage(`Markr: exported ${saveUri.fsPath.split('/').pop()}`);
+  }
+
+  private _buildPage(body: string, filename: string, stats: ReturnType<typeof docStats>, text: string, files: FileEntry[]): string {
+    const nonce      = getNonce();
+    const theme      = vscode.window.activeColorTheme;
+    const isDark     = theme.kind === vscode.ColorThemeKind.Dark || theme.kind === vscode.ColorThemeKind.HighContrast;
+    const mode       = isDark ? 'dark' : 'light';
+    const cfg        = vscode.workspace.getConfiguration('markr');
+    const showTOC    = cfg.get<boolean>('showTOC', true);
+    const mdJson     = JSON.stringify(text);
+    const filesJson  = JSON.stringify(files);
+    const autoEdit   = isAiConfig(filename);
+    const tokStr     = tokenEstimate(stats.chars);
+    const statsTitle = `${stats.words.toLocaleString()} words · ${stats.headings} heading${stats.headings !== 1 ? 's' : ''} · ${stats.codeBlocks} code block${stats.codeBlocks !== 1 ? 's' : ''}`;
 
     return /* html */`<!DOCTYPE html>
 <html lang="en" data-m="${mode}">
@@ -1463,34 +1302,35 @@ export class MarkdownPreviewPanel {
 </head>
 <body>
 
-<!-- ── Toolbar ─────────────────────────────────────────────────────────── -->
+<!-- Toolbar -->
 <div id="toolbar">
   <div class="tl">
     <button id="btn-sidebar" class="tb-btn on" title="Toggle sidebar">${ICON.sidebar}</button>
     <span class="logo-mark">${ICON.logo} Markr</span>
     <span class="sep-dot">·</span>
     <span class="fname" title="${filename}">${filename}</span>
-    ${isAI ? '<span class="ai-badge">✦ AI</span>' : ''}
+    ${autoEdit ? '<span class="ai-badge">✦ AI</span>' : ''}
   </div>
   <div class="tr">
     <span class="stats" title="${statsTitle}">
-      <span id="stat-time">${readingTime(stats.words)}</span> min
+      <span id="stat-time">${readingTime(stats.words)}</span>m
       · <span id="stat-words">${stats.words.toLocaleString()}</span>w
-      · <span id="stat-tok" class="${isAI ? 'stats-highlight' : ''}" title="${stats.chars.toLocaleString()} characters">${tokStr}</span>
+      · <span id="stat-tok" class="${autoEdit ? 'stats-accent' : ''}" title="${stats.chars.toLocaleString()} chars">${tokStr}</span>
     </span>
     <span id="save-status" class="save-status"></span>
     <div class="sep-v"></div>
-    <button id="btn-edit" class="tb-btn${autoEdit ? ' accent' : ''}" title="Split edit mode — edits update the file">${autoEdit ? '⚡ Edit' : 'Edit'}</button>
+    <button id="btn-edit" class="tb-btn${autoEdit ? ' accent' : ''}" title="Split edit mode">${autoEdit ? '⚡ Edit' : 'Edit'}</button>
     <div class="sep-v"></div>
-    <button id="btn-copy-md"   class="tb-btn" title="Copy raw Markdown">${ICON.copyMd} MD</button>
-    <button id="btn-copy-html" class="tb-btn" title="Copy rendered HTML">${ICON.copyHtml} HTML</button>
-    <button id="btn-print"     class="tb-btn" title="Print">${ICON.print} Print</button>
+    <button id="btn-copy-md"   class="tb-btn" title="Copy Markdown">${ICON.copyMd} MD</button>
+    <button id="btn-copy-html" class="tb-btn" title="Copy HTML">${ICON.copyHtml} HTML</button>
+    <button id="btn-export"    class="tb-btn" title="Export to .html file">${ICON.export}</button>
+    <button id="btn-print"     class="tb-btn" title="Print">${ICON.print}</button>
     <div class="sep-v"></div>
     <button id="btn-focus" class="tb-btn" title="Focus mode">${ICON.focus}</button>
   </div>
 </div>
 
-<!-- ── Format Toolbar ──────────────────────────────────────────────────── -->
+<!-- Format Toolbar (edit mode) -->
 <div id="fmt-toolbar">
   <div class="fmt-group">
     <button class="fmt-btn" data-action="bold"  title="Bold (⌘B)"><b>B</b></button>
@@ -1516,27 +1356,26 @@ export class MarkdownPreviewPanel {
     <button class="fmt-btn" data-action="ul"   title="Bullet list">${ICON.ul}</button>
     <button class="fmt-btn" data-action="ol"   title="Numbered list">${ICON.ol}</button>
     <button class="fmt-btn" data-action="task" title="Task list" style="font-size:13px">☐</button>
+    <button class="fmt-btn" data-action="table" title="Table" style="font-size:13px">⊞</button>
+    <button class="fmt-btn" data-action="hr" title="Divider" style="font-size:16px;letter-spacing:-2px">——</button>
   </div>
   <div class="fmt-sep"></div>
   <div class="fmt-group">
-    <button class="fmt-btn" data-action="table" title="Insert table" style="font-size:13px">⊞</button>
-    <button class="fmt-btn" data-action="hr" title="Horizontal rule" style="font-size:16px;letter-spacing:-2px">——</button>
+    <button class="fmt-btn" id="btn-wrap" title="Toggle word wrap" style="font-size:11px;letter-spacing:-0.5px">Wrap</button>
   </div>
 </div>
 
-<!-- ── Layout ───────────────────────────────────────────────────────────── -->
+<!-- Layout -->
 <div id="outer-layout">
-
   <div id="sidebar">
     <div class="sb-section">
       <div class="sb-header">
         <span class="sb-title">Notebooks</span>
-        <button class="sb-action" id="btn-new-file" title="New markdown file">+</button>
+        <button class="sb-action" id="btn-new-file" title="New file">+</button>
         <span class="sb-chevron">${ICON.chevron}</span>
       </div>
       <div class="sb-body" id="files-list"></div>
     </div>
-
     <div class="sb-section flex-fill ${showTOC ? '' : 'collapsed'}" id="sec-toc">
       <div class="sb-header">
         <span class="sb-title">On this page</span>
@@ -1545,23 +1384,72 @@ export class MarkdownPreviewPanel {
       <div class="sb-body" id="toc-body"></div>
     </div>
   </div>
-
   <div id="main-col">
     <div id="main">
-      <div id="scroller">
-        <article class="markdown-body">${body}</article>
-      </div>
-      <textarea id="edit-area" spellcheck="false" autocorrect="off" autocapitalize="off"
-        placeholder="Start writing Markdown…"></textarea>
-      <div id="split-preview">
-        <article class="markdown-body">${body}</article>
-      </div>
+      <div id="scroller"><article class="markdown-body">${body}</article></div>
+      <textarea id="edit-area" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Start writing Markdown…"></textarea>
+      <div id="split-preview"><article class="markdown-body">${body}</article></div>
     </div>
   </div>
-
 </div>
 
 <button id="top-btn" title="Back to top">${ICON.arrowUp}</button>
+
+<!-- Quick Open overlay (Cmd+K) -->
+<div id="quick-open">
+  <div class="qo-backdrop" id="qo-backdrop"></div>
+  <div class="qo-panel">
+    <input id="qo-input" type="text" placeholder="Search files… (↑↓ navigate, Enter open, Esc close)" autocomplete="off">
+    <div class="qo-hint">⌘K to open · ? for shortcuts</div>
+    <div class="qo-results" id="qo-results"></div>
+  </div>
+</div>
+
+<!-- Keyboard Shortcuts overlay (?) -->
+<div id="shortcuts-panel">
+  <div class="sp-backdrop" id="sp-backdrop"></div>
+  <div class="sp-card">
+    <div class="sp-hdr">
+      <h3 class="sp-title">Keyboard Shortcuts</h3>
+      <button class="sp-close" id="sp-close">✕</button>
+    </div>
+    <div class="sp-section">
+      <div class="sp-section-title">Navigation</div>
+      <div class="sp-row"><span class="sp-desc">Open Markr preview</span><div class="sp-keys"><span class="sp-key">⌘⇧M</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Quick file search</span><div class="sp-keys"><span class="sp-key">⌘K</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Show shortcuts</span><div class="sp-keys"><span class="sp-key">?</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Close overlay / exit edit</span><div class="sp-keys"><span class="sp-key">Esc</span></div></div>
+    </div>
+    <div class="sp-section">
+      <div class="sp-section-title">Editing</div>
+      <div class="sp-row"><span class="sp-desc">Toggle split edit mode</span><div class="sp-keys"><span class="sp-key">Edit button</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Bold</span><div class="sp-keys"><span class="sp-key">⌘B</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Italic</span><div class="sp-keys"><span class="sp-key">⌘I</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Link</span><div class="sp-keys"><span class="sp-key">⌘K</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Inline code</span><div class="sp-keys"><span class="sp-key">⌘&#96;</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Heading 1 / 2 / 3</span><div class="sp-keys"><span class="sp-key">⌘⇧1</span><span class="sp-key">⌘⇧2</span><span class="sp-key">⌘⇧3</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Indent (Tab)</span><div class="sp-keys"><span class="sp-key">Tab</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Continue list (Enter)</span><div class="sp-keys"><span class="sp-key">↵</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Paste image from clipboard</span><div class="sp-keys"><span class="sp-key">⌘V</span> <span style="font-size:11px;color:var(--text-faint)">(with image)</span></div></div>
+    </div>
+    <div class="sp-section">
+      <div class="sp-section-title">Toolbar</div>
+      <div class="sp-row"><span class="sp-desc">Copy raw Markdown</span><div class="sp-keys"><span class="sp-key">MD button</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Copy rendered HTML</span><div class="sp-keys"><span class="sp-key">HTML button</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Export to .html file</span><div class="sp-keys"><span class="sp-key">↓ button</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Print / PDF</span><div class="sp-keys"><span class="sp-key">Print button</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Focus / reading mode</span><div class="sp-keys"><span class="sp-key">⊡ button</span></div></div>
+    </div>
+    <div class="sp-section">
+      <div class="sp-section-title">GitHub Alerts (in any .md)</div>
+      <div class="sp-row"><span class="sp-desc">Info callout</span><div class="sp-keys"><span class="sp-key">&gt; [!NOTE]</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Tip callout</span><div class="sp-keys"><span class="sp-key">&gt; [!TIP]</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Important callout</span><div class="sp-keys"><span class="sp-key">&gt; [!IMPORTANT]</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Warning callout</span><div class="sp-keys"><span class="sp-key">&gt; [!WARNING]</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Caution callout</span><div class="sp-keys"><span class="sp-key">&gt; [!CAUTION]</span></div></div>
+    </div>
+  </div>
+</div>
 
 <script nonce="${nonce}">
   const __MD__       = ${mdJson};
