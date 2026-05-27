@@ -448,12 +448,13 @@ body {
 .sep-v { width: 1px; height: 16px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
 .tb-btn {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px;
-  border: none; border-radius: 4px; font-size: 11.5px; font-family: inherit;
-  cursor: pointer; color: var(--vscode-foreground, var(--text)); background: transparent;
-  white-space: nowrap; transition: background 0.1s, color 0.1s; line-height: 1; height: 26px; flex-shrink: 0;
+  border: 1px solid var(--border-faint); border-radius: 4px; font-size: 11.5px; font-family: inherit;
+  cursor: pointer; color: var(--vscode-foreground, var(--text)); background: rgba(127,127,127,0.04);
+  white-space: nowrap; transition: background 0.1s, color 0.1s, border-color 0.1s, box-shadow 0.1s; line-height: 1; height: 26px; flex-shrink: 0;
 }
-.tb-btn:hover { background: var(--vscode-toolbar-hoverBackground, var(--bg-hover)); }
-.tb-btn.on { background: var(--accent-bg); color: var(--accent); }
+.tb-btn:hover { background: var(--vscode-toolbar-hoverBackground, var(--bg-hover)); border-color: var(--border); box-shadow: inset 0 0 0 1px var(--border-faint); }
+.tb-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.tb-btn.on { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-border); }
 .tb-btn.accent { background: var(--accent); color: #fff; font-weight: 600; }
 .tb-btn.accent:hover { background: var(--accent-dim); }
 .tb-btn svg { flex-shrink: 0; }
@@ -513,7 +514,17 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 .sb-body { overflow-y: auto; overflow-x: hidden; padding: 2px 0 8px; }
 .sb-section.collapsed .sb-body { display: none; }
 .sb-ai-label { padding: 6px 12px 2px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); opacity: 0.7; font-family: ui-monospace, monospace; }
-.file-dir { padding: 6px 12px 2px; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); font-family: ui-monospace, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-dir {
+  width: 100%; display: flex; align-items: center; gap: 5px; padding: 6px 10px 3px 10px;
+  border: none; background: transparent; cursor: pointer; text-align: left;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-faint); font-family: ui-monospace, monospace; white-space: nowrap;
+}
+.file-dir:hover { background: var(--bg-hover); color: var(--text-muted); }
+.file-dir .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.file-dir .folder-count { opacity: 0.7; font-size: 9px; }
+.folder-chevron { width: 10px; height: 10px; transition: transform 0.12s; flex-shrink: 0; }
+.file-dir.collapsed .folder-chevron { transform: rotate(-90deg); }
 .file-item {
   display: flex; align-items: center; padding: 4px 10px 4px 12px; gap: 6px;
   font-size: 12px; font-family: ui-monospace, monospace; color: var(--text-muted);
@@ -551,16 +562,22 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 #main-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
 #main { flex: 1; display: flex; overflow: hidden; }
 #scroller { flex: 1; overflow-y: auto; overflow-x: hidden; }
-#edit-area, #split-preview { display: none; }
+#edit-area, #split-preview, #split-resizer { display: none; }
 body.edit-mode #scroller { display: none; }
 body.edit-mode #edit-area {
-  display: block; flex: 1; padding: 24px 28px;
+  display: block; flex: 0 0 var(--edit-pane-width, 50%); min-width: 260px; padding: 24px 28px;
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 13.5px; line-height: 1.8; color: var(--text); background: var(--bg);
   border: none; border-right: 1px solid var(--border); outline: none; resize: none;
   overflow-y: auto; tab-size: 2; caret-color: var(--accent); white-space: pre-wrap;
 }
 body.edit-mode #split-preview { display: block; flex: 1; overflow-y: auto; }
+body.edit-mode #split-resizer {
+  display: block; width: 7px; flex: 0 0 7px; cursor: col-resize;
+  background: var(--bg-panel); border-left: 1px solid var(--border); border-right: 1px solid var(--border);
+}
+body.edit-mode #split-resizer:hover,
+body.resizing-split #split-resizer { background: var(--accent-bg); }
 
 /* === Frontmatter ============================================================*/
 .fm-panel {
@@ -846,14 +863,27 @@ const SCRIPT = /* javascript */`
   let currentMarkdown = (typeof __MD__ !== 'undefined') ? __MD__ : '';
   let filesCache  = (typeof __FILES__ !== 'undefined') ? [...__FILES__] : [];
   let filesLoading = (typeof __FILES_LOADING__ !== 'undefined') ? __FILES_LOADING__ : false;
+  let currentUri = (typeof __CURRENT_URI__ !== 'undefined') ? __CURRENT_URI__ : '';
   let editMode    = false;
   let wordWrap    = true;
   let editTimer, saveTimer;
+  const collapsedFolders = new Set();
 
   function qs(s, c)  { return (c || document).querySelector(s); }
   function qsa(s, c) { return [...(c || document).querySelectorAll(s)]; }
   function escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function autoEditKey(uri) { return 'markr-autoedit-dismissed:' + (uri || currentUri || ''); }
+  function isAutoEditDismissed(uri) {
+    try { return sessionStorage.getItem(autoEditKey(uri)) === '1'; } catch { return false; }
+  }
+  function setAutoEditDismissed(uri, dismissed) {
+    try {
+      const key = autoEditKey(uri);
+      if (dismissed) sessionStorage.setItem(key, '1');
+      else sessionStorage.removeItem(key);
+    } catch {}
   }
 
   // ── Live stats ─────────────────────────────────────────────────────────────
@@ -919,14 +949,27 @@ const SCRIPT = /* javascript */`
       rootFiles.forEach(f => { html += fileItemHtml(f); });
     }
     Object.keys(groups).filter(k => k).sort().forEach(dir => {
-      html += '<div class="file-dir">' + escHtml(dir) + '</div>';
-      groups[dir].forEach(f => { html += fileItemHtml(f); });
+      const collapsed = collapsedFolders.has(dir);
+      html += '<button class="file-dir' + (collapsed ? ' collapsed' : '') + '" data-dir="' + escHtml(dir) + '">'
+        + '<span class="folder-chevron">▾</span><span class="folder-name">' + escHtml(dir) + '</span>'
+        + '<span class="folder-count">' + groups[dir].length + '</span></button>';
+      if (!collapsed) groups[dir].forEach(f => { html += fileItemHtml(f); });
     });
     container.innerHTML = html;
+    qsa('.file-dir', container).forEach(el => {
+      el.addEventListener('click', () => {
+        const dir = el.getAttribute('data-dir');
+        if (!dir) return;
+        if (collapsedFolders.has(dir)) collapsedFolders.delete(dir);
+        else collapsedFolders.add(dir);
+        renderFileList(filesCache);
+      });
+    });
     qsa('.file-item', container).forEach(el => {
       el.addEventListener('click', () => {
         const uri = el.getAttribute('data-uri');
         if (!uri) return;
+        if (editMode) flushEdit();
         // If already loaded in a tab, switch instantly — no extension round-trip
         if (tabs.find(t => t.uri === uri)) { switchToTab(uri); return; }
         vsc.postMessage({ type: 'openFile', uri });
@@ -1010,6 +1053,37 @@ const SCRIPT = /* javascript */`
     const max = ta.scrollHeight - ta.clientHeight; if (max <= 0) return;
     sp.scrollTop = (ta.scrollTop / max) * (sp.scrollHeight - sp.clientHeight);
   });
+
+  // ── Split resize / preview focus ───────────────────────────────────────────
+  (function setupSplitResize() {
+    const main = qs('#main');
+    const resizer = qs('#split-resizer');
+    if (!main || !resizer) return;
+    const saved = (() => { try { return localStorage.getItem('markr-edit-pane-width'); } catch { return null; } })();
+    if (saved) document.documentElement.style.setProperty('--edit-pane-width', saved);
+    resizer.addEventListener('mousedown', e => {
+      e.preventDefault();
+      document.body.classList.add('resizing-split');
+      const onMove = ev => {
+        const rect = main.getBoundingClientRect();
+        const pct = Math.min(75, Math.max(25, ((ev.clientX - rect.left) / rect.width) * 100));
+        const value = pct.toFixed(1) + '%';
+        document.documentElement.style.setProperty('--edit-pane-width', value);
+        try { localStorage.setItem('markr-edit-pane-width', value); } catch {}
+      };
+      const onUp = () => {
+        document.body.classList.remove('resizing-split');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    resizer.addEventListener('dblclick', () => {
+      document.documentElement.style.setProperty('--edit-pane-width', '50%');
+      try { localStorage.setItem('markr-edit-pane-width', '50%'); } catch {}
+    });
+  })();
 
   // ── Copy buttons ───────────────────────────────────────────────────────────
   function addCopyButtons() {
@@ -1132,6 +1206,12 @@ const SCRIPT = /* javascript */`
     clearTimeout(editTimer);
     editTimer = setTimeout(() => vsc.postMessage({ type: 'edit', content, uri: activeTabUri }), 250);
   }
+  function flushEdit() {
+    const ta = qs('#edit-area'); if (!ta) return;
+    clearTimeout(editTimer);
+    currentMarkdown = ta.value;
+    vsc.postMessage({ type: 'edit', content: currentMarkdown, uri: activeTabUri });
+  }
 
   qs('#edit-area')?.addEventListener('input', () => triggerEdit());
 
@@ -1224,7 +1304,7 @@ const SCRIPT = /* javascript */`
     qsa('.qo-item', container).forEach(el => {
       el.addEventListener('click', () => {
         const uri = el.getAttribute('data-uri');
-        if (uri) { vsc.postMessage({ type: 'openFile', uri }); closeQuickOpen(); }
+        if (uri) { if (editMode) flushEdit(); vsc.postMessage({ type: 'openFile', uri }); closeQuickOpen(); }
       });
     });
   }
@@ -1233,7 +1313,7 @@ const SCRIPT = /* javascript */`
     const items = qsa('.qo-item', qs('#qo-results'));
     if (e.key === 'ArrowDown') { e.preventDefault(); qoSelected = Math.min(qoSelected + 1, items.length - 1); renderQoResults(qs('#qo-input').value); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); qoSelected = Math.max(qoSelected - 1, 0); renderQoResults(qs('#qo-input').value); }
-    else if (e.key === 'Enter') { const sel = items[qoSelected] || items[0]; const uri = sel?.getAttribute('data-uri'); if (uri) { vsc.postMessage({ type: 'openFile', uri }); closeQuickOpen(); } }
+    else if (e.key === 'Enter') { const sel = items[qoSelected] || items[0]; const uri = sel?.getAttribute('data-uri'); if (uri) { if (editMode) flushEdit(); vsc.postMessage({ type: 'openFile', uri }); closeQuickOpen(); } }
   });
   qs('#qo-backdrop')?.addEventListener('click', closeQuickOpen);
 
@@ -1339,15 +1419,22 @@ const SCRIPT = /* javascript */`
     vsc.postMessage({ type: 'modeChange', mode: 'edit' });
     updateStats(currentMarkdown);
   }
-  function exitEditMode() {
+  function exitEditMode(rememberAutoEdit = true, notify = true, flush = true) {
+    if (editMode && flush) flushEdit();
+    if (rememberAutoEdit) setAutoEditDismissed(currentUri, true);
     editMode = false;
     document.body.classList.remove('edit-mode');
     const btn = qs('#btn-edit'); if (btn) btn.textContent = editMode ? '← Preview' : 'Edit';
     const si = qs('#save-status'); if (si) si.className = 'save-status';
-    vsc.postMessage({ type: 'modeChange', mode: 'preview' });
+    if (notify) vsc.postMessage({ type: 'modeChange', mode: 'preview' });
   }
   qs('#btn-edit')?.addEventListener('click', () => { editMode ? exitEditMode() : enterEditMode(); });
-  if (typeof __AUTOEDIT__ !== 'undefined' && __AUTOEDIT__) { setTimeout(enterEditMode, 50); }
+  qs('#split-preview')?.addEventListener('click', e => {
+    if (!editMode) return;
+    if (e.target.closest('a,button,pre,code,input,textarea,select')) return;
+    exitEditMode(true);
+  });
+  if (typeof __AUTOEDIT__ !== 'undefined' && __AUTOEDIT__ && !isAutoEditDismissed(currentUri)) { setTimeout(enterEditMode, 50); }
 
   // ── Back to top ────────────────────────────────────────────────────────────
   const topBtn   = qs('#top-btn');
@@ -1370,6 +1457,7 @@ const SCRIPT = /* javascript */`
         tab.aiKind = msg.aiKind || '';
       }
       activeTabUri = msg.uri;
+      currentUri = msg.uri;
       const body = qs('#scroller .markdown-body'); if (body) body.innerHTML = msg.html;
       const spBody = qs('#split-preview .markdown-body'); if (spBody) spBody.innerHTML = msg.html;
       currentMarkdown = msg.markdown;
@@ -1380,8 +1468,8 @@ const SCRIPT = /* javascript */`
         aiBadge.style.display = msg.isAiConfig ? '' : 'none';
       }
       updateStats(msg.markdown);
-      if (msg.isAiConfig) { if (!editMode) enterEditMode(); }
-      else { if (editMode) exitEditMode(); }
+      if (msg.isAiConfig && !isAutoEditDismissed(msg.uri)) { if (!editMode) enterEditMode(); }
+      else { if (editMode) exitEditMode(false, false, false); }
       qs('#scroller').scrollTop = 0;
       buildTOC(); addCopyButtons(); setupHeadingAnchors();
       if (qs('#scroller .language-mermaid')) setupMermaid();
@@ -1460,6 +1548,7 @@ const SCRIPT = /* javascript */`
     }
     const tab = tabs.find(t => t.uri === uri); if (!tab) return;
     activeTabUri = uri;
+    currentUri = uri;
     const body = qs('#scroller .markdown-body');
     if (body) { body.innerHTML = tab.html; }
     const spBody = qs('#split-preview .markdown-body');
@@ -1472,8 +1561,8 @@ const SCRIPT = /* javascript */`
       aiBadge.style.display = tab.isAiConfig ? '' : 'none';
     }
     updateStats(tab.markdown);
-    if (tab.isAiConfig) { if (!editMode) enterEditMode(); }
-    else { if (editMode) exitEditMode(); }
+    if (tab.isAiConfig && !isAutoEditDismissed(uri)) { if (!editMode) enterEditMode(); }
+    else { if (editMode) exitEditMode(false, false, false); }
     setTimeout(() => { if (qs('#scroller')) qs('#scroller').scrollTop = tab.scrollTop || 0; }, 40);
     buildTOC(); addCopyButtons(); setupHeadingAnchors();
     if (qs('#scroller .language-mermaid')) setupMermaid();
@@ -1867,6 +1956,7 @@ export class MarkdownPreviewPanel {
     const mdJson     = JSON.stringify(text);
     const filesJson  = JSON.stringify(files);
     const filesLoadingJson = JSON.stringify(filesLoading);
+    const currentUriJson = JSON.stringify(this._document.uri.toString());
     const relPath    = vscode.workspace.asRelativePath(this._document.uri);
     const aiKind     = aiDocKind(filename, relPath);
     const autoEdit   = !!aiKind;
@@ -1994,6 +2084,7 @@ export class MarkdownPreviewPanel {
     <div id="main">
       <div id="scroller"><article class="markdown-body">${body}</article></div>
       <textarea id="edit-area" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Start writing Markdown…"></textarea>
+      <div id="split-resizer" title="Drag to resize editor and preview"></div>
       <div id="split-preview"><article class="markdown-body">${body}</article></div>
     </div>
   </div>
@@ -2062,6 +2153,7 @@ export class MarkdownPreviewPanel {
   const __MD__       = ${mdJson};
   const __FILES__    = ${filesJson};
   const __FILES_LOADING__ = ${filesLoadingJson};
+  const __CURRENT_URI__ = ${currentUriJson};
   const __AUTOEDIT__ = ${autoEdit};
 </script>
 <script nonce="${nonce}">${SCRIPT}</script>

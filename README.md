@@ -32,9 +32,9 @@ Open any `.md` file and run **Markr: Open Markr Preview** or press:
 | Area | What Markr Adds |
 |---|---|
 | Reading | Clean typography, focus mode, back-to-top, reading time, word count |
-| Navigation | Workspace file panel, live table of contents, scroll spy, heading links |
+| Navigation | Collapsible workspace folders, live table of contents, scroll spy, heading links |
 | AI Markdown | First-class handling for `AGENTS.md`, `SKILL.md`, prompts, rules, and context files |
-| Editing | Split edit mode, formatting toolbar, autosave, image paste support |
+| Editing | Resizable split edit mode, formatting toolbar, autosave, image paste support |
 | Rendering | GitHub-style Markdown, syntax highlighting, alerts, Mermaid diagrams |
 | Export | Copy Markdown, copy HTML, export HTML, print, export PDF |
 | Themes | Markr Light, Markr Dark, Notion, Linear |
@@ -43,7 +43,7 @@ Open any `.md` file and run **Markr: Open Markr Preview** or press:
 
 ## Workspace Navigation
 
-Markr includes a file panel for Markdown-heavy projects. It indexes workspace `.md` files, groups them by folder, highlights AI configuration files, and lets you switch between files without leaving the preview.
+Markr includes a file panel for Markdown-heavy projects. It indexes workspace `.md` files, groups them by folder, lets folders collapse, highlights AI configuration files, and lets you switch between files without leaving the preview.
 
 The file list loads asynchronously so the preview can appear quickly even in projects with many Markdown files. You can control the list size with `markr.maxWorkspaceFiles`.
 
@@ -58,7 +58,7 @@ Modern development projects often contain Markdown files that define agent behav
 - `CLAUDE.md`, `codex.md`, `gemini.md`, and Copilot instruction files
 - Cursor, Windsurf, Aider, prompt, rule, memory, and context Markdown files
 
-AI docs open directly into split edit mode, show a clear type badge, and stay grouped at the top of the file panel. Use the **Source** toolbar action to jump from Markr into the normal VS Code Markdown editor whenever you want the full editor experience.
+AI docs open directly into split edit mode, show a clear type badge, and stay grouped at the top of the file panel. The split can be resized, and switching to preview is remembered for that file during the session. Use the **Source** toolbar action to jump from Markr into the normal VS Code Markdown editor whenever you want the full editor experience.
 
 ---
 
