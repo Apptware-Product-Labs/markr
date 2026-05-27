@@ -242,6 +242,7 @@ const CSS = /* css */`
   --accent:       #F97316;
   --accent-dim:   #C2570A;
   --accent-bg:    rgba(249,115,22,0.08);
+  --accent-border: rgba(249,115,22,0.3);
   --text:         #1c1a17;
   --text-2:       #4a4540;
   --text-muted:   #888178;
@@ -265,27 +266,69 @@ const CSS = /* css */`
   --hl: #1c1a17; --hl-kw: #d73a49; --hl-fn: #6f42c1; --hl-lit: #005cc5;
   --hl-str: #032f62; --hl-bi: #e36209; --hl-cm: #888178; --hl-tag: #22863a;
   --hl-add-bg: #f0fff4; --hl-del-bg: #ffeef0; --hl-add-fg: #22863a; --hl-del-fg: #b31d28;
-  --sb-thumb:     rgba(0,0,0,0.22);   --sb-thumb-hv:  rgba(0,0,0,0.38);  --sb-track: transparent;
+  --sb-thumb:     rgba(88,78,66,0.42); --sb-thumb-hv:  rgba(88,78,66,0.62);
+  --sb-track:     #f0ece5;             --sb-track-panel: #e8e2d8;        --sb-track-code: #e2dacf;
 }
 
 /* === Notion (clean white) ===================================================*/
 [data-m="notion"] {
-  --accent:       #F97316;  --accent-dim:   #C2570A;  --accent-bg:    rgba(249,115,22,0.06);
-  --text:         #37352f;  --text-2:       #55534e;  --text-muted:   #9b9a97;  --text-faint:   #c7c6c3;
-  --bg:           #ffffff;  --bg-panel:     #f7f6f3;  --bg-hover:     #efefef;  --bg-subtle:    #f7f6f3;
+  --accent:       #37352f;  --accent-dim:   #2f2d28;  --accent-bg:    rgba(55,53,47,0.08);
+  --accent-border: rgba(55,53,47,0.12);
+  --text:         #37352f;  --text-2:       #55534e;  --text-muted:   #787774;  --text-faint:   #b9b8b6;
+  --bg:           #ffffff;  --bg-panel:     #fbfbfa;  --bg-hover:     rgba(55,53,47,0.08);  --bg-subtle:    #f7f6f3;
   --border:       #e9e9e7;  --border-faint: #f1f0ef;  --code-bg:      #f7f6f3;
-  --link:         #0b6e99;  --link-hv:      #0550ae;  --success:      #0f7b6c;
-  --fg:           #37352f;  --fg-muted:     #9b9a97;  --code-inline:  rgba(135,131,120,0.15);
+  --link:         #337ea9;  --link-hv:      #2c6e95;  --success:      #448361;
+  --fg:           #37352f;  --fg-muted:     #787774;  --code-inline:  rgba(135,131,120,0.15);
   --hr:           #e9e9e7;  --table-alt:    #f7f6f3;  --brd-muted:    #e9e9e7;
   --hl: #37352f; --hl-kw: #d73a49; --hl-fn: #6f42c1; --hl-lit: #005cc5;
   --hl-str: #032f62; --hl-bi: #e36209; --hl-cm: #9b9a97; --hl-tag: #22863a;
   --hl-add-bg: #f0fff4; --hl-del-bg: #ffeef0; --hl-add-fg: #22863a; --hl-del-fg: #b31d28;
-  --sb-thumb:     rgba(0,0,0,0.22);   --sb-thumb-hv:  rgba(0,0,0,0.38);  --sb-track: transparent;
+  --sb-thumb:     rgba(55,53,47,0.28); --sb-thumb-hv:  rgba(55,53,47,0.45);
+  --sb-track:     #f7f6f3;             --sb-track-panel: #f1f1ef;        --sb-track-code: #efeeeb;
 }
+
+[data-m="notion"] #toolbar { background: var(--bg); }
+[data-m="notion"] .logo-mark {
+  background: none; background-clip: initial;
+  color: var(--text); -webkit-text-fill-color: var(--text);
+}
+[data-m="notion"] .logo-mark svg rect { fill: var(--text); }
+[data-m="notion"] .file-item.active,
+[data-m="notion"] .toc-item a.active {
+  color: var(--text); border-left-color: transparent; background: var(--accent-bg);
+}
+[data-m="notion"] .tab.active {
+  color: var(--text); border-color: transparent; background: var(--accent-bg);
+}
+[data-m="notion"] .markdown-body blockquote {
+  color: var(--text-2); background: transparent; border-left-color: rgba(55,53,47,0.24);
+}
+[data-m="notion"] .markdown-body h1,
+[data-m="notion"] .markdown-body h2,
+[data-m="notion"] .markdown-body h3,
+[data-m="notion"] .markdown-body h4,
+[data-m="notion"] .markdown-body h5,
+[data-m="notion"] .markdown-body h6 {
+  font-weight: 600;
+}
+[data-m="notion"] .markdown-body pre {
+  border-radius: 4px; border-color: rgba(55,53,47,0.09);
+}
+[data-m="notion"] .markdown-body table {
+  border-radius: 3px; border-color: var(--border);
+}
+[data-m="notion"] .markdown-body table th {
+  border-bottom-width: 1px; font-weight: 500;
+}
+[data-m="notion"] .markdown-body table td {
+  border-bottom-color: var(--border);
+}
+[data-m="notion"] .markdown-body .task-list-item input[type="checkbox"] { accent-color: #2383e2; }
 
 /* === Linear (cool dark) =====================================================*/
 [data-m="linear"] {
   --accent:       #5e6ad2;  --accent-dim:   #4956c3;  --accent-bg:    rgba(94,106,210,0.13);
+  --accent-border: rgba(94,106,210,0.3);
   --text:         #e2e2e6;  --text-2:       #b0b0b8;  --text-muted:   #72727a;  --text-faint:   #3a3a42;
   --bg:           #0d0d10;  --bg-panel:     #131318;  --bg-hover:     #1b1b22;  --bg-subtle:    #111116;
   --border:       #1e1e28;  --border-faint: #17171e;  --code-bg:      #0a0a0d;
@@ -296,7 +339,8 @@ const CSS = /* css */`
   --hl-str: #a5d6ff; --hl-bi: #ffa657; --hl-cm: #72727a; --hl-tag: #7ee787;
   --hl-add-bg: rgba(46,160,67,0.15); --hl-del-bg: rgba(248,81,73,0.15);
   --hl-add-fg: #aff5b4; --hl-del-fg: #ffdcd7;
-  --sb-thumb:     rgba(255,255,255,0.22); --sb-thumb-hv:  rgba(255,255,255,0.38); --sb-track: transparent;
+  --sb-thumb:     rgba(255,255,255,0.22); --sb-thumb-hv:  rgba(255,255,255,0.38);
+  --sb-track:     #111116;                --sb-track-panel: #17171e;       --sb-track-code: #0d0d10;
 }
 
 /* === Tokens (Dark) =========================================================*/
@@ -304,6 +348,7 @@ const CSS = /* css */`
   --accent:       #FB923C;
   --accent-dim:   #EA7E28;
   --accent-bg:    rgba(251,146,60,0.1);
+  --accent-border: rgba(251,146,60,0.3);
   --text:         #e8e3dc;
   --text-2:       #b5afa8;
   --text-muted:   #7e7970;
@@ -328,7 +373,8 @@ const CSS = /* css */`
   --hl-str: #a5d6ff; --hl-bi: #ffa657; --hl-cm: #7e7970; --hl-tag: #7ee787;
   --hl-add-bg: rgba(46,160,67,0.15); --hl-del-bg: rgba(248,81,73,0.15);
   --hl-add-fg: #aff5b4; --hl-del-fg: #ffdcd7;
-  --sb-thumb:     rgba(255,255,255,0.22); --sb-thumb-hv:  rgba(255,255,255,0.38); --sb-track: transparent;
+  --sb-thumb:     rgba(255,255,255,0.22); --sb-thumb-hv:  rgba(255,255,255,0.38);
+  --sb-track:     #1e1c19;                --sb-track-panel: #242019;       --sb-track-code: #181612;
 }
 
 /* === Reset =================================================================*/
@@ -685,15 +731,22 @@ body.focus-mode #sidebar { width: 0; min-width: 0; opacity: 0; overflow: hidden;
 body.focus-mode .markdown-body { max-width: 720px; font-size: 16.5px; line-height: 1.85; }
 
 /* === Scrollbar =============================================================*/
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: var(--bg); }
-::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 10px; }
+* { scrollbar-width: thin; scrollbar-color: var(--sb-thumb) var(--sb-track); }
+#sidebar *, #toc-body { scrollbar-color: var(--sb-thumb) var(--sb-track-panel); }
+#edit-area, #scroller, #split-preview, #fmt-toolbar, .qo-results, .sp-card,
+.mermaid, .markdown-body table, pre { scrollbar-gutter: stable; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--sb-track); }
+::-webkit-scrollbar-thumb { background: var(--sb-thumb); border: 2px solid var(--sb-track); border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hv); }
 #sidebar ::-webkit-scrollbar-track,
-#toc-body::-webkit-scrollbar-track { background: var(--bg-panel); }
-#edit-area::-webkit-scrollbar-track  { background: var(--bg); }
-pre::-webkit-scrollbar-track { background: var(--code-bg); }
-pre::-webkit-scrollbar { height: 4px; }
+#toc-body::-webkit-scrollbar-track { background: var(--sb-track-panel); }
+#sidebar ::-webkit-scrollbar-thumb,
+#toc-body::-webkit-scrollbar-thumb { border-color: var(--sb-track-panel); }
+#edit-area::-webkit-scrollbar-track { background: var(--sb-track); }
+pre::-webkit-scrollbar-track { background: var(--sb-track-code); }
+pre::-webkit-scrollbar-thumb { border-color: var(--sb-track-code); }
+pre::-webkit-scrollbar { height: 8px; }
 
 /* === Theme Picker ===========================================================*/
 .theme-picker-wrap { position: relative; }
@@ -735,8 +788,7 @@ body.has-tabs #fmt-toolbar { top: 78px; }
   white-space: nowrap; max-width: 168px; background: transparent; user-select: none;
 }
 .tab:hover { background: var(--bg-hover); color: var(--text); }
-.tab.active { background: var(--accent-bg); color: var(--accent); border-color: rgba(249,115,22,0.3); }
-[data-m="linear"] .tab.active { border-color: rgba(94,106,210,0.3); }
+.tab.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-border); }
 .tab-ai { font-size: 9px; opacity: 0.8; }
 .tab-name { overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
 .tab-close {
