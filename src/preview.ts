@@ -1020,6 +1020,10 @@ const SCRIPT = /* javascript */`
   }
   qsa('.fmt-btn').forEach(btn => { btn.addEventListener('click', () => { const a = btn.getAttribute('data-action'); if (a) applyFormat(a); }); });
 
+  // Undo / Redo
+  qs('#btn-undo')?.addEventListener('click', () => { qs('#edit-area')?.focus(); document.execCommand('undo'); triggerEdit(); });
+  qs('#btn-redo')?.addEventListener('click', () => { qs('#edit-area')?.focus(); document.execCommand('redo'); triggerEdit(); });
+
   // Word wrap toggle
   qs('#btn-wrap')?.addEventListener('click', () => {
     wordWrap = !wordWrap;
@@ -1402,6 +1406,8 @@ const ICON = {
   export: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
   pdf: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>`,
   palette: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>`,
+  undo: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>`,
+  redo: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>`,
 };
 
 // ─── Panel ───────────────────────────────────────────────────────────────────
@@ -1758,6 +1764,11 @@ export class MarkdownPreviewPanel {
 
 <!-- Format Toolbar (edit mode) -->
 <div id="fmt-toolbar">
+  <div class="fmt-group">
+    <button class="fmt-btn" id="btn-undo" title="Undo (⌘Z)">${ICON.undo}</button>
+    <button class="fmt-btn" id="btn-redo" title="Redo (⌘⇧Z)">${ICON.redo}</button>
+  </div>
+  <div class="fmt-sep"></div>
   <div class="fmt-group">
     <button class="fmt-btn" data-action="bold"  title="Bold (⌘B)"><b>B</b></button>
     <button class="fmt-btn" data-action="italic" title="Italic (⌘I)"><i>I</i></button>
