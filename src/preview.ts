@@ -265,6 +265,7 @@ const CSS = /* css */`
   --hl: #1c1a17; --hl-kw: #d73a49; --hl-fn: #6f42c1; --hl-lit: #005cc5;
   --hl-str: #032f62; --hl-bi: #e36209; --hl-cm: #888178; --hl-tag: #22863a;
   --hl-add-bg: #f0fff4; --hl-del-bg: #ffeef0; --hl-add-fg: #22863a; --hl-del-fg: #b31d28;
+  --sb-thumb:     rgba(0,0,0,0.18);   --sb-thumb-hv:  rgba(0,0,0,0.30);  --sb-track: rgba(0,0,0,0.04);
 }
 
 /* === Notion (clean white) ===================================================*/
@@ -279,6 +280,7 @@ const CSS = /* css */`
   --hl: #37352f; --hl-kw: #d73a49; --hl-fn: #6f42c1; --hl-lit: #005cc5;
   --hl-str: #032f62; --hl-bi: #e36209; --hl-cm: #9b9a97; --hl-tag: #22863a;
   --hl-add-bg: #f0fff4; --hl-del-bg: #ffeef0; --hl-add-fg: #22863a; --hl-del-fg: #b31d28;
+  --sb-thumb:     rgba(0,0,0,0.15);   --sb-thumb-hv:  rgba(0,0,0,0.26);  --sb-track: rgba(0,0,0,0.03);
 }
 
 /* === Linear (cool dark) =====================================================*/
@@ -294,6 +296,7 @@ const CSS = /* css */`
   --hl-str: #a5d6ff; --hl-bi: #ffa657; --hl-cm: #72727a; --hl-tag: #7ee787;
   --hl-add-bg: rgba(46,160,67,0.15); --hl-del-bg: rgba(248,81,73,0.15);
   --hl-add-fg: #aff5b4; --hl-del-fg: #ffdcd7;
+  --sb-thumb:     rgba(255,255,255,0.12); --sb-thumb-hv:  rgba(255,255,255,0.22); --sb-track: transparent;
 }
 
 /* === Tokens (Dark) =========================================================*/
@@ -325,6 +328,7 @@ const CSS = /* css */`
   --hl-str: #a5d6ff; --hl-bi: #ffa657; --hl-cm: #7e7970; --hl-tag: #7ee787;
   --hl-add-bg: rgba(46,160,67,0.15); --hl-del-bg: rgba(248,81,73,0.15);
   --hl-add-fg: #aff5b4; --hl-del-fg: #ffdcd7;
+  --sb-thumb:     rgba(255,255,255,0.14); --sb-thumb-hv:  rgba(255,255,255,0.24); --sb-track: transparent;
 }
 
 /* === Reset =================================================================*/
@@ -681,10 +685,10 @@ body.focus-mode #sidebar { width: 0; min-width: 0; opacity: 0; overflow: hidden;
 body.focus-mode .markdown-body { max-width: 720px; font-size: 16.5px; line-height: 1.85; }
 
 /* === Scrollbar =============================================================*/
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: var(--sb-track, transparent); }
+::-webkit-scrollbar-thumb { background: var(--sb-thumb, var(--border)); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hv, var(--text-muted)); }
 
 /* === Theme Picker ===========================================================*/
 .theme-picker-wrap { position: relative; }
