@@ -528,7 +528,8 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 .sb-section.collapsed .sb-body { display: none; }
 .sb-ai-label { padding: 6px 12px 2px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); opacity: 0.7; font-family: ui-monospace, monospace; }
 .file-dir {
-  width: 100%; display: flex; align-items: center; gap: 5px; padding: 6px 10px 3px 10px;
+  width: 100%; display: flex; align-items: center; gap: 5px;
+  padding: 6px 10px 3px calc(10px + (var(--depth, 0) * 12px));
   border: none; background: transparent; cursor: pointer; text-align: left;
   font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--text-faint); font-family: ui-monospace, monospace; white-space: nowrap;
@@ -539,7 +540,7 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 .folder-chevron { width: 10px; height: 10px; transition: transform 0.12s; flex-shrink: 0; }
 .file-dir.collapsed .folder-chevron { transform: rotate(-90deg); }
 .file-item {
-  display: flex; align-items: center; padding: 4px 10px 4px 12px; gap: 6px;
+  display: flex; align-items: center; padding: 4px 10px 4px calc(12px + (var(--depth, 0) * 12px)); gap: 6px;
   font-size: 12px; font-family: ui-monospace, monospace; color: var(--text-muted);
   cursor: pointer; border-left: 2px solid transparent;
   transition: background 0.1s, color 0.1s, border-color 0.1s;
@@ -954,20 +955,12 @@ const SCRIPT = /* javascript */`
       html += '<div class="sb-ai-label">✦ AI Docs</div>';
       aiFiles.forEach(f => { html += fileItemHtml(f); });
     }
-    const groups = {};
-    otherFiles.forEach(f => { const k = f.dir || ''; if (!groups[k]) groups[k] = []; groups[k].push(f); });
-    const rootFiles = groups[''] || [];
-    if (rootFiles.length) {
+    const tree = buildFileTree(otherFiles);
+    if (tree.files.length) {
       if (aiFiles.length) html += '<div class="sb-ai-label" style="margin-top:4px;color:var(--text-faint)">Other</div>';
-      rootFiles.forEach(f => { html += fileItemHtml(f); });
+      tree.files.forEach(f => { html += fileItemHtml(f, 0); });
     }
-    Object.keys(groups).filter(k => k).sort().forEach(dir => {
-      const collapsed = collapsedFolders.has(dir);
-      html += '<button class="file-dir' + (collapsed ? ' collapsed' : '') + '" data-dir="' + escHtml(dir) + '">'
-        + '<span class="folder-chevron">▾</span><span class="folder-name">' + escHtml(dir) + '</span>'
-        + '<span class="folder-count">' + groups[dir].length + '</span></button>';
-      if (!collapsed) groups[dir].forEach(f => { html += fileItemHtml(f); });
-    });
+    html += renderTree(tree, 0);
     container.innerHTML = html;
     qsa('.file-dir', container).forEach(el => {
       el.addEventListener('click', () => {
@@ -989,6 +982,36 @@ const SCRIPT = /* javascript */`
       });
     });
   }
+  function buildFileTree(files) {
+    const root = { name: '', path: '', files: [], dirs: {} };
+    files.forEach(f => {
+      let node = root;
+      (f.dir || '').split('/').filter(Boolean).forEach(part => {
+        const path = node.path ? node.path + '/' + part : part;
+        if (!node.dirs[part]) node.dirs[part] = { name: part, path, files: [], dirs: {} };
+        node = node.dirs[part];
+      });
+      node.files.push(f);
+    });
+    return root;
+  }
+  function treeCount(node) {
+    return node.files.length + Object.keys(node.dirs).reduce((sum, key) => sum + treeCount(node.dirs[key]), 0);
+  }
+  function renderTree(node, depth) {
+    return Object.keys(node.dirs).sort().map(name => {
+      const child = node.dirs[name];
+      const collapsed = collapsedFolders.has(child.path);
+      let html = '<button class="file-dir' + (collapsed ? ' collapsed' : '') + '" data-dir="' + escHtml(child.path) + '" style="--depth:' + depth + '">'
+        + '<span class="folder-chevron">▾</span><span class="folder-name">' + escHtml(child.name) + '</span>'
+        + '<span class="folder-count">' + treeCount(child) + '</span></button>';
+      if (!collapsed) {
+        child.files.sort((a, b) => a.label.localeCompare(b.label)).forEach(f => { html += fileItemHtml(f, depth + 1); });
+        html += renderTree(child, depth + 1);
+      }
+      return html;
+    }).join('');
+  }
   // Fast active-indicator update — no DOM rebuild, just toggle a class
   function updateFileListActive(uri) {
     filesCache.forEach(f => { f.active = f.uri === uri; });
@@ -997,12 +1020,12 @@ const SCRIPT = /* javascript */`
     });
   }
 
-  function fileItemHtml(f) {
+  function fileItemHtml(f, depth = 0) {
     const icon = f.isAiConfig
       ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>'
       : '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h8l4 4v8H2V2z" opacity=".4"/><path d="M10 2v4h4"/></svg>';
     return '<div class="file-item' + (f.active ? ' active' : '') + (f.isAiConfig ? ' ai' : '')
-      + '" data-uri="' + escHtml(f.uri) + '" title="' + escHtml(f.relPath) + '">'
+      + '" data-uri="' + escHtml(f.uri) + '" title="' + escHtml(f.relPath) + '" style="--depth:' + depth + '">'
       + icon + '<span class="file-name">' + escHtml(f.label) + '</span>'
       + (f.aiKind ? '<span class="file-ai-kind">' + escHtml(f.aiKind) + '</span>' : '') + '</div>';
   }

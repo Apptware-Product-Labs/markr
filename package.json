@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr",
   "description": "Fast Markdown preview for VS Code with workspace navigation, AI docs support, GitHub-style rendering, split editing, themes, and export tools",
-  "version": "3.2.6",
+  "version": "3.2.7",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Sumit Patil",
