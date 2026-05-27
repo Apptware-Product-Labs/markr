@@ -16,20 +16,36 @@ interface FileEntry {
   active: boolean;
   dir: string;
   isAiConfig: boolean;
+  aiKind: string;
 }
 
-// ─── AI config detection ─────────────────────────────────────────────────────
+// ─── AI Markdown detection ───────────────────────────────────────────────────
 
 const AI_CONFIG_NAMES = new Set([
   'claude.md', 'claude.local.md', 'codex.md', 'agents.md', 'gemini.md',
   'skills.md', 'skill.md', 'system-prompt.md', 'systemprompt.md',
   'copilot-instructions.md', '.cursorrules', 'cursor.md', 'windsurf.md',
   'aider.md', 'gpt.md', 'openai.md', 'anthropic.md', 'context.md',
+  'instructions.md', 'memory.md', 'rules.md', 'prompt.md', 'prompts.md',
 ]);
 
-function isAiConfig(label: string): boolean {
+function aiDocKind(label: string, relPath = ''): string {
   const lower = label.toLowerCase();
-  return AI_CONFIG_NAMES.has(lower) || /^claude(\.local)?\.md$/i.test(lower);
+  const path = relPath.toLowerCase();
+  if (lower === 'agents.md' || lower === 'agent.md') return 'Agent';
+  if (lower === 'skill.md' || lower === 'skills.md' || path.includes('/skills/')) return 'Skill';
+  if (lower.includes('copilot')) return 'Copilot';
+  if (lower.includes('claude')) return 'Claude';
+  if (lower.includes('codex')) return 'Codex';
+  if (lower.includes('gemini')) return 'Gemini';
+  if (lower.includes('cursor') || lower === '.cursorrules') return 'Cursor';
+  if (lower.includes('windsurf')) return 'Windsurf';
+  if (lower.includes('aider')) return 'Aider';
+  if (lower.includes('system') || lower.includes('prompt')) return 'Prompt';
+  if (lower.includes('context') || lower.includes('memory')) return 'Context';
+  if (lower.includes('rule') || lower.includes('instruction')) return 'Rules';
+  if (AI_CONFIG_NAMES.has(lower) || /^claude(\.local)?\.md$/i.test(lower)) return 'AI Doc';
+  return '';
 }
 
 // ─── Marked setup ────────────────────────────────────────────────────────────
@@ -512,6 +528,12 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 .file-item svg { flex-shrink: 0; opacity: 0.45; }
 .file-item.active svg { opacity: 1; }
 .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-ai-kind {
+  flex-shrink: 0; max-width: 58px; overflow: hidden; text-overflow: ellipsis;
+  font-size: 9px; line-height: 1; color: var(--accent);
+  background: var(--accent-bg); border: 1px solid var(--accent-border);
+  border-radius: 3px; padding: 2px 4px;
+}
 .toc-item { list-style: none; margin: 0; padding: 0; }
 .toc-item a {
   display: block; padding: 3px 12px 3px 10px; color: var(--text-muted); text-decoration: none;
@@ -887,7 +909,7 @@ const SCRIPT = /* javascript */`
     const otherFiles = files.filter(f => !f.isAiConfig);
     let html = '';
     if (aiFiles.length) {
-      html += '<div class="sb-ai-label">✦ AI Config</div>';
+      html += '<div class="sb-ai-label">✦ AI Docs</div>';
       aiFiles.forEach(f => { html += fileItemHtml(f); });
     }
     const groups = {};
@@ -926,7 +948,8 @@ const SCRIPT = /* javascript */`
       : '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h8l4 4v8H2V2z" opacity=".4"/><path d="M10 2v4h4"/></svg>';
     return '<div class="file-item' + (f.active ? ' active' : '') + (f.isAiConfig ? ' ai' : '')
       + '" data-uri="' + escHtml(f.uri) + '" title="' + escHtml(f.relPath) + '">'
-      + icon + '<span class="file-name">' + escHtml(f.label) + '</span></div>';
+      + icon + '<span class="file-name">' + escHtml(f.label) + '</span>'
+      + (f.aiKind ? '<span class="file-ai-kind">' + escHtml(f.aiKind) + '</span>' : '') + '</div>';
   }
 
   // ── TOC ────────────────────────────────────────────────────────────────────
@@ -1196,7 +1219,7 @@ const SCRIPT = /* javascript */`
       '<div class="qo-item' + (x.f.isAiConfig ? ' ai' : '') + (i === qoSelected ? ' selected' : '')
       + '" data-uri="' + escHtml(x.f.uri) + '">'
       + '<span class="qo-name">' + escHtml(x.f.label) + '</span>'
-      + '<span class="qo-path">' + escHtml(x.f.dir || '') + '</span>'
+      + '<span class="qo-path">' + escHtml(x.f.aiKind || x.f.dir || '') + '</span>'
       + '</div>'
     ).join('');
     qsa('.qo-item', container).forEach(el => {
@@ -1245,6 +1268,9 @@ const SCRIPT = /* javascript */`
 
   // ── Toolbar buttons ────────────────────────────────────────────────────────
   qs('#btn-copy-md')?.addEventListener('click', () => vsc.postMessage({ type: 'copyMarkdown' }));
+  qs('#btn-source')?.addEventListener('click', () => {
+    vsc.postMessage({ type: 'openInEditor', uri: activeTabUri });
+  });
 
   qs('#btn-copy-html')?.addEventListener('click', () => {
     const html = qs('.markdown-body')?.innerHTML || '';
@@ -1336,15 +1362,24 @@ const SCRIPT = /* javascript */`
     if (msg.type === 'fileLoaded') {
       let tab = tabs.find(t => t.uri === msg.uri);
       if (!tab) {
-        tab = { uri: msg.uri, filename: msg.filename, html: msg.html, markdown: msg.markdown, isAiConfig: msg.isAiConfig, scrollTop: 0 };
+        tab = { uri: msg.uri, filename: msg.filename, html: msg.html, markdown: msg.markdown, isAiConfig: msg.isAiConfig, aiKind: msg.aiKind || '', scrollTop: 0 };
         tabs.push(tab);
-      } else { tab.html = msg.html; tab.markdown = msg.markdown; }
+      } else {
+        tab.html = msg.html;
+        tab.markdown = msg.markdown;
+        tab.isAiConfig = msg.isAiConfig;
+        tab.aiKind = msg.aiKind || '';
+      }
       activeTabUri = msg.uri;
       const body = qs('#scroller .markdown-body'); if (body) body.innerHTML = msg.html;
       const spBody = qs('#split-preview .markdown-body'); if (spBody) spBody.innerHTML = msg.html;
       currentMarkdown = msg.markdown;
       const fnEl = qs('.fname'); if (fnEl) fnEl.textContent = msg.filename;
-      const aiBadge = qs('.ai-badge'); if (aiBadge) aiBadge.style.display = msg.isAiConfig ? '' : 'none';
+      const aiBadge = qs('.ai-badge');
+      if (aiBadge) {
+        aiBadge.textContent = msg.aiKind ? '✦ ' + msg.aiKind : '✦ AI';
+        aiBadge.style.display = msg.isAiConfig ? '' : 'none';
+      }
       updateStats(msg.markdown);
       if (msg.isAiConfig) { if (!editMode) enterEditMode(); }
       else { if (editMode) exitEditMode(); }
@@ -1390,7 +1425,7 @@ const SCRIPT = /* javascript */`
       uri: activeFile.uri, filename: activeFile.label,
       html: qs('#scroller .markdown-body')?.innerHTML || '',
       markdown: currentMarkdown,
-      isAiConfig: activeFile.isAiConfig, scrollTop: 0,
+      isAiConfig: activeFile.isAiConfig, aiKind: activeFile.aiKind || '', scrollTop: 0,
     }];
     activeTabUri = activeFile.uri;
   })();
@@ -1433,7 +1468,10 @@ const SCRIPT = /* javascript */`
     currentMarkdown = tab.markdown;
     const fnEl = qs('.fname'); if (fnEl) fnEl.textContent = tab.filename;
     const aiBadge = qs('.ai-badge');
-    if (aiBadge) aiBadge.style.display = tab.isAiConfig ? '' : 'none';
+    if (aiBadge) {
+      aiBadge.textContent = tab.aiKind ? '✦ ' + tab.aiKind : '✦ AI';
+      aiBadge.style.display = tab.isAiConfig ? '' : 'none';
+    }
     updateStats(tab.markdown);
     if (tab.isAiConfig) { if (!editMode) enterEditMode(); }
     else { if (editMode) exitEditMode(); }
@@ -1470,6 +1508,7 @@ const ICON = {
   sidebar: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>`,
   copyMd: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
   copyHtml: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>`,
+  source: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M10 13l-2 2 2 2"/><path d="M14 13l2 2-2 2"/></svg>`,
   print: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`,
   focus: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>`,
   arrowUp: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>`,
@@ -1549,6 +1588,16 @@ export class MarkdownPreviewPanel {
           vscode.window.setStatusBarMessage('$(check) Markr: Markdown copied', 3000)
         );
       }
+      if (msg.type === 'openInEditor') {
+        const uri = msg.uri ? vscode.Uri.parse(msg.uri) : this._document.uri;
+        const doc = await vscode.workspace.openTextDocument(uri);
+        this._document = doc;
+        await vscode.window.showTextDocument(doc, {
+          viewColumn: vscode.ViewColumn.One,
+          preserveFocus: false,
+          preview: false,
+        });
+      }
       if (msg.type === 'edit') {
         this._editMode = true;
         const doc = msg.uri
@@ -1572,6 +1621,8 @@ export class MarkdownPreviewPanel {
           this._document = doc;
           const rawText = doc.getText();
           const filename = doc.uri.path.split('/').pop() ?? 'untitled';
+          const relPath = vscode.workspace.asRelativePath(doc.uri);
+          const aiKind = aiDocKind(filename, relPath);
           const { meta, body } = extractFrontmatter(rawText);
           const rendered = applyGithubAlerts(marked.parse(body) as string);
           const stats = docStats(rawText);
@@ -1582,7 +1633,8 @@ export class MarkdownPreviewPanel {
             filename,
             html: (meta ? renderFrontmatter(meta) : '') + rendered,
             markdown: rawText,
-            isAiConfig: isAiConfig(filename),
+            isAiConfig: !!aiKind,
+            aiKind,
             tokStr: tokenEstimate(stats.chars),
             statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
             words: stats.words,
@@ -1649,7 +1701,8 @@ export class MarkdownPreviewPanel {
                 const parts   = relPath.split('/');
                 const label   = parts[parts.length - 1];
                 const dir     = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-                return { label, relPath, uri: uri.toString(), active: false, dir, isAiConfig: isAiConfig(label) };
+                const aiKind = aiDocKind(label, relPath);
+                return { label, relPath, uri: uri.toString(), active: false, dir, isAiConfig: !!aiKind, aiKind };
               });
             this._filesCacheValid = true;
             return this._filesCache;
@@ -1810,7 +1863,9 @@ export class MarkdownPreviewPanel {
     const mdJson     = JSON.stringify(text);
     const filesJson  = JSON.stringify(files);
     const filesLoadingJson = JSON.stringify(filesLoading);
-    const autoEdit   = isAiConfig(filename);
+    const relPath    = vscode.workspace.asRelativePath(this._document.uri);
+    const aiKind     = aiDocKind(filename, relPath);
+    const autoEdit   = !!aiKind;
     const tokStr     = tokenEstimate(stats.chars);
     const statsTitle = `${stats.words.toLocaleString()} words · ${stats.headings} heading${stats.headings !== 1 ? 's' : ''} · ${stats.codeBlocks} code block${stats.codeBlocks !== 1 ? 's' : ''}`;
 
@@ -1837,7 +1892,7 @@ export class MarkdownPreviewPanel {
     <span class="logo-mark">${ICON.logo} Markr</span>
     <span class="sep-dot">·</span>
     <span class="fname" title="${filename}">${filename}</span>
-    ${autoEdit ? '<span class="ai-badge">✦ AI</span>' : ''}
+    <span class="ai-badge" style="${autoEdit ? '' : 'display:none'}">✦ ${aiKind || 'AI'}</span>
   </div>
   <div class="tr">
     <span class="stats" title="${statsTitle}">
@@ -1848,6 +1903,7 @@ export class MarkdownPreviewPanel {
     <span id="save-status" class="save-status"></span>
     <div class="sep-v"></div>
     <button id="btn-edit" class="tb-btn${autoEdit ? ' accent' : ''}" title="Split edit mode">${autoEdit ? '⚡ Edit' : 'Edit'}</button>
+    <button id="btn-source" class="tb-btn" title="Open Markdown source in VS Code editor">${ICON.source} Source</button>
     <div class="sep-v"></div>
     <button id="btn-copy-md"   class="tb-btn" title="Copy Markdown">${ICON.copyMd} MD</button>
     <button id="btn-copy-html" class="tb-btn" title="Copy HTML">${ICON.copyHtml} HTML</button>
