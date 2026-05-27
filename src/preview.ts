@@ -265,7 +265,7 @@ const CSS = /* css */`
   --hl: #1c1a17; --hl-kw: #d73a49; --hl-fn: #6f42c1; --hl-lit: #005cc5;
   --hl-str: #032f62; --hl-bi: #e36209; --hl-cm: #888178; --hl-tag: #22863a;
   --hl-add-bg: #f0fff4; --hl-del-bg: #ffeef0; --hl-add-fg: #22863a; --hl-del-fg: #b31d28;
-  --sb-thumb:     rgba(0,0,0,0.18);   --sb-thumb-hv:  rgba(0,0,0,0.30);  --sb-track: rgba(0,0,0,0.04);
+  --sb-thumb:     rgba(0,0,0,0.22);   --sb-thumb-hv:  rgba(0,0,0,0.38);  --sb-track: transparent;
 }
 
 /* === Notion (clean white) ===================================================*/
@@ -280,7 +280,7 @@ const CSS = /* css */`
   --hl: #37352f; --hl-kw: #d73a49; --hl-fn: #6f42c1; --hl-lit: #005cc5;
   --hl-str: #032f62; --hl-bi: #e36209; --hl-cm: #9b9a97; --hl-tag: #22863a;
   --hl-add-bg: #f0fff4; --hl-del-bg: #ffeef0; --hl-add-fg: #22863a; --hl-del-fg: #b31d28;
-  --sb-thumb:     rgba(0,0,0,0.15);   --sb-thumb-hv:  rgba(0,0,0,0.26);  --sb-track: rgba(0,0,0,0.03);
+  --sb-thumb:     rgba(0,0,0,0.22);   --sb-thumb-hv:  rgba(0,0,0,0.38);  --sb-track: transparent;
 }
 
 /* === Linear (cool dark) =====================================================*/
@@ -296,7 +296,7 @@ const CSS = /* css */`
   --hl-str: #a5d6ff; --hl-bi: #ffa657; --hl-cm: #72727a; --hl-tag: #7ee787;
   --hl-add-bg: rgba(46,160,67,0.15); --hl-del-bg: rgba(248,81,73,0.15);
   --hl-add-fg: #aff5b4; --hl-del-fg: #ffdcd7;
-  --sb-thumb:     rgba(255,255,255,0.12); --sb-thumb-hv:  rgba(255,255,255,0.22); --sb-track: transparent;
+  --sb-thumb:     rgba(255,255,255,0.22); --sb-thumb-hv:  rgba(255,255,255,0.38); --sb-track: transparent;
 }
 
 /* === Tokens (Dark) =========================================================*/
@@ -328,7 +328,7 @@ const CSS = /* css */`
   --hl-str: #a5d6ff; --hl-bi: #ffa657; --hl-cm: #7e7970; --hl-tag: #7ee787;
   --hl-add-bg: rgba(46,160,67,0.15); --hl-del-bg: rgba(248,81,73,0.15);
   --hl-add-fg: #aff5b4; --hl-del-fg: #ffdcd7;
-  --sb-thumb:     rgba(255,255,255,0.14); --sb-thumb-hv:  rgba(255,255,255,0.24); --sb-track: transparent;
+  --sb-thumb:     rgba(255,255,255,0.22); --sb-thumb-hv:  rgba(255,255,255,0.38); --sb-track: transparent;
 }
 
 /* === Reset =================================================================*/
@@ -685,10 +685,10 @@ body.focus-mode #sidebar { width: 0; min-width: 0; opacity: 0; overflow: hidden;
 body.focus-mode .markdown-body { max-width: 720px; font-size: 16.5px; line-height: 1.85; }
 
 /* === Scrollbar =============================================================*/
-::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: var(--sb-track, transparent); }
-::-webkit-scrollbar-thumb { background: var(--sb-thumb, var(--border)); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hv, var(--text-muted)); }
+::-webkit-scrollbar-thumb { background: var(--sb-thumb); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hv); }
 
 /* === Theme Picker ===========================================================*/
 .theme-picker-wrap { position: relative; }
@@ -708,6 +708,39 @@ body.focus-mode .markdown-body { max-width: 720px; font-size: 16.5px; line-heigh
 .theme-opt:hover { background: var(--bg-hover); color: var(--text); }
 .theme-opt.active { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
 .theme-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* === Tab Bar ================================================================*/
+#tab-bar {
+  position: fixed; inset: 42px 0 auto 0; height: 36px;
+  display: none; align-items: center;
+  background: var(--bg-panel); border-bottom: 1px solid var(--border);
+  overflow-x: auto; overflow-y: hidden; z-index: 285; padding: 0 6px; gap: 2px;
+}
+#tab-bar::-webkit-scrollbar { height: 0; width: 0; }
+body.has-tabs #tab-bar { display: flex; }
+body.has-tabs #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
+body.has-tabs.edit-mode #outer-layout { margin-top: 114px; height: calc(100vh - 114px); }
+body.has-tabs #fmt-toolbar { top: 78px; }
+.tab {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 0 6px 0 9px; height: 26px; border-radius: 5px;
+  font-size: 11.5px; font-family: ui-monospace, monospace;
+  color: var(--text-muted); cursor: pointer; flex-shrink: 0;
+  border: 1px solid transparent; transition: background 0.1s, color 0.1s;
+  white-space: nowrap; max-width: 168px; background: transparent; user-select: none;
+}
+.tab:hover { background: var(--bg-hover); color: var(--text); }
+.tab.active { background: var(--accent-bg); color: var(--accent); border-color: rgba(249,115,22,0.3); }
+[data-m="linear"] .tab.active { border-color: rgba(94,106,210,0.3); }
+.tab-ai { font-size: 9px; opacity: 0.8; }
+.tab-name { overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
+.tab-close {
+  border: none; background: transparent; cursor: pointer; color: var(--text-faint);
+  font-size: 13px; line-height: 1; padding: 0; width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center; border-radius: 3px;
+  flex-shrink: 0; transition: background 0.1s, color 0.1s; margin-left: 2px;
+}
+.tab-close:hover { background: var(--bg-hover); color: var(--text); }
 
 /* === Print =================================================================*/
 @media print {
@@ -998,7 +1031,7 @@ const SCRIPT = /* javascript */`
     updateStats(content);
     showSaving();
     clearTimeout(editTimer);
-    editTimer = setTimeout(() => vsc.postMessage({ type: 'edit', content }), 250);
+    editTimer = setTimeout(() => vsc.postMessage({ type: 'edit', content, uri: activeTabUri }), 250);
   }
 
   qs('#edit-area')?.addEventListener('input', () => triggerEdit());
@@ -1223,6 +1256,26 @@ const SCRIPT = /* javascript */`
   // ── Messages from extension ────────────────────────────────────────────────
   window.addEventListener('message', ev => {
     const msg = ev.data;
+    if (msg.type === 'fileLoaded') {
+      let tab = tabs.find(t => t.uri === msg.uri);
+      if (!tab) {
+        tab = { uri: msg.uri, filename: msg.filename, html: msg.html, markdown: msg.markdown, isAiConfig: msg.isAiConfig, scrollTop: 0 };
+        tabs.push(tab);
+      } else { tab.html = msg.html; tab.markdown = msg.markdown; }
+      activeTabUri = msg.uri;
+      const body = qs('#scroller .markdown-body'); if (body) body.innerHTML = msg.html;
+      const spBody = qs('#split-preview .markdown-body'); if (spBody) spBody.innerHTML = msg.html;
+      currentMarkdown = msg.markdown;
+      const fnEl = qs('.fname'); if (fnEl) fnEl.textContent = msg.filename;
+      const aiBadge = qs('.ai-badge'); if (aiBadge) aiBadge.style.display = msg.isAiConfig ? '' : 'none';
+      updateStats(msg.markdown);
+      if (msg.isAiConfig) { if (!editMode) enterEditMode(); }
+      else { if (editMode) exitEditMode(); }
+      qs('#scroller').scrollTop = 0;
+      buildTOC(); addCopyButtons(); setupHeadingAnchors(); setupMermaid();
+      renderTabBar();
+      if (msg.files) renderFileList(msg.files);
+    }
     if (msg.type === 'scrollToHeading') {
       const el = document.getElementById(msg.id); if (!el) return;
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1244,9 +1297,84 @@ const SCRIPT = /* javascript */`
     }
   });
 
+  // ── Multi-tab ──────────────────────────────────────────────────────────────
+  let tabs = [];
+  let activeTabUri = null;
+
+  (function initFirstTab() {
+    const activeFile = filesCache.find(f => f.active);
+    if (!activeFile) return;
+    tabs = [{
+      uri: activeFile.uri, filename: activeFile.label,
+      html: qs('#scroller .markdown-body')?.innerHTML || '',
+      markdown: currentMarkdown,
+      isAiConfig: activeFile.isAiConfig, scrollTop: 0,
+    }];
+    activeTabUri = activeFile.uri;
+  })();
+
+  function renderTabBar() {
+    const bar = qs('#tab-bar'); if (!bar) return;
+    document.body.classList.toggle('has-tabs', tabs.length > 1);
+    if (tabs.length <= 1) { bar.innerHTML = ''; return; }
+    bar.innerHTML = tabs.map(t =>
+      '<div class="tab' + (t.uri === activeTabUri ? ' active' : '') + '" data-uri="' + escHtml(t.uri) + '">'
+      + (t.isAiConfig ? '<span class="tab-ai">✦</span>' : '')
+      + '<span class="tab-name">' + escHtml(t.filename) + '</span>'
+      + '<button class="tab-close" data-uri="' + escHtml(t.uri) + '">×</button>'
+      + '</div>'
+    ).join('');
+    qsa('.tab', bar).forEach(el => {
+      el.addEventListener('click', e => {
+        if (e.target.closest('.tab-close')) return;
+        switchToTab(el.getAttribute('data-uri'));
+      });
+    });
+    qsa('.tab-close', bar).forEach(el => {
+      el.addEventListener('click', e => { e.stopPropagation(); closeTab(el.getAttribute('data-uri')); });
+    });
+  }
+
+  function switchToTab(uri) {
+    if (!uri || uri === activeTabUri) return;
+    const curTab = tabs.find(t => t.uri === activeTabUri);
+    if (curTab) {
+      curTab.scrollTop = qs('#scroller')?.scrollTop || 0;
+      if (editMode) curTab.markdown = qs('#edit-area')?.value || curTab.markdown;
+    }
+    const tab = tabs.find(t => t.uri === uri); if (!tab) return;
+    activeTabUri = uri;
+    const body = qs('#scroller .markdown-body');
+    if (body) { body.innerHTML = tab.html; }
+    const spBody = qs('#split-preview .markdown-body');
+    if (spBody) spBody.innerHTML = tab.html;
+    currentMarkdown = tab.markdown;
+    const fnEl = qs('.fname'); if (fnEl) fnEl.textContent = tab.filename;
+    const aiBadge = qs('.ai-badge');
+    if (aiBadge) aiBadge.style.display = tab.isAiConfig ? '' : 'none';
+    updateStats(tab.markdown);
+    if (tab.isAiConfig) { if (!editMode) enterEditMode(); }
+    else { if (editMode) exitEditMode(); }
+    setTimeout(() => { if (qs('#scroller')) qs('#scroller').scrollTop = tab.scrollTop || 0; }, 40);
+    buildTOC(); addCopyButtons(); setupHeadingAnchors(); setupMermaid();
+    renderTabBar();
+    vsc.postMessage({ type: 'setActiveDoc', uri });
+  }
+
+  function closeTab(uri) {
+    const idx = tabs.findIndex(t => t.uri === uri); if (idx === -1) return;
+    tabs.splice(idx, 1);
+    if (activeTabUri === uri) {
+      const next = tabs[idx] || tabs[idx - 1];
+      if (next) switchToTab(next.uri); else activeTabUri = null;
+    }
+    renderTabBar();
+  }
+
   // ── Init ───────────────────────────────────────────────────────────────────
   if (typeof __FILES__ !== 'undefined') renderFileList(__FILES__);
   buildTOC(); setupScrollSpy(); addCopyButtons(); setupHeadingAnchors(); setupMermaid();
+  renderTabBar();
   qs('#btn-sidebar')?.classList.add('on');
 })();
 `;
@@ -1332,7 +1460,10 @@ export class MarkdownPreviewPanel {
       }
       if (msg.type === 'edit') {
         this._editMode = true;
-        const doc  = this._document;
+        const doc = msg.uri
+            ? (await vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri)).catch(() => this._document))
+            : this._document;
+        this._document = doc;
         const edit = new vscode.WorkspaceEdit();
         edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), msg.content);
         await vscode.workspace.applyEdit(edit);
@@ -1345,9 +1476,32 @@ export class MarkdownPreviewPanel {
         if (msg.mode === 'preview') this._render();
       }
       if (msg.type === 'openFile') {
+        vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri)).then(async doc => {
+          this._document = doc;
+          const rawText = doc.getText();
+          const filename = doc.uri.path.split('/').pop() ?? 'untitled';
+          const { meta, body } = extractFrontmatter(rawText);
+          const rendered = applyGithubAlerts(marked.parse(body) as string);
+          const stats = docStats(rawText);
+          const files = await this._getWorkspaceFiles();
+          this._panel.webview.postMessage({
+            type: 'fileLoaded',
+            uri: doc.uri.toString(),
+            filename,
+            html: (meta ? renderFrontmatter(meta) : '') + rendered,
+            markdown: rawText,
+            isAiConfig: isAiConfig(filename),
+            tokStr: tokenEstimate(stats.chars),
+            statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
+            words: stats.words,
+            readMins: Math.max(1, Math.ceil(stats.words / 200)),
+            files,
+          });
+        });
+      }
+      if (msg.type === 'setActiveDoc') {
         vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri)).then(doc => {
-          vscode.window.showTextDocument(doc, { preview: false });
-          MarkdownPreviewPanel.createOrShow(doc);
+          this._document = doc;
         });
       }
       if (msg.type === 'newFile') { vscode.commands.executeCommand('workbench.action.files.newUntitledFile'); }
@@ -1593,6 +1747,8 @@ export class MarkdownPreviewPanel {
     <button id="btn-focus" class="tb-btn" title="Focus mode">${ICON.focus}</button>
   </div>
 </div>
+
+<div id="tab-bar"></div>
 
 <!-- Format Toolbar (edit mode) -->
 <div id="fmt-toolbar">
