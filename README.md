@@ -41,6 +41,18 @@ Open any `.md` file and run **Markr: Open Markr Preview** or press:
 
 ---
 
+## Feature Showcase
+
+Run **Markr: Open Feature Showcase** from the Command Palette to open a bundled QA document covering:
+
+- Mermaid flowchart for Strangler Fig architecture
+- Mermaid sequence diagram for Client -> Gateway -> Services -> Kafka order flow
+- Mermaid Gantt chart for a colour-coded Sprint 12 release timeline
+- GitHub `NOTE`, `TIP`, `WARNING`, `IMPORTANT`, and `CAUTION` alerts
+- TypeScript and SQL syntax highlighting examples
+
+---
+
 ## Workspace Navigation
 
 Markr includes a file panel for Markdown-heavy projects. It indexes workspace `.md` files, groups them by folder, lets folders collapse, highlights AI configuration files, and lets you switch between files without leaving the preview.

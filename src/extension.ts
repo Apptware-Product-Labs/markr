@@ -12,6 +12,12 @@ export function activate(context: vscode.ExtensionContext) {
       MarkdownPreviewPanel.createOrShow(editor.document);
     }),
 
+    vscode.commands.registerCommand('markr.openShowcase', async () => {
+      const uri = vscode.Uri.joinPath(context.extensionUri, 'samples', 'markr-showcase.md');
+      const doc = await vscode.workspace.openTextDocument(uri);
+      MarkdownPreviewPanel.createOrShow(doc);
+    }),
+
     // Live update as you type
     vscode.workspace.onDidChangeTextDocument(({ document }) => {
       if (document.languageId === 'markdown') {
