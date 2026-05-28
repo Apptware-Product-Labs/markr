@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: VS Code Marketplace — Markr
+    url: https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr
+    about: Install or review Markr on the VS Code Marketplace
+  - name: Apptware Labs
+    url: https://apptware.com
+    about: Built by Apptware Labs Pvt Ltd

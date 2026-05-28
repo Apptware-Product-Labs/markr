@@ -1,0 +1,6 @@
+# Every PR automatically requests a review from the maintainer.
+# Add more lines to route specific paths to specific people.
+#
+# Format: <path-pattern>  <@github-user-or-team>
+
+*  @product-head
