@@ -1136,6 +1136,7 @@ const SCRIPT = /* javascript */`
     if (prevSnap) showDiffChip(prevSnap.value, snap.value);
     clearTimeout(editTimer);
     editTimer = setTimeout(() => vsc.postMessage({ type: 'edit', content: snap.value, uri: activeTabUri }), 120);
+    updateToolbarState();
   }
 
   function histUndo() {
@@ -1488,37 +1489,125 @@ const SCRIPT = /* javascript */`
 
   // ── Format toolbar ─────────────────────────────────────────────────────────
   function applyFormat(action) {
-    snapHistory(); // capture pre-format state so each format is its own undo step
+    snapHistory();
     const ta = qs('#edit-area'); if (!ta) return;
     const start = ta.selectionStart, end = ta.selectionEnd, val = ta.value, sel = val.slice(start, end);
-    function wrap(before, after, ph) {
+
+    // Inline toggle: wrap selection/placeholder, or remove if already wrapped
+    function toggleInline(marker, ph) {
+      const mlen = marker.length;
+      // Case 1: characters immediately outside the selection ARE this marker → unwrap
+      if (start >= mlen && val.slice(start - mlen, start) === marker && val.slice(end, end + mlen) === marker) {
+        const nv = val.slice(0, start - mlen) + sel + val.slice(end + mlen);
+        ta.value = nv;
+        ta.setSelectionRange(start - mlen, end - mlen);
+        ta.focus(); triggerEdit(); updateToolbarState(); return;
+      }
+      // Case 2: no selection — cursor is inside a marker pair on this line → remove the pair
+      if (!sel) {
+        const ls = val.lastIndexOf('\\n', start - 1) + 1;
+        const lePos = val.indexOf('\\n', start);
+        const le = lePos === -1 ? val.length : lePos;
+        const line = val.slice(ls, le), curPos = start - ls;
+        const positions = [];
+        let idx = 0;
+        while (true) { const f = line.indexOf(marker, idx); if (f === -1) break; positions.push(f); idx = f + mlen; }
+        for (let i = 0; i + 1 < positions.length; i += 2) {
+          const openEnd = positions[i] + mlen, closeStart = positions[i + 1];
+          if (curPos >= openEnd && curPos <= closeStart) {
+            const absOpen = ls + positions[i], absClose = ls + positions[i + 1];
+            // Remove close marker first (higher index), then open
+            let nv = val.slice(0, absClose) + val.slice(absClose + mlen);
+            nv = nv.slice(0, absOpen) + nv.slice(absOpen + mlen);
+            ta.value = nv;
+            ta.setSelectionRange(start - mlen, start - mlen);
+            ta.focus(); triggerEdit(); updateToolbarState(); return;
+          }
+        }
+      }
+      // Case 3: default — wrap selection (or insert placeholder)
       const inner = sel || ph || '';
-      ta.setRangeText(before + inner + after, start, end, 'preserve');
-      ta.setSelectionRange(start + before.length, start + before.length + inner.length);
+      ta.setRangeText(marker + inner + marker, start, end, 'preserve');
+      ta.setSelectionRange(start + mlen, start + mlen + inner.length);
+      ta.focus(); triggerEdit(); updateToolbarState();
+    }
+
+    // Line-prefix toggle: applies/removes prefix across all selected lines
+    function setLinePrefix(prefix) {
+      const fls = val.lastIndexOf('\\n', start - 1) + 1;
+      // Don't include a trailing line if selection ends exactly at a newline
+      const adjEnd = (end > fls && val[end - 1] === '\\n') ? end - 1 : end;
+      const lePos = val.indexOf('\\n', adjEnd);
+      const endPos = lePos === -1 ? val.length : lePos;
+      const lines = val.slice(fls, endPos).split('\\n');
+      // Toggle: remove prefix if ALL lines already have it, otherwise apply
+      const allHave = lines.every(l => l.startsWith(prefix));
+      const newLines = lines.map(l => {
+        const stripped = l
+          .replace(/^#{1,6}\\s/, '')
+          .replace(/^>\\s?/, '')
+          .replace(/^[-*]\\s\\[[ x]\\]\\s/, '')
+          .replace(/^[-*]\\s/, '')
+          .replace(/^\\d+\\.\\s/, '');
+        return allHave ? stripped : prefix + stripped;
+      });
+      const newBlock = newLines.join('\\n');
+      ta.setRangeText(newBlock, fls, endPos, 'preserve');
+      // Place cursor at end of first (modified) line
+      const ncp = fls + newLines[0].length;
+      ta.setSelectionRange(ncp, ncp);
+      ta.focus(); triggerEdit(); updateToolbarState();
+    }
+
+    // Indent/outdent all selected lines by 2 spaces
+    function indentLines(dir) {
+      const fls = val.lastIndexOf('\\n', start - 1) + 1;
+      const adjEnd = (end > fls && val[end - 1] === '\\n') ? end - 1 : end;
+      const lePos = val.indexOf('\\n', adjEnd);
+      const endPos = lePos === -1 ? val.length : lePos;
+      const lines = val.slice(fls, endPos).split('\\n');
+      const newLines = lines.map(l =>
+        dir > 0 ? '  ' + l : (l.startsWith('  ') ? l.slice(2) : l.startsWith(' ') ? l.slice(1) : l)
+      );
+      const newBlock = newLines.join('\\n');
+      ta.setRangeText(newBlock, fls, endPos, 'preserve');
+      ta.setSelectionRange(fls, fls + newBlock.length);
       ta.focus(); triggerEdit();
     }
-    function linePrefix(prefix) {
-      const ls = val.lastIndexOf('\\n', start - 1) + 1, line = val.slice(ls, end);
-      const clean = line.replace(/^#{1,6}\\s/, '').replace(/^>\\s?/, '').replace(/^-\\s/, '').replace(/^\\d+\\.\\s/, '');
-      ta.setRangeText(prefix + clean, ls, end, 'preserve');
-      ta.setSelectionRange(ls + prefix.length + clean.length, ls + prefix.length + clean.length);
-      ta.focus(); triggerEdit();
-    }
+
     switch (action) {
-      case 'bold':      return wrap('**', '**', 'bold text');
-      case 'italic':    return wrap('*', '*', 'italic text');
-      case 'strike':    return wrap('~~', '~~', 'strikethrough');
-      case 'code':      return wrap('\`', '\`', 'code');
-      case 'codeblock': return wrap('\\n\`\`\`\\n', '\\n\`\`\`\\n', 'code here');
-      case 'link':      return wrap('[', '](url)', sel || 'link text');
-      case 'image':     return wrap('![', '](url)', sel || 'alt text');
-      case 'quote':     return linePrefix('> ');
-      case 'h1':        return linePrefix('# ');
-      case 'h2':        return linePrefix('## ');
-      case 'h3':        return linePrefix('### ');
-      case 'ul':        return linePrefix('- ');
-      case 'ol':        return linePrefix('1. ');
-      case 'task':      return linePrefix('- [ ] ');
+      case 'bold':      return toggleInline('**', 'bold text');
+      case 'italic':    return toggleInline('*', 'italic text');
+      case 'strike':    return toggleInline('~~', 'strikethrough');
+      case 'code':      return toggleInline('\`', 'code');
+      case 'codeblock': {
+        const ins = '\\n\`\`\`\\n' + (sel || 'code here') + '\\n\`\`\`\\n';
+        ta.setRangeText(ins, start, end, 'preserve');
+        ta.setSelectionRange(start + 5, start + 5 + (sel || 'code here').length);
+        ta.focus(); triggerEdit(); break;
+      }
+      case 'link': {
+        const inner = sel || 'link text';
+        ta.setRangeText('[' + inner + '](url)', start, end, 'preserve');
+        ta.setSelectionRange(start + 1, start + 1 + inner.length);
+        ta.focus(); triggerEdit(); break;
+      }
+      case 'image': {
+        const inner = sel || 'alt text';
+        ta.setRangeText('![' + inner + '](url)', start, end, 'preserve');
+        ta.setSelectionRange(start + 2, start + 2 + inner.length);
+        ta.focus(); triggerEdit(); break;
+      }
+      case 'quote':   return setLinePrefix('> ');
+      case 'h1':      return setLinePrefix('# ');
+      case 'h2':      return setLinePrefix('## ');
+      case 'h3':      return setLinePrefix('### ');
+      case 'h4':      return setLinePrefix('#### ');
+      case 'ul':      return setLinePrefix('- ');
+      case 'ol':      return setLinePrefix('1. ');
+      case 'task':    return setLinePrefix('- [ ] ');
+      case 'indent':  return indentLines(1);
+      case 'outdent': return indentLines(-1);
       case 'hr': {
         const ins = '\\n\\n---\\n\\n';
         ta.setRangeText(ins, start, end, 'preserve');
@@ -1533,6 +1622,53 @@ const SCRIPT = /* javascript */`
       }
     }
   }
+
+  // ── Format state detection (active button highlighting) ─────────────────────
+  function getFormatState(ta) {
+    const val = ta.value, pos = ta.selectionStart;
+    const ls = val.lastIndexOf('\\n', pos - 1) + 1;
+    const lePos = val.indexOf('\\n', pos);
+    const le = lePos === -1 ? val.length : lePos;
+    const line = val.slice(ls, le), linePos = pos - ls;
+    const before = line.slice(0, linePos);
+    // Count occurrences of a string within text
+    function countIn(str, text) {
+      let count = 0, idx = 0;
+      while (true) { const f = text.indexOf(str, idx); if (f === -1) break; count++; idx = f + str.length; }
+      return count;
+    }
+    const boldCount     = countIn('**', before);
+    const strikeCount   = countIn('~~', before);
+    const codeCount     = countIn('\`', before);
+    const asteriskCount = countIn('*', before);
+    // Each ** contributes 2 to the * count — subtract them to isolate italic *
+    const italicCount   = asteriskCount - 2 * boldCount;
+    return {
+      bold:   boldCount   % 2 === 1,
+      italic: italicCount % 2 === 1,
+      strike: strikeCount % 2 === 1,
+      code:   codeCount   % 2 === 1,
+      h1:     line.startsWith('# ')   && !line.startsWith('## '),
+      h2:     line.startsWith('## ')  && !line.startsWith('### '),
+      h3:     line.startsWith('### ') && !line.startsWith('#### '),
+      h4:     line.startsWith('#### '),
+      quote:  line.startsWith('> '),
+      ul:     (line.startsWith('- ') || line.startsWith('* ')) && !line.startsWith('- [') && !line.startsWith('* ['),
+      ol:     /^\\d+\\.\\s/.test(line),
+      task:   line.startsWith('- [') || line.startsWith('* ['),
+    };
+  }
+
+  function updateToolbarState() {
+    const ta = qs('#edit-area');
+    if (!ta || !editMode) return;
+    const s = getFormatState(ta);
+    ['bold','italic','strike','code','h1','h2','h3','h4','quote','ul','ol','task'].forEach(a => {
+      const btn = qs('[data-action="' + a + '"]');
+      if (btn) btn.classList.toggle('on', !!s[a]);
+    });
+  }
+
   qsa('.fmt-btn').forEach(btn => { btn.addEventListener('click', () => { const a = btn.getAttribute('data-action'); if (a) applyFormat(a); }); });
 
   // Undo / Redo — use custom stack (execCommand is unreliable in VS Code webviews)
@@ -1546,6 +1682,11 @@ const SCRIPT = /* javascript */`
     if (ta) ta.style.whiteSpace = wordWrap ? 'pre-wrap' : 'pre';
     qs('#btn-wrap')?.classList.toggle('on', wordWrap);
   });
+
+  // Toolbar active state — update whenever the cursor moves or selection changes
+  qs('#edit-area')?.addEventListener('keyup',   updateToolbarState);
+  qs('#edit-area')?.addEventListener('mouseup',  updateToolbarState);
+  qs('#edit-area')?.addEventListener('click',    updateToolbarState);
 
   // ── Smart editor ───────────────────────────────────────────────────────────
   function triggerEdit() {
@@ -1574,9 +1715,41 @@ const SCRIPT = /* javascript */`
     if (mod && ((e.shiftKey && e.key === 'z') || e.key === 'y')) { e.preventDefault(); histRedo(); return; }
     // Save
     if (mod && e.key === 's') { e.preventDefault(); saveFile(); return; }
-    if (e.key === 'Tab' && !e.shiftKey) {
-      e.preventDefault(); ta.setRangeText('  ', start, end, 'preserve');
-      ta.setSelectionRange(start + 2, start + 2); triggerEdit(); return;
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      // Detect if the current line is a list item — if so, indent/outdent the whole line
+      const tls = val.lastIndexOf('\\n', start - 1) + 1;
+      const tlePos = val.indexOf('\\n', tls);
+      const tle = tlePos === -1 ? val.length : tlePos;
+      const tfl = val.slice(tls, tle);
+      // Skip leading spaces to find the actual list marker
+      let tmi = 0; while (tmi < tfl.length && tfl[tmi] === ' ') tmi++;
+      const isListLine = tfl.length > tmi && (
+        tfl.slice(tmi, tmi + 2) === '- ' ||
+        tfl.slice(tmi, tmi + 2) === '* ' ||
+        tfl.slice(tmi, tmi + 3) === '- [' ||
+        tfl.slice(tmi, tmi + 3) === '* [' ||
+        (tfl[tmi] >= '0' && tfl[tmi] <= '9' && tfl.indexOf('. ', tmi) > tmi)
+      );
+      if (isListLine) {
+        if (e.shiftKey) {
+          // Outdent: remove up to 2 leading spaces from line
+          const outdented = tfl.startsWith('  ') ? tfl.slice(2) : (tfl.startsWith(' ') ? tfl.slice(1) : tfl);
+          const removed = tfl.length - outdented.length;
+          ta.setRangeText(outdented, tls, tle, 'preserve');
+          const ncp = Math.max(tls, start - removed);
+          ta.setSelectionRange(ncp, ncp);
+        } else {
+          // Indent: add 2 spaces at line start
+          ta.setRangeText('  ' + tfl, tls, tle, 'preserve');
+          ta.setSelectionRange(start + 2, start + 2);
+        }
+      } else if (!e.shiftKey) {
+        // Default Tab: insert 2 spaces at cursor
+        ta.setRangeText('  ', start, end, 'preserve');
+        ta.setSelectionRange(start + 2, start + 2);
+      }
+      triggerEdit(); return;
     }
     if (mod && e.key === 'b') { e.preventDefault(); applyFormat('bold'); return; }
     if (mod && e.key === 'i') { e.preventDefault(); applyFormat('italic'); return; }
@@ -1801,6 +1974,7 @@ const SCRIPT = /* javascript */`
     // Initialise a fresh undo stack with the current document as the baseline
     resetHistory();
     snapHistory();
+    updateToolbarState();
   }
   function exitEditMode(rememberAutoEdit = true, notify = true, flush = true) {
     if (editMode && flush) flushEdit();
@@ -1910,6 +2084,10 @@ const SCRIPT = /* javascript */`
       // Reset undo/redo history and dirty state whenever a new file is loaded
       resetHistory();
       markClean();
+      // Always sync the textarea content when switching files while already in edit mode.
+      // enterEditMode() only fires when !editMode, so without this the old content stays in
+      // the editor when switching between two AI-config files (both trigger edit mode).
+      if (editMode) { const ea = qs('#edit-area'); if (ea) { ea.value = currentMarkdown; updateToolbarState(); } }
       if (msg.isAiConfig && !isAutoEditDismissed(msg.uri)) { if (!editMode) enterEditMode(); }
       else { if (editMode) exitEditMode(false, false, false); }
       qs('#scroller').scrollTop = 0;
@@ -2064,7 +2242,9 @@ const ICON = {
   palette: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>`,
   paste: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>`,
   undo: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>`,
-  redo: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>`,
+  redo:    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>`,
+  indent:  `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="8" x2="15" y2="8"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="16" x2="15" y2="16"/><polyline points="17 8 21 12 17 16"/></svg>`,
+  outdent: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="9" y1="8" x2="21" y2="8"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="9" y1="16" x2="21" y2="16"/><polyline points="7 8 3 12 7 16"/></svg>`,
 };
 
 // ─── Panel ───────────────────────────────────────────────────────────────────
@@ -2583,6 +2763,7 @@ export class MarkdownPreviewPanel {
     <button class="fmt-btn h-btn" data-action="h1" title="H1 (⌘⇧1)">H1</button>
     <button class="fmt-btn h-btn" data-action="h2" title="H2 (⌘⇧2)">H2</button>
     <button class="fmt-btn h-btn" data-action="h3" title="H3 (⌘⇧3)">H3</button>
+    <button class="fmt-btn h-btn" data-action="h4" title="H4">H4</button>
   </div>
   <div class="fmt-sep"></div>
   <div class="fmt-group">
@@ -2597,6 +2778,11 @@ export class MarkdownPreviewPanel {
     <button class="fmt-btn" data-action="task" title="Task list" style="font-size:13px">☐</button>
     <button class="fmt-btn" data-action="table" title="Table" style="font-size:13px">⊞</button>
     <button class="fmt-btn" data-action="hr" title="Divider" style="font-size:16px;letter-spacing:-2px">——</button>
+  </div>
+  <div class="fmt-sep"></div>
+  <div class="fmt-group">
+    <button class="fmt-btn" data-action="indent"  title="Indent (Tab)">${ICON.indent}</button>
+    <button class="fmt-btn" data-action="outdent" title="Outdent (⇧Tab)">${ICON.outdent}</button>
   </div>
   <div class="fmt-sep"></div>
   <div class="fmt-group">

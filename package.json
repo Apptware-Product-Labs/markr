@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr – Markdown Preview",
   "description": "Markdown preview & viewer for VS Code — GitHub-style rendering, Mermaid diagrams, split editing, live TOC, AI docs support, themes, and PDF export",
-  "version": "3.6.2",
+  "version": "3.6.3",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",

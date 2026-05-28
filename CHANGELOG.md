@@ -7,6 +7,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.6.3] — 2026-05-28
+
+### Fixed
+- **Edit area stale when switching AI config files**: switching from one `skill.md`/`agent.md` to another while in edit mode now correctly loads the new file's content into the editor (previously the textarea kept showing the previous file)
+
+### Added
+- **Format toolbar active state**: buttons now highlight when the cursor is inside the corresponding format — e.g. Bold lights up inside `**…**`, Italic inside `*…*`, H2 on an `## ` line, Blockquote on a `> ` line, etc.
+- **Toggle formatting off**: clicking an already-active button removes the format — works for all inline markers (bold, italic, strikethrough, inline code) and all line-prefix formats (H1–H4, blockquote, bullet/numbered/task lists)
+- **H4 heading button** added to the format toolbar
+- **Indent / Outdent buttons** added to the format toolbar (also accessible via Tab / Shift+Tab on list lines)
+- **Smart Tab / Shift+Tab**: pressing Tab on a list item indents the whole line by 2 spaces; Shift+Tab outdents — non-list lines still get the 2-space insert on Tab
+
+---
+
 ## [3.6.2] — 2026-05-28
 
 ### Fixed
