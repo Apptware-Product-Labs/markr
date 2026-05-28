@@ -18,6 +18,16 @@ export function activate(context: vscode.ExtensionContext) {
       MarkdownPreviewPanel.createOrShow(doc);
     }),
 
+    vscode.commands.registerCommand('markr.pastePreview', async () => {
+      const text = await vscode.env.clipboard.readText();
+      if (!text.trim()) {
+        vscode.window.showInformationMessage('Clipboard is empty — copy some Markdown first.');
+        return;
+      }
+      const doc = await vscode.workspace.openTextDocument({ content: text, language: 'markdown' });
+      MarkdownPreviewPanel.createOrShow(doc);
+    }),
+
     // Live update as you type
     vscode.workspace.onDidChangeTextDocument(({ document }) => {
       if (document.languageId === 'markdown') {
