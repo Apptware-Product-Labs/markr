@@ -1,0 +1,48 @@
+name: Feature request
+description: Suggest a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea that would make Markr better? We'd love to hear it.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the pain point. "I'm frustrated when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to see? Rough sketches, links, or examples all welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Other ways you've worked around this, or other tools that do it well.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Feature area
+      options:
+        - Preview rendering
+        - Mermaid / diagrams
+        - Editor / split view
+        - Table of Contents
+        - Export (PDF / PNG)
+        - Themes
+        - Workspace navigation
+        - Keyboard shortcuts
+        - Performance
+        - Other
+    validations:
+      required: true
