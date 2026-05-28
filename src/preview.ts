@@ -836,17 +836,18 @@ pre:hover .copy-btn { opacity: 1; }
   font-size: 11px; color: var(--text-muted); min-width: 36px; text-align: center;
 }
 .mermaid-modal-body {
-  /* overflow: auto gives real scrollbars as zoom increases */
+  /* flex-centering keeps every diagram centred; overflow:auto scrolls when zoomed in */
   overflow: auto; padding: 20px; flex: 1;
+  display: flex; justify-content: center; align-items: flex-start;
 }
 .mermaid-modal-body .mermaid-zoom-inner {
-  /* Width-based zoom: at 100% fills the panel; at 200% scrolls naturally */
-  width: 100%; min-width: 100%;
-  transition: width 0.12s ease;
+  /* pixel-sized by JS (nw*zoom × nh*zoom) — shrinks and grows for real scrollbars */
+  flex-shrink: 0;
 }
 .mermaid-modal-body .mermaid-zoom-inner svg {
-  /* SVG always fills the inner container — scales with it */
-  display: block; width: 100% !important; height: auto !important;
+  /* pixel size set by JS; viewBox handles aspect-ratio scaling */
+  display: block;
+  transition: width 0.12s ease, height 0.12s ease;
 }
 .mermaid-modal-close {
   background: none; border: none; font-size: 18px; line-height: 1;
@@ -1456,11 +1457,24 @@ const SCRIPT = /* javascript */`
       "    const modal = document.getElementById('mermaid-modal');",
       "    const inner = document.getElementById('mermaid-zoom-inner');",
       "    if (!modal || !inner) return;",
+      "    // Capture natural rendered dimensions BEFORE copying (SVG is live in the DOM)",
+      "    const rect = svg.getBoundingClientRect();",
+      "    const nw = Math.round(rect.width)  || parseFloat(svg.getAttribute('width'))  || 800;",
+      "    const nh = Math.round(rect.height) || parseFloat(svg.getAttribute('height')) || 400;",
       "    inner.innerHTML = svg.outerHTML;",
-      "    inner.style.width = '100%';",
+      "    inner.dataset.nw = nw;",
+      "    inner.dataset.nh = nh;",
+      "    // Ensure the copied SVG has a viewBox so pixel-based zoom scales correctly.",
+      "    // Gantt charts often lack a viewBox; without it width/height changes don't scale content.",
+      "    const s = inner.querySelector('svg');",
+      "    if (s) {",
+      "      if (!s.getAttribute('viewBox')) s.setAttribute('viewBox', '0 0 ' + nw + ' ' + nh);",
+      "      s.style.width  = nw + 'px';",
+      "      s.style.height = nh + 'px';",
+      "    }",
       "    document.getElementById('mermaid-zoom-level').textContent = '100%';",
       "    modal.classList.add('open');",
-      "    // Reset scroll so the diagram is always at the top-left on open",
+      "    // Reset scroll so the diagram starts at the top-left on every open",
       "    const body = modal.querySelector('.mermaid-modal-body');",
       "    if (body) { body.scrollTop = 0; body.scrollLeft = 0; }",
       "  }",
@@ -1816,17 +1830,35 @@ const SCRIPT = /* javascript */`
   // gives real scrollbars so you can pan the diagram at any zoom level.
   let mermaidZoom = 1;
   function setMermaidZoom(z) {
-    mermaidZoom = Math.min(4, Math.max(0.5, z));
+    mermaidZoom = Math.min(4, Math.max(0.25, z));
     const inner = qs('#mermaid-zoom-inner');
-    if (inner) inner.style.width = Math.round(mermaidZoom * 100) + '%';
+    if (inner) {
+      const nw = parseFloat(inner.dataset.nw || '0');
+      const nh = parseFloat(inner.dataset.nh || '0');
+      const svg = inner.querySelector('svg');
+      if (svg && nw && nh) {
+        // Scale the SVG by setting explicit pixel dimensions.
+        // The SVG's viewBox handles proportional scaling of all content.
+        // The inner (flex-shrink:0) expands/contracts so overflow:auto
+        // on the modal body gives real scrollbars at any zoom level.
+        svg.style.width  = Math.round(nw * mermaidZoom) + 'px';
+        svg.style.height = Math.round(nh * mermaidZoom) + 'px';
+      }
+    }
     const lbl = qs('#mermaid-zoom-level');
     if (lbl) lbl.textContent = Math.round(mermaidZoom * 100) + '%';
   }
   function closeMermaidModal() {
     qs('#mermaid-modal')?.classList.remove('open');
     mermaidZoom = 1;
+    // Reset SVG to natural size
     const inner = qs('#mermaid-zoom-inner');
-    if (inner) inner.style.width = '100%';
+    if (inner) {
+      const nw = parseFloat(inner.dataset.nw || '0');
+      const nh = parseFloat(inner.dataset.nh || '0');
+      const svg = inner.querySelector('svg');
+      if (svg && nw && nh) { svg.style.width = nw + 'px'; svg.style.height = nh + 'px'; }
+    }
   }
   qs('#mermaid-modal-close')?.addEventListener('click',    closeMermaidModal);
   qs('#mermaid-modal-backdrop')?.addEventListener('click', closeMermaidModal);
