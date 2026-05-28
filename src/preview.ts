@@ -450,11 +450,53 @@ body {
 .stats-accent { color: var(--accent); }
 .save-status {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 11px; color: var(--success); opacity: 0; transition: opacity 0.25s;
+  font-size: 11px; opacity: 0; transition: opacity 0.2s, color 0.2s;
   white-space: nowrap; flex-shrink: 0;
 }
-.save-status.visible { opacity: 1; }
-.save-status.saving { color: var(--text-muted); opacity: 1; }
+.save-status.saving  { color: var(--text-muted); opacity: 1; }
+.save-status.saved   { color: #22c55e; opacity: 1; }
+
+/* Undo/redo diff chip — shows what text was removed/added */
+#diff-chip {
+  display: none; align-items: center; gap: 3px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10.5px; max-width: 220px; overflow: hidden; white-space: nowrap;
+  opacity: 0; transition: opacity 0.2s; flex-shrink: 0;
+}
+#diff-chip.show { display: inline-flex; opacity: 1; }
+.dc-del { color: #ef4444; background: rgba(239,68,68,0.12); border-radius: 3px; padding: 1px 5px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.dc-add { color: #22c55e; background: rgba(34,197,94,0.12); border-radius: 3px; padding: 1px 5px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+
+/* Explicit save button — hidden until user enters edit mode */
+body:not(.edit-mode) #btn-save-file { display: none; }
+#btn-save-file.dirty {
+  background: var(--accent); color: #fff; font-weight: 700;
+  border-color: var(--accent-dim);
+}
+#btn-save-file.dirty:hover { background: var(--accent-dim); }
+
+/* Clipboard preview banner */
+#clipboard-banner {
+  display: none; align-items: center; justify-content: space-between;
+  padding: 6px 14px; gap: 8px; flex-shrink: 0;
+  background: var(--accent-bg); border-bottom: 1px solid var(--accent-border);
+  font-size: 11.5px;
+}
+#clipboard-banner.open { display: flex; }
+.cb-label { color: var(--accent); display: flex; align-items: center; gap: 5px; font-weight: 500; }
+.cb-actions { display: flex; gap: 6px; }
+.cb-save {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 4px; padding: 3px 10px; font-size: 11px; font-family: inherit;
+  cursor: pointer; font-weight: 600;
+}
+.cb-save:hover { opacity: 0.88; }
+.cb-dismiss {
+  background: transparent; color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 3px 8px; font-size: 11px; font-family: inherit; cursor: pointer;
+}
+.cb-dismiss:hover { background: var(--bg-hover); color: var(--text); }
 .sep-v { width: 1px; height: 16px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
 .tb-btn {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px;
@@ -794,17 +836,17 @@ pre:hover .copy-btn { opacity: 1; }
   font-size: 11px; color: var(--text-muted); min-width: 36px; text-align: center;
 }
 .mermaid-modal-body {
-  overflow: auto; padding: 32px; flex: 1;
-  display: flex; align-items: flex-start; justify-content: center;
+  /* overflow: auto gives real scrollbars as zoom increases */
+  overflow: auto; padding: 20px; flex: 1;
 }
 .mermaid-modal-body .mermaid-zoom-inner {
-  transform-origin: top center; transition: transform 0.15s ease;
-  width: 100%;
+  /* Width-based zoom: at 100% fills the panel; at 200% scrolls naturally */
+  width: 100%; min-width: 100%;
+  transition: width 0.12s ease;
 }
-/* Make the SVG inside the modal fill the available width */
 .mermaid-modal-body .mermaid-zoom-inner svg {
-  width: 100% !important; height: auto !important;
-  max-width: 100%;
+  /* SVG always fills the inner container — scales with it */
+  display: block; width: 100% !important; height: auto !important;
 }
 .mermaid-modal-close {
   background: none; border: none; font-size: 18px; line-height: 1;
@@ -942,8 +984,18 @@ const SCRIPT = /* javascript */`
   let currentUri = (typeof __CURRENT_URI__ !== 'undefined') ? __CURRENT_URI__ : '';
   let editMode    = false;
   let wordWrap    = true;
+  let isDirty     = false;   // true when there are unsaved changes on disk
   let editTimer, saveTimer;
   const collapsedFolders = new Set();
+
+  // ── Custom undo / redo history ─────────────────────────────────────────────
+  // document.execCommand('undo') is deprecated and unreliable in VS Code's webview.
+  // We maintain our own stack of { value, ss (selStart), se (selEnd) } snapshots.
+  const HIST_MAX = 100;
+  const histStack = [];
+  let histIdx  = -1;
+  let histBusy = false;   // prevents re-entrancy while we're restoring a snap
+  let histSnapTimer = null;
 
   function qs(s, c)  { return (c || document).querySelector(s); }
   function qsa(s, c) { return [...(c || document).querySelectorAll(s)]; }
@@ -993,9 +1045,113 @@ const SCRIPT = /* javascript */`
     const el = qs('#save-status');
     if (!el) return;
     el.textContent = '✓ saved';
-    el.className = 'save-status visible';
+    el.className = 'save-status saved';
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => { el.className = 'save-status'; }, 2500);
+    markClean(); // file is now on disk — clear the dirty indicator
+  }
+
+  // ── Dirty / save tracking ──────────────────────────────────────────────────
+  function markDirty() {
+    isDirty = true;
+    const btn = qs('#btn-save-file');
+    if (!btn) return;
+    btn.classList.add('dirty');
+    btn.innerHTML = '● Save';
+    btn.title = 'Unsaved changes — click to save (⌘S / Ctrl+S)';
+  }
+  function markClean() {
+    isDirty = false;
+    const btn = qs('#btn-save-file');
+    if (!btn) return;
+    btn.classList.remove('dirty');
+    btn.innerHTML = 'Save';
+    btn.title = 'Save (⌘S / Ctrl+S)';
+  }
+  function saveFile() {
+    if (!isDirty) return;
+    showSaving();
+    clearTimeout(editTimer);
+    const ta = qs('#edit-area');
+    const content = ta ? ta.value : currentMarkdown;
+    vsc.postMessage({ type: 'saveFile', content, uri: activeTabUri });
+  }
+
+  // ── Diff chip — shows what was removed/added after undo/redo ──────────────
+  function showDiffChip(oldVal, newVal) {
+    // Find the changed region via longest common prefix + suffix
+    let i = 0;
+    while (i < oldVal.length && i < newVal.length && oldVal[i] === newVal[i]) i++;
+    let j = 0;
+    const maxJ = Math.min(oldVal.length - i, newVal.length - i);
+    while (j < maxJ && oldVal[oldVal.length - 1 - j] === newVal[newVal.length - 1 - j]) j++;
+    const removed = oldVal.slice(i, oldVal.length - (j || 0));
+    const added   = newVal.slice(i, newVal.length - (j || 0));
+    const el = qs('#diff-chip'); if (!el) return;
+    let html = '';
+    if (removed) {
+      const txt = removed.replace(/\\n/g, '↵').replace(/\\t/g, '→');
+      html += '<span class="dc-del">−' + escHtml(txt.length > 35 ? txt.slice(0, 35) + '…' : txt) + '</span>';
+    }
+    if (added) {
+      const txt = added.replace(/\\n/g, '↵').replace(/\\t/g, '→');
+      html += '<span class="dc-add">+' + escHtml(txt.length > 35 ? txt.slice(0, 35) + '…' : txt) + '</span>';
+    }
+    if (!html) return;
+    el.innerHTML = html;
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.classList.remove('show'); }, 3000);
+  }
+
+  // Capture a snapshot. Called before programmatic edits (format, etc.) and
+  // on a 600 ms debounce during regular typing so rapid keystrokes are grouped.
+  function snapHistory() {
+    if (histBusy) return;
+    const ta = qs('#edit-area'); if (!ta) return;
+    const snap = { value: ta.value, ss: ta.selectionStart, se: ta.selectionEnd };
+    // Trim the redo branch whenever a new edit comes in
+    histStack.splice(histIdx + 1);
+    const last = histStack[histIdx];
+    if (last && last.value === snap.value) return; // nothing changed
+    histStack.push(snap);
+    if (histStack.length > HIST_MAX) { histStack.shift(); } else { histIdx++; }
+  }
+  function scheduleSnap() {
+    clearTimeout(histSnapTimer);
+    histSnapTimer = setTimeout(snapHistory, 600);
+  }
+
+  function applyHistSnap(snap, prevSnap) {
+    const ta = qs('#edit-area'); if (!ta || !snap) return;
+    histBusy = true;
+    ta.value = snap.value;
+    ta.setSelectionRange(snap.ss, snap.se);
+    ta.focus();
+    histBusy = false;
+    currentMarkdown = snap.value;
+    updateStats(snap.value);
+    showSaving();
+    if (prevSnap) showDiffChip(prevSnap.value, snap.value);
+    clearTimeout(editTimer);
+    editTimer = setTimeout(() => vsc.postMessage({ type: 'edit', content: snap.value, uri: activeTabUri }), 120);
+  }
+
+  function histUndo() {
+    if (histIdx <= 0) return;
+    const prev = histStack[histIdx];
+    histIdx--;
+    applyHistSnap(histStack[histIdx], prev);
+  }
+  function histRedo() {
+    if (histIdx >= histStack.length - 1) return;
+    const prev = histStack[histIdx];
+    histIdx++;
+    applyHistSnap(histStack[histIdx], prev);
+  }
+  function resetHistory() {
+    histStack.length = 0; histIdx = -1; histBusy = false;
+    clearTimeout(histSnapTimer);
   }
 
   // ── File list ──────────────────────────────────────────────────────────────
@@ -1154,22 +1310,28 @@ const SCRIPT = /* javascript */`
   }
 
   // ── Scroll sync editor→preview ─────────────────────────────────────────────
+  // Use a 50 ms debounce instead of rAF — rAF fires before the downstream scroll
+  // event, which causes the two panes to fight each other on every tick.
   let splitScrollSyncing = false;
+  let splitScrollTimer = null;
+  function setSplitScrollBusy() {
+    splitScrollSyncing = true;
+    if (splitScrollTimer) clearTimeout(splitScrollTimer);
+    splitScrollTimer = setTimeout(() => { splitScrollSyncing = false; }, 50);
+  }
   qs('#edit-area')?.addEventListener('scroll', () => {
     if (splitScrollSyncing) return;
     const ta = qs('#edit-area'), sp = qs('#split-preview'); if (!ta || !sp) return;
     const max = ta.scrollHeight - ta.clientHeight; if (max <= 0) return;
-    splitScrollSyncing = true;
+    setSplitScrollBusy();
     sp.scrollTop = (ta.scrollTop / max) * (sp.scrollHeight - sp.clientHeight);
-    requestAnimationFrame(() => { splitScrollSyncing = false; });
   });
   qs('#split-preview')?.addEventListener('scroll', () => {
     if (splitScrollSyncing) return;
     const ta = qs('#edit-area'), sp = qs('#split-preview'); if (!ta || !sp) return;
     const max = sp.scrollHeight - sp.clientHeight; if (max <= 0) return;
-    splitScrollSyncing = true;
+    setSplitScrollBusy();
     ta.scrollTop = (sp.scrollTop / max) * (ta.scrollHeight - ta.clientHeight);
-    requestAnimationFrame(() => { splitScrollSyncing = false; });
   });
 
   // ── Split resize / preview focus ───────────────────────────────────────────
@@ -1295,9 +1457,12 @@ const SCRIPT = /* javascript */`
       "    const inner = document.getElementById('mermaid-zoom-inner');",
       "    if (!modal || !inner) return;",
       "    inner.innerHTML = svg.outerHTML;",
-      "    inner.style.transform = 'scale(1)';",
+      "    inner.style.width = '100%';",
       "    document.getElementById('mermaid-zoom-level').textContent = '100%';",
       "    modal.classList.add('open');",
+      "    // Reset scroll so the diagram is always at the top-left on open",
+      "    const body = modal.querySelector('.mermaid-modal-body');",
+      "    if (body) { body.scrollTop = 0; body.scrollLeft = 0; }",
       "  }",
       "  div.addEventListener('click', openModal);",
       "  zoomBtn.addEventListener('click', openModal);",
@@ -1309,6 +1474,7 @@ const SCRIPT = /* javascript */`
 
   // ── Format toolbar ─────────────────────────────────────────────────────────
   function applyFormat(action) {
+    snapHistory(); // capture pre-format state so each format is its own undo step
     const ta = qs('#edit-area'); if (!ta) return;
     const start = ta.selectionStart, end = ta.selectionEnd, val = ta.value, sel = val.slice(start, end);
     function wrap(before, after, ph) {
@@ -1355,9 +1521,9 @@ const SCRIPT = /* javascript */`
   }
   qsa('.fmt-btn').forEach(btn => { btn.addEventListener('click', () => { const a = btn.getAttribute('data-action'); if (a) applyFormat(a); }); });
 
-  // Undo / Redo
-  qs('#btn-undo')?.addEventListener('click', () => { qs('#edit-area')?.focus(); document.execCommand('undo'); triggerEdit(); });
-  qs('#btn-redo')?.addEventListener('click', () => { qs('#edit-area')?.focus(); document.execCommand('redo'); triggerEdit(); });
+  // Undo / Redo — use custom stack (execCommand is unreliable in VS Code webviews)
+  qs('#btn-undo')?.addEventListener('click', () => histUndo());
+  qs('#btn-redo')?.addEventListener('click', () => histRedo());
 
   // Word wrap toggle
   qs('#btn-wrap')?.addEventListener('click', () => {
@@ -1373,8 +1539,9 @@ const SCRIPT = /* javascript */`
     const content = ta.value;
     currentMarkdown = content;
     updateStats(content);
-    showSaving();
+    markDirty(); // mark unsaved — actual disk write only happens on explicit Save
     clearTimeout(editTimer);
+    // Still send to extension so the split-preview re-renders in real time
     editTimer = setTimeout(() => vsc.postMessage({ type: 'edit', content, uri: activeTabUri }), 250);
   }
   function flushEdit() {
@@ -1384,10 +1551,15 @@ const SCRIPT = /* javascript */`
     vsc.postMessage({ type: 'edit', content: currentMarkdown, uri: activeTabUri });
   }
 
-  qs('#edit-area')?.addEventListener('input', () => triggerEdit());
+  qs('#edit-area')?.addEventListener('input', () => { triggerEdit(); scheduleSnap(); });
 
   qs('#edit-area')?.addEventListener('keydown', e => {
     const ta = e.target, start = ta.selectionStart, end = ta.selectionEnd, val = ta.value, mod = e.metaKey || e.ctrlKey;
+    // Undo / redo — must be checked first so our stack wins over VS Code's global handler
+    if (mod && !e.shiftKey && e.key === 'z') { e.preventDefault(); histUndo(); return; }
+    if (mod && ((e.shiftKey && e.key === 'z') || e.key === 'y')) { e.preventDefault(); histRedo(); return; }
+    // Save
+    if (mod && e.key === 's') { e.preventDefault(); saveFile(); return; }
     if (e.key === 'Tab' && !e.shiftKey) {
       e.preventDefault(); ta.setRangeText('  ', start, end, 'preserve');
       ta.setSelectionRange(start + 2, start + 2); triggerEdit(); return;
@@ -1503,6 +1675,8 @@ const SCRIPT = /* javascript */`
       if (qs('#shortcuts-panel.open')) { closeShortcuts(); return; }
       if (editMode) { exitEditMode(); return; }
     }
+    // Cmd+S / Ctrl+S — explicit save (catches the shortcut when focus is outside the textarea)
+    if ((e.metaKey || e.ctrlKey) && e.key === 's' && editMode) { e.preventDefault(); saveFile(); return; }
     if ((e.metaKey || e.ctrlKey) && e.key === 'k' && !inEditor) { e.preventDefault(); openQuickOpen(); return; }
     if (e.key === '?' && !inEditor && !inQo) { e.preventDefault(); openShortcuts(); return; }
   });
@@ -1517,7 +1691,16 @@ const SCRIPT = /* javascript */`
   });
 
   // ── Toolbar buttons ────────────────────────────────────────────────────────
+  // Clipboard markdown for save-as flow
+  let clipboardMarkdown = '';
   qs('#btn-paste-preview')?.addEventListener('click', () => vsc.postMessage({ type: 'pastePreview' }));
+  qs('#btn-save-file')?.addEventListener('click', () => saveFile());
+  qs('#btn-save-clipboard')?.addEventListener('click', () => {
+    if (clipboardMarkdown) vsc.postMessage({ type: 'saveClipboardAs', markdown: clipboardMarkdown });
+  });
+  qs('#btn-dismiss-clipboard')?.addEventListener('click', () => {
+    qs('#clipboard-banner')?.classList.remove('open');
+  });
   qs('#btn-copy-md')?.addEventListener('click', () => vsc.postMessage({ type: 'copyMarkdown' }));
   qs('#btn-source')?.addEventListener('click', () => {
     vsc.postMessage({ type: 'openInEditor', uri: activeTabUri });
@@ -1560,6 +1743,17 @@ const SCRIPT = /* javascript */`
 
   let sidebarOpen = true;
   qs('#btn-sidebar')?.addEventListener('click', () => {
+    // If focus mode is active the sidebar is hidden by CSS, not by .hidden.
+    // Clicking the sidebar icon should exit focus mode and restore the sidebar.
+    if (focusMode) {
+      focusMode = false;
+      document.body.classList.remove('focus-mode');
+      qs('#btn-focus')?.classList.remove('on');
+      sidebarOpen = true;
+      qs('#sidebar')?.classList.remove('hidden');
+      qs('#btn-sidebar')?.classList.add('on');
+      return;
+    }
     sidebarOpen = !sidebarOpen;
     qs('#sidebar')?.classList.toggle('hidden', !sidebarOpen);
     qs('#btn-sidebar')?.classList.toggle('on', sidebarOpen);
@@ -1590,6 +1784,9 @@ const SCRIPT = /* javascript */`
     const btn = qs('#btn-edit'); if (btn) btn.textContent = '← Preview';
     vsc.postMessage({ type: 'modeChange', mode: 'edit' });
     updateStats(currentMarkdown);
+    // Initialise a fresh undo stack with the current document as the baseline
+    resetHistory();
+    snapHistory();
   }
   function exitEditMode(rememberAutoEdit = true, notify = true, flush = true) {
     if (editMode && flush) flushEdit();
@@ -1615,24 +1812,31 @@ const SCRIPT = /* javascript */`
   topBtn?.addEventListener('click', () => scroller?.scrollTo({ top: 0, behavior: 'smooth' }));
 
   // ── Mermaid zoom modal ──────────────────────────────────────────────────────
+  // Width-based zoom: the inner div grows/shrinks; overflow: auto on the body
+  // gives real scrollbars so you can pan the diagram at any zoom level.
   let mermaidZoom = 1;
   function setMermaidZoom(z) {
-    mermaidZoom = Math.min(4, Math.max(0.25, z));
-    const inner = qs('#mermaid-zoom-inner'); if (inner) inner.style.transform = 'scale(' + mermaidZoom + ')';
-    const lbl   = qs('#mermaid-zoom-level'); if (lbl)   lbl.textContent = Math.round(mermaidZoom * 100) + '%';
+    mermaidZoom = Math.min(4, Math.max(0.5, z));
+    const inner = qs('#mermaid-zoom-inner');
+    if (inner) inner.style.width = Math.round(mermaidZoom * 100) + '%';
+    const lbl = qs('#mermaid-zoom-level');
+    if (lbl) lbl.textContent = Math.round(mermaidZoom * 100) + '%';
   }
   function closeMermaidModal() {
     qs('#mermaid-modal')?.classList.remove('open');
     mermaidZoom = 1;
+    const inner = qs('#mermaid-zoom-inner');
+    if (inner) inner.style.width = '100%';
   }
   qs('#mermaid-modal-close')?.addEventListener('click',    closeMermaidModal);
   qs('#mermaid-modal-backdrop')?.addEventListener('click', closeMermaidModal);
   qs('#mermaid-zoom-in')?.addEventListener('click',    () => setMermaidZoom(mermaidZoom + 0.25));
   qs('#mermaid-zoom-out')?.addEventListener('click',   () => setMermaidZoom(mermaidZoom - 0.25));
   qs('#mermaid-zoom-reset')?.addEventListener('click', () => setMermaidZoom(1));
-  // Scroll wheel zoom inside modal body
-  qs('#mermaid-modal')?.addEventListener('wheel', e => {
+  // Scroll-wheel zoom inside the modal body only (prevent page scroll while interacting)
+  qs('.mermaid-modal-body')?.addEventListener('wheel', e => {
     if (!qs('#mermaid-modal')?.classList.contains('open')) return;
+    if (!(e.metaKey || e.ctrlKey)) return; // only zoom on Ctrl+scroll / pinch-to-zoom
     e.preventDefault();
     setMermaidZoom(mermaidZoom + (e.deltaY < 0 ? 0.1 : -0.1));
   }, { passive: false });
@@ -1667,6 +1871,13 @@ const SCRIPT = /* javascript */`
         aiBadge.style.display = msg.isAiConfig ? '' : 'none';
       }
       updateStats(msg.markdown);
+      // Clipboard banner
+      const banner = qs('#clipboard-banner');
+      if (banner) banner.classList.toggle('open', !!msg.isClipboard);
+      if (msg.isClipboard) clipboardMarkdown = msg.markdown;
+      // Reset undo/redo history and dirty state whenever a new file is loaded
+      resetHistory();
+      markClean();
       if (msg.isAiConfig && !isAutoEditDismissed(msg.uri)) { if (!editMode) enterEditMode(); }
       else { if (editMode) exitEditMode(false, false, false); }
       qs('#scroller').scrollTop = 0;
@@ -1682,7 +1893,13 @@ const SCRIPT = /* javascript */`
       setTimeout(() => { el.style.background = ''; }, 1400);
     }
     if (msg.type === 'updateSplitPreview') {
-      const sp = qs('#split-preview .markdown-body'); if (sp) sp.innerHTML = msg.html;
+      // Preserve split-preview scroll position across the innerHTML swap so
+      // the preview doesn't jump to the top on every keystroke.
+      const spEl = qs('#split-preview');
+      const prevSpST = spEl ? spEl.scrollTop : 0;
+      const sp = qs('#split-preview .markdown-body');
+      if (sp) sp.innerHTML = msg.html;
+      if (spEl) spEl.scrollTop = prevSpST;
       if (!editMode) {
         const body = qs('#scroller .markdown-body');
         if (body) body.innerHTML = msg.html;
@@ -1901,10 +2118,53 @@ export class MarkdownPreviewPanel {
           html: (meta ? renderFrontmatter(meta) : '') + rendered,
           markdown: rawText,
           isAiConfig: false,
+          isClipboard: true,
           tokStr: tokenEstimate(stats.chars),
           statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
           words: stats.words,
           readMins: Math.max(1, Math.ceil(stats.words / 200)),
+        });
+      }
+      if (msg.type === 'saveClipboardAs') {
+        const defaultDir = vscode.workspace.workspaceFolders?.[0]?.uri
+          ?? vscode.Uri.file(os.homedir());
+        const saveUri = await vscode.window.showSaveDialog({
+          defaultUri: defaultDir.with({ path: defaultDir.path + '/clipboard.md' }),
+          filters: { 'Markdown files': ['md'] },
+        });
+        if (!saveUri) return;
+        await vscode.workspace.fs.writeFile(saveUri, Buffer.from(msg.markdown, 'utf-8'));
+        // Reload as a real on-disk file (banner will close because isClipboard is absent)
+        const doc = await vscode.workspace.openTextDocument(saveUri);
+        this._document = doc;
+        const rawText = doc.getText();
+        const filename = saveUri.path.split('/').pop() ?? 'untitled.md';
+        const relPath = vscode.workspace.asRelativePath(saveUri);
+        const aiKind = aiDocKind(filename, relPath);
+        const { meta, body } = extractFrontmatter(rawText);
+        const rendered = applyGithubAlerts(marked.parse(body) as string);
+        const stats = docStats(rawText);
+        this._filesCacheValid = false;
+        this._panel.webview.postMessage({
+          type: 'fileLoaded',
+          uri: doc.uri.toString(),
+          filename,
+          html: (meta ? renderFrontmatter(meta) : '') + rendered,
+          markdown: rawText,
+          isAiConfig: !!aiKind,
+          aiKind,
+          isClipboard: false,
+          tokStr: tokenEstimate(stats.chars),
+          statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
+          words: stats.words,
+          readMins: Math.max(1, Math.ceil(stats.words / 200)),
+        });
+        // Restore Markr to the foreground — the Save dialog shifts VS Code focus
+        // away from the webview. preserveFocus=true keeps keyboard in the panel.
+        this._panel.reveal(this._panel.viewColumn ?? vscode.ViewColumn.Beside, true);
+        vscode.window.setStatusBarMessage(`$(check) Markr: saved ${filename}`, 3000);
+        this._getWorkspaceFiles().then(files => {
+          this._panel.webview.postMessage({ type: 'updateFiles', files });
         });
       }
       if (msg.type === 'openInEditor') {
@@ -1918,6 +2178,7 @@ export class MarkdownPreviewPanel {
         });
       }
       if (msg.type === 'edit') {
+        // Live preview update only — no disk write until user explicitly saves.
         this._editMode = true;
         let doc = this._document;
         if (msg.uri) {
@@ -1930,11 +2191,27 @@ export class MarkdownPreviewPanel {
         this._document = doc;
         const edit = new vscode.WorkspaceEdit();
         edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), msg.content);
-        await vscode.workspace.applyEdit(edit);
-        await vscode.workspace.save(doc.uri);   // write to disk → removes unsaved dot
+        await vscode.workspace.applyEdit(edit); // keep VS Code document in sync (shows ● dot)
+        // No workspace.save() here — user must press ⌘S or click the Save button
         const html = applyGithubAlerts(marked.parse(msg.content) as string);
         this._panel.webview.postMessage({ type: 'updateSplitPreview', html });
+      }
+      if (msg.type === 'saveFile') {
+        // Explicit save triggered by the user (⌘S or Save button).
+        let doc = this._document;
+        if (msg.uri) {
+          try { doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(msg.uri)); } catch { doc = this._document; }
+        }
+        this._document = doc;
+        if (typeof msg.content === 'string') {
+          // Apply the latest content in case the debounce timer hasn't fired yet
+          const edit = new vscode.WorkspaceEdit();
+          edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), msg.content);
+          await vscode.workspace.applyEdit(edit);
+        }
+        await vscode.workspace.save(doc.uri);
         this._panel.webview.postMessage({ type: 'saved' });
+        vscode.window.setStatusBarMessage('$(check) Markr: saved', 2000);
       }
       if (msg.type === 'modeChange') {
         this._editMode = msg.mode === 'edit';
@@ -2225,11 +2502,13 @@ export class MarkdownPreviewPanel {
       · <span id="stat-tok" class="${autoEdit ? 'stats-accent' : ''}" title="${stats.chars.toLocaleString()} chars">${tokStr}</span>
     </span>
     <span id="save-status" class="save-status"></span>
+    <span id="diff-chip"></span>
     <div class="sep-v"></div>
     <button id="btn-edit" class="tb-btn${autoEdit ? ' accent' : ''}" title="Split edit mode">${autoEdit ? '⚡ Edit' : 'Edit'}</button>
+    <button id="btn-save-file" class="tb-btn" title="Save (⌘S / Ctrl+S)">Save</button>
     <button id="btn-source" class="tb-btn" title="Open Markdown source in VS Code editor">${ICON.source} Source</button>
     <div class="sep-v"></div>
-    <button id="btn-paste-preview" class="tb-btn" title="Paste Markdown from clipboard to preview">${ICON.paste} Paste</button>
+    <button id="btn-paste-preview" class="tb-btn" title="Preview Clipboard — instantly render Markdown you copied from Claude, ChatGPT, Notion, or anywhere. No file needed.">${ICON.paste} Preview Clipboard</button>
     <div class="sep-v"></div>
     <button id="btn-copy-md"   class="tb-btn" title="Copy Markdown">${ICON.copyMd} MD</button>
     <button id="btn-copy-html" class="tb-btn" title="Copy HTML">${ICON.copyHtml} HTML</button>
@@ -2313,6 +2592,17 @@ export class MarkdownPreviewPanel {
     </div>
   </div>
   <div id="main-col">
+    <!-- Clipboard preview banner — shown when content comes from clipboard -->
+    <div id="clipboard-banner">
+      <span class="cb-label">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+        Clipboard preview — not saved to disk
+      </span>
+      <div class="cb-actions">
+        <button class="cb-save" id="btn-save-clipboard" title="Pick a location and save this as a .md file">Save as .md file</button>
+        <button class="cb-dismiss" id="btn-dismiss-clipboard" title="Dismiss this banner">Dismiss</button>
+      </div>
+    </div>
     <div id="main">
       <div id="scroller"><article class="markdown-body">${body}</article></div>
       <textarea id="edit-area" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Start writing Markdown…"></textarea>
