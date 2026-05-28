@@ -191,8 +191,7 @@ MIT — free for personal and commercial use. See [LICENSE](LICENSE).
 
 Built with ❤️ by **[Apptware Labs Pvt Ltd](https://apptware.com)**
 
-*Apptware Labs is a product and engineering studio building open-source developer tools*  
-*alongside enterprise software products for teams that care about quality.*
+*Apptware Labs is a product studio building developer tools and enterprise software — open source and commercial.*
 
 <br/>
 
