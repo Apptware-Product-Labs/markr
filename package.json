@@ -1,11 +1,11 @@
 {
   "name": "markr",
-  "displayName": "Markr",
-  "description": "Fast Markdown preview for VS Code with workspace navigation, AI docs support, GitHub-style rendering, split editing, themes, and export tools",
-  "version": "3.6.0",
+  "displayName": "Markr – Markdown Preview",
+  "description": "Markdown preview & viewer for VS Code — GitHub-style rendering, Mermaid diagrams, split editing, live TOC, AI docs support, themes, and PDF export",
+  "version": "3.6.1",
   "publisher": "Apptware-Product-Lab",
   "author": {
-    "name": "Apptware Labs Pvt Ltd",
+    "name": "Apptware Product Labs Pvt Ltd",
     "email": "sumit.patil@apptware.com",
     "url": "https://apptware.com"
   },
@@ -27,26 +27,33 @@
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Other",
-    "Visualization"
+    "Visualization",
+    "Notebooks",
+    "Other"
   ],
   "keywords": [
     "markdown",
-    "markdown-preview",
-    "github-markdown",
+    "markdown preview",
+    "markdown viewer",
+    "markdown reader",
+    "md preview",
+    "mermaid",
+    "github markdown",
+    "gfm",
+    "toc",
+    "diagrams",
+    "pdf export",
+    "split editor",
     "documentation",
+    "preview",
     "ai",
     "agents",
     "skills",
-    "preview",
-    "notebook",
-    "reader",
-    "viewer",
-    "editor",
-    "markr",
-    "md",
-    "mermaid",
-    "toc"
+    "claude",
+    "copilot",
+    "cursor",
+    "ai docs",
+    "llm"
   ],
   "activationEvents": [
     "onLanguage:markdown"
