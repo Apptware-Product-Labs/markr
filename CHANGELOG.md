@@ -7,6 +7,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.6.2] — 2026-05-28
+
+### Fixed
+- LICENSE copyright corrected to Apptware Labs Pvt Ltd
+
+---
+
 ## [3.6.1] — 2026-05-28
 
 ### Fixed
