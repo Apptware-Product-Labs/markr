@@ -1412,6 +1412,7 @@ const SCRIPT = /* javascript */`
   });
 
   // ── Toolbar buttons ────────────────────────────────────────────────────────
+  qs('#btn-paste-preview')?.addEventListener('click', () => vsc.postMessage({ type: 'pastePreview' }));
   qs('#btn-copy-md')?.addEventListener('click', () => vsc.postMessage({ type: 'copyMarkdown' }));
   qs('#btn-source')?.addEventListener('click', () => {
     vsc.postMessage({ type: 'openInEditor', uri: activeTabUri });
@@ -1680,6 +1681,7 @@ const ICON = {
   export: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`,
   pdf: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="12" y2="17"/></svg>`,
   palette: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>`,
+  paste: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>`,
   undo: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>`,
   redo: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"/></svg>`,
 };
@@ -1747,6 +1749,31 @@ export class MarkdownPreviewPanel {
         vscode.env.clipboard.writeText(this._document.getText()).then(() =>
           vscode.window.setStatusBarMessage('$(check) Markr: Markdown copied', 3000)
         );
+      }
+      if (msg.type === 'pastePreview') {
+        const text = await vscode.env.clipboard.readText();
+        if (!text.trim()) {
+          vscode.window.showInformationMessage('Clipboard is empty — copy some Markdown first.');
+          return;
+        }
+        const doc = await vscode.workspace.openTextDocument({ content: text, language: 'markdown' });
+        this._document = doc;
+        const rawText = doc.getText();
+        const { meta, body } = extractFrontmatter(rawText);
+        const rendered = applyGithubAlerts(marked.parse(body) as string);
+        const stats = docStats(rawText);
+        this._panel.webview.postMessage({
+          type: 'fileLoaded',
+          uri: doc.uri.toString(),
+          filename: 'Clipboard',
+          html: (meta ? renderFrontmatter(meta) : '') + rendered,
+          markdown: rawText,
+          isAiConfig: false,
+          tokStr: tokenEstimate(stats.chars),
+          statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
+          words: stats.words,
+          readMins: Math.max(1, Math.ceil(stats.words / 200)),
+        });
       }
       if (msg.type === 'openInEditor') {
         const uri = msg.uri ? vscode.Uri.parse(msg.uri) : this._document.uri;
@@ -2069,6 +2096,8 @@ export class MarkdownPreviewPanel {
     <div class="sep-v"></div>
     <button id="btn-edit" class="tb-btn${autoEdit ? ' accent' : ''}" title="Split edit mode">${autoEdit ? '⚡ Edit' : 'Edit'}</button>
     <button id="btn-source" class="tb-btn" title="Open Markdown source in VS Code editor">${ICON.source} Source</button>
+    <div class="sep-v"></div>
+    <button id="btn-paste-preview" class="tb-btn" title="Paste Markdown from clipboard to preview">${ICON.paste} Paste</button>
     <div class="sep-v"></div>
     <button id="btn-copy-md"   class="tb-btn" title="Copy Markdown">${ICON.copyMd} MD</button>
     <button id="btn-copy-html" class="tb-btn" title="Copy HTML">${ICON.copyHtml} HTML</button>

@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr",
   "description": "Fast Markdown preview for VS Code with workspace navigation, AI docs support, GitHub-style rendering, split editing, themes, and export tools",
-  "version": "3.3.1",
+  "version": "3.4.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
@@ -65,6 +65,12 @@
         "title": "Open Feature Showcase",
         "category": "Markr",
         "icon": "$(preview)"
+      },
+      {
+        "command": "markr.pastePreview",
+        "title": "Paste Markdown to Preview",
+        "category": "Markr",
+        "icon": "$(clippy)"
       }
     ],
     "menus": {
@@ -96,6 +102,12 @@
         "key": "ctrl+shift+m",
         "mac": "cmd+shift+m",
         "when": "editorLangId == markdown"
+      },
+      {
+        "command": "markr.pastePreview",
+        "key": "ctrl+shift+p",
+        "mac": "cmd+shift+p",
+        "when": "!editorFocus"
       }
     ],
     "configuration": {
