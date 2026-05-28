@@ -748,8 +748,63 @@ pre:hover .copy-btn { opacity: 1; }
 .markdown-body kbd { display: inline-block; padding: 3px 5px; font-family: ui-monospace, monospace; font-size: 11px; line-height: 10px; color: var(--text); vertical-align: middle; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px; box-shadow: inset 0 -1px 0 var(--border); }
 .markdown-body details { display: block; margin-bottom: 16px; }
 .markdown-body details summary { display: list-item; cursor: pointer; font-weight: 600; }
-.mermaid-wrap { margin-bottom: 16px; }
-.mermaid { text-align: center; overflow-x: auto; }
+/* Mermaid diagrams */
+.mermaid-wrap { margin-bottom: 16px; position: relative; }
+.mermaid-wrap:hover .mermaid-zoom-btn { opacity: 1; }
+.mermaid { text-align: center; overflow-x: auto; cursor: zoom-in; }
+.mermaid-zoom-btn {
+  position: absolute; top: 8px; right: 8px;
+  opacity: 0; transition: opacity 0.15s;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 7px; font-size: 11px;
+  color: var(--text-muted); cursor: pointer; line-height: 1.4;
+}
+.mermaid-zoom-btn:hover { background: var(--bg-hover); color: var(--text); }
+
+/* Mermaid fullscreen modal */
+.mermaid-modal {
+  display: none; position: fixed; inset: 0; z-index: 9999;
+  align-items: center; justify-content: center;
+}
+.mermaid-modal.open { display: flex; }
+.mermaid-modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+}
+.mermaid-modal-box {
+  position: relative; z-index: 1;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+  max-width: 92vw; max-height: 88vh;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.mermaid-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; border-bottom: 1px solid var(--border);
+  font-size: 12px; color: var(--text-muted); flex-shrink: 0;
+}
+.mermaid-modal-controls { display: flex; gap: 6px; align-items: center; }
+.mermaid-modal-controls button {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 10px; font-size: 13px;
+  color: var(--text); cursor: pointer; line-height: 1.4;
+}
+.mermaid-modal-controls button:hover { background: var(--bg-hover); }
+.mermaid-modal-controls .zoom-level {
+  font-size: 11px; color: var(--text-muted); min-width: 36px; text-align: center;
+}
+.mermaid-modal-body {
+  overflow: auto; padding: 24px; flex: 1;
+  display: flex; align-items: flex-start; justify-content: center;
+}
+.mermaid-modal-body .mermaid-zoom-inner {
+  transform-origin: top center; transition: transform 0.15s ease;
+}
+.mermaid-modal-close {
+  background: none; border: none; font-size: 18px; line-height: 1;
+  color: var(--text-muted); cursor: pointer; padding: 2px 6px; border-radius: 4px;
+}
+.mermaid-modal-close:hover { background: var(--bg-hover); color: var(--text); }
 
 /* === Highlight.js ==========================================================*/
 .hljs { color: var(--hl); background: transparent; }
@@ -1187,15 +1242,59 @@ const SCRIPT = /* javascript */`
     if (scriptNonce) script.nonce = scriptNonce;
     script.textContent = [
       "import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';",
-      "const mode = document.documentElement.getAttribute('data-m');",
-      "const dark = mode === 'dark' || mode === 'linear';",
-      "mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'loose' });",
+      "const mode = document.documentElement.getAttribute('data-m') || 'light';",
+      // Theme config per Markr theme — clean modern palette for light themes
+      "const themeConfigs = {",
+      "  light: { theme: 'base', themeVariables: {",
+      "    primaryColor: '#fff7ed', primaryBorderColor: '#f97316', primaryTextColor: '#1a1614',",
+      "    background: '#ffffff', mainBkg: '#fff7ed', nodeBorder: '#f97316',",
+      "    clusterBkg: '#fef3c7', titleColor: '#1a1614', edgeLabelBackground: '#ffffff',",
+      "    lineColor: '#9ca3af', textColor: '#1a1614',",
+      "    sectionBkgColor: '#fff7ed', altSectionBkgColor: '#fffbf5', gridColor: '#e5e7eb',",
+      "    doneTaskBkgColor: '#22c55e', doneTaskBorderColor: '#16a34a',",
+      "    activeTaskBkgColor: '#f97316', activeTaskBorderColor: '#ea580c',",
+      "    taskBorderColor: '#d1d5db', taskBkgColor: '#f3f4f6',",
+      "    taskTextColor: '#1a1614', taskTextLightColor: '#6b7280', taskTextOutsideColor: '#374151',",
+      "    critBkgColor: '#ef4444', critBorderColor: '#dc2626',",
+      "  }},",
+      "  notion: { theme: 'base', themeVariables: {",
+      "    primaryColor: '#f6f5f4', primaryBorderColor: '#37352f', primaryTextColor: '#37352f',",
+      "    background: '#ffffff', mainBkg: '#f6f5f4', nodeBorder: '#37352f',",
+      "    clusterBkg: '#f6f5f4', titleColor: '#37352f', edgeLabelBackground: '#ffffff',",
+      "    lineColor: '#9b9a97', textColor: '#37352f',",
+      "    sectionBkgColor: '#f6f5f4', altSectionBkgColor: '#ffffff', gridColor: '#e9e9e7',",
+      "    doneTaskBkgColor: '#2ecc71', doneTaskBorderColor: '#27ae60',",
+      "    activeTaskBkgColor: '#2383e2', activeTaskBorderColor: '#1a6db5',",
+      "    taskBorderColor: '#e9e9e7', taskBkgColor: '#f6f5f4',",
+      "    taskTextColor: '#37352f', taskTextLightColor: '#6b6b6b', taskTextOutsideColor: '#37352f',",
+      "    critBkgColor: '#e03e3e', critBorderColor: '#c0392b',",
+      "  }},",
+      "  dark:   { theme: 'dark' },",
+      "  linear: { theme: 'dark', themeVariables: { primaryColor: '#1a1b2e', primaryBorderColor: '#5e6ad2', lineColor: '#5e6ad2' } },",
+      "};",
+      "const cfg = themeConfigs[mode] || themeConfigs.light;",
+      "mermaid.initialize({ startOnLoad: false, ...cfg, securityLevel: 'loose' });",
       "document.querySelectorAll('pre code.markr-mermaid-source').forEach(async block => {",
       "  const pre = block.parentElement; if (!pre) return;",
       "  const wrap = document.createElement('div'); wrap.className = 'mermaid-wrap';",
+      "  const zoomBtn = document.createElement('button'); zoomBtn.className = 'mermaid-zoom-btn';",
+      "  zoomBtn.title = 'Expand diagram'; zoomBtn.textContent = '⤢ Expand';",
       "  const div = document.createElement('div'); div.className = 'mermaid';",
       "  div.textContent = block.textContent || '';",
-      "  wrap.appendChild(div); pre.replaceWith(wrap);",
+      "  wrap.appendChild(zoomBtn); wrap.appendChild(div); pre.replaceWith(wrap);",
+      "  // click diagram or expand button → open modal",
+      "  function openModal() {",
+      "    const svg = div.querySelector('svg'); if (!svg) return;",
+      "    const modal = document.getElementById('mermaid-modal');",
+      "    const inner = document.getElementById('mermaid-zoom-inner');",
+      "    if (!modal || !inner) return;",
+      "    inner.innerHTML = svg.outerHTML;",
+      "    inner.style.transform = 'scale(1)';",
+      "    document.getElementById('mermaid-zoom-level').textContent = '100%';",
+      "    modal.classList.add('open');",
+      "  }",
+      "  div.addEventListener('click', openModal);",
+      "  zoomBtn.addEventListener('click', openModal);",
       "});",
       "try { await mermaid.run(); } catch(e) { console.warn('Mermaid:', e); }",
     ].join('\\n');
@@ -1508,6 +1607,33 @@ const SCRIPT = /* javascript */`
   const scroller = qs('#scroller');
   scroller?.addEventListener('scroll', () => { topBtn?.classList.toggle('show', (scroller.scrollTop || 0) > 300); });
   topBtn?.addEventListener('click', () => scroller?.scrollTo({ top: 0, behavior: 'smooth' }));
+
+  // ── Mermaid zoom modal ──────────────────────────────────────────────────────
+  let mermaidZoom = 1;
+  function setMermaidZoom(z) {
+    mermaidZoom = Math.min(4, Math.max(0.25, z));
+    const inner = qs('#mermaid-zoom-inner'); if (inner) inner.style.transform = 'scale(' + mermaidZoom + ')';
+    const lbl   = qs('#mermaid-zoom-level'); if (lbl)   lbl.textContent = Math.round(mermaidZoom * 100) + '%';
+  }
+  function closeMermaidModal() {
+    qs('#mermaid-modal')?.classList.remove('open');
+    mermaidZoom = 1;
+  }
+  qs('#mermaid-modal-close')?.addEventListener('click',    closeMermaidModal);
+  qs('#mermaid-modal-backdrop')?.addEventListener('click', closeMermaidModal);
+  qs('#mermaid-zoom-in')?.addEventListener('click',    () => setMermaidZoom(mermaidZoom + 0.25));
+  qs('#mermaid-zoom-out')?.addEventListener('click',   () => setMermaidZoom(mermaidZoom - 0.25));
+  qs('#mermaid-zoom-reset')?.addEventListener('click', () => setMermaidZoom(1));
+  // Scroll wheel zoom inside modal body
+  qs('#mermaid-modal')?.addEventListener('wheel', e => {
+    if (!qs('#mermaid-modal')?.classList.contains('open')) return;
+    e.preventDefault();
+    setMermaidZoom(mermaidZoom + (e.deltaY < 0 ? 0.1 : -0.1));
+  }, { passive: false });
+  // ESC to close
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeMermaidModal();
+  });
 
   // ── Messages from extension ────────────────────────────────────────────────
   window.addEventListener('message', ev => {
@@ -2191,6 +2317,26 @@ export class MarkdownPreviewPanel {
 </div>
 
 <button id="top-btn" title="Back to top">${ICON.arrowUp}</button>
+
+<!-- Mermaid zoom modal -->
+<div class="mermaid-modal" id="mermaid-modal">
+  <div class="mermaid-modal-backdrop" id="mermaid-modal-backdrop"></div>
+  <div class="mermaid-modal-box">
+    <div class="mermaid-modal-header">
+      <span>Diagram</span>
+      <div class="mermaid-modal-controls">
+        <button id="mermaid-zoom-out" title="Zoom out">−</button>
+        <span class="zoom-level" id="mermaid-zoom-level">100%</span>
+        <button id="mermaid-zoom-in"  title="Zoom in">+</button>
+        <button id="mermaid-zoom-reset" title="Reset zoom">Reset</button>
+        <button class="mermaid-modal-close" id="mermaid-modal-close">✕</button>
+      </div>
+    </div>
+    <div class="mermaid-modal-body">
+      <div class="mermaid-zoom-inner" id="mermaid-zoom-inner"></div>
+    </div>
+  </div>
+</div>
 
 <!-- Quick Open overlay (Cmd+K) -->
 <div id="quick-open">

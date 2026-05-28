@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr",
   "description": "Fast Markdown preview for VS Code with workspace navigation, AI docs support, GitHub-style rendering, split editing, themes, and export tools",
-  "version": "3.4.0",
+  "version": "3.5.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
