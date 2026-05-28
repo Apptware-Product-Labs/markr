@@ -1,141 +1,207 @@
 <div align="center">
 
+<img src="icon.png" alt="Markr" width="80" />
+
 # Markr
 
-Fast, polished Markdown preview for VS Code.
+### The Markdown preview VS Code deserves.
 
-GitHub-style rendering, workspace navigation, AI docs support, live table of contents, Mermaid diagrams, split editing, themes, and clean export tools in one focused preview.
+**GitHub-accurate rendering · Live TOC · Syntax highlighting · Mermaid · Multi-tab · Themes · Export**
 
-[![Version](https://img.shields.io/visual-studio-marketplace/v/Apptware-Product-Lab.markr?color=F97316&label=version&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/Apptware-Product-Lab.markr?color=EF4444&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr)
+<br/>
+
+[![Version](https://img.shields.io/visual-studio-marketplace/v/Apptware-Product-Lab.markr?color=F97316&label=VS%20Code&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/Apptware-Product-Lab.markr?color=EF4444&label=installs&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr)
+[![Open VSX](https://img.shields.io/open-vsx/dt/Apptware-Product-Lab/markr?color=F97316&label=Open%20VSX&style=flat-square)](https://open-vsx.org/extension/Apptware-Product-Lab/markr)
 [![License: MIT](https://img.shields.io/badge/license-MIT-orange.svg?style=flat-square)](LICENSE)
+[![Made by Apptware Labs](https://img.shields.io/badge/made%20by-Apptware%20Labs-F97316?style=flat-square)](https://apptware.com)
+
+<br/>
+
+[**Install on VS Code**](https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr) · [**Install on Cursor / Open VSX**](https://open-vsx.org/extension/Apptware-Product-Lab/markr) · [**Report a Bug**](https://github.com/Apptware-Product-Labs/markr/issues) · [**Request a Feature**](https://github.com/Apptware-Product-Labs/markr/issues/new)
 
 </div>
 
 ---
 
-## Why Markr
+## What is Markr?
 
-The built-in Markdown preview is useful, but it is intentionally minimal. Markr is built for people who spend real time in Markdown: documentation, specs, README files, notes, AI instructions, changelogs, and long-form project files.
+Markr is a free, open-source Markdown preview extension for VS Code and Cursor. It renders your `.md` files exactly as GitHub does — clean typography, accurate colors, beautiful tables — with a full suite of power features built in.
 
-Open any `.md` file and run **Markr: Open Markr Preview** or press:
+Whether you're writing documentation, maintaining a README, managing AI agent configs, or working in a large Markdown-heavy repo, Markr gives you a significantly better experience than the built-in preview. No configuration. No fuss.
 
-| Platform | Shortcut |
-|---|---|
-| macOS | `Cmd+Shift+M` |
-| Windows / Linux | `Ctrl+Shift+M` |
+**Open any `.md` file. Press `Cmd+Shift+M`. That's it.**
 
 ---
 
-## Highlights
+## Why Markr?
 
-| Area | What Markr Adds |
-|---|---|
-| Reading | Clean typography, focus mode, back-to-top, reading time, word count |
-| Navigation | Collapsible workspace folders, live table of contents, scroll spy, heading links |
-| AI Markdown | First-class handling for `AGENTS.md`, `SKILL.md`, prompts, rules, and context files |
-| Editing | Resizable split edit mode, formatting toolbar, autosave, image paste support |
-| Rendering | GitHub-style Markdown, syntax highlighting, alerts, Mermaid diagrams |
-| Export | Copy Markdown, copy HTML, export HTML, print, export PDF |
-| Themes | Markr Light, Markr Dark, Notion, Linear |
-
----
-
-## Feature Showcase
-
-Run **Markr: Open Feature Showcase** from the Command Palette to open a bundled QA document covering:
-
-- Mermaid flowchart for Strangler Fig architecture
-- Mermaid sequence diagram for Client -> Gateway -> Services -> Kafka order flow
-- Mermaid Gantt chart for a colour-coded Sprint 12 release timeline
-- GitHub `NOTE`, `TIP`, `WARNING`, `IMPORTANT`, and `CAUTION` alerts
-- TypeScript and SQL syntax highlighting examples
+| | Built-in VS Code Preview | Markr |
+|---|:---:|:---:|
+| GitHub-accurate styling | Partial | ✅ Pixel-perfect |
+| Live Table of Contents | ✗ | ✅ Collapsible, scroll spy |
+| Multi-tab navigation | ✗ | ✅ Open multiple files |
+| Workspace file browser | ✗ | ✅ Grouped by folder |
+| Mermaid diagrams | ✗ | ✅ Flowcharts, Gantt & more |
+| Syntax highlighting | Basic | ✅ 190+ languages |
+| Copy code buttons | ✗ | ✅ Hover to reveal |
+| Heading anchor links | ✗ | ✅ Click to copy |
+| Word count + reading time | ✗ | ✅ Always visible |
+| Export to HTML / PDF | ✗ | ✅ One click |
+| Themes | VS Code only | ✅ Light, Dark, Notion, Linear |
+| Focus / reading mode | ✗ | ✅ Distraction-free |
+| Split edit mode | ✗ | ✅ Preview + editor side by side |
+| AI config file support | ✗ | ✅ AGENTS.md, CLAUDE.md & more |
 
 ---
 
-## Workspace Navigation
+## Features
 
-Markr includes a file panel for Markdown-heavy projects. It indexes workspace `.md` files, groups them by folder, lets folders collapse, highlights AI configuration files, and lets you switch between files without leaving the preview.
+### 📄 GitHub-Style Rendering
+Headings, tables, blockquotes, task lists, strikethrough, footnotes, inline code, fenced code blocks — all rendered exactly as GitHub does. Automatically switches between light and dark with your VS Code theme.
 
-The file list loads asynchronously so the preview can appear quickly even in projects with many Markdown files. You can control the list size with `markr.maxWorkspaceFiles`.
+### 📑 Live Table of Contents
+Auto-generated from your headings the moment you open the file. Scroll spy highlights the active section in real time. Click any item to jump there. Collapse it with one button.
+
+### 🗂 Workspace File Browser
+Browse and switch between all `.md` files in your workspace without leaving the preview. Files are grouped by folder, AI config files are pinned at the top, and the browser handles large repos (500+ files) without blocking.
+
+### 📂 Multi-Tab Navigation
+Open multiple Markdown files in tabs — just like your editor. Switching between previously-opened files is instant with no round-trip to the extension host.
+
+### 🎨 Syntax Highlighting — 190+ Languages
+TypeScript, Python, Go, Rust, Java, SQL, YAML, Bash, Dockerfile — every language highlighted with GitHub's exact color tokens, in both light and dark themes.
+
+### 🔀 Mermaid Diagrams
+Drop a `mermaid` block in your Markdown and Markr renders it live. Flowcharts, sequence diagrams, Gantt charts, class diagrams, and pie charts — all supported.
+
+### ✦ AI Config File Support
+Markr detects and highlights AI documentation files — `AGENTS.md`, `CLAUDE.md`, `SKILL.md`, Cursor rules, Copilot instructions, and more. They open directly into split edit mode so you can read and edit simultaneously.
+
+### ⚡ Scroll Sync
+Move your cursor in the editor — the preview scrolls to match. Always in context, never lost.
+
+### 🛠 Toolbar
+
+```
+◈ Markr  ·  filename.md      3 min read · 580 words    [Source] [MD] [HTML] [Print] [PDF] [≡] [⊡]
+```
+
+| Button | What it does |
+|--------|--------------|
+| `Source` | Jump to VS Code's built-in editor for this file |
+| `MD` | Copy raw Markdown to clipboard |
+| `HTML` | Copy rendered HTML to clipboard |
+| `Print` | Print-ready layout |
+| `PDF` | Export as PDF using Chrome/Edge |
+| `≡` | Toggle TOC sidebar |
+| `⊡` | Focus / reading mode |
+
+### 🎯 Focus Mode
+One click hides the sidebar, widens content to 720 px, bumps the font size. Pure reading flow.
+
+### 🎨 Themes
+Switch between four themes from the toolbar — **Markr Light**, **Markr Dark**, **Notion White**, **Linear Dark**. Your choice is remembered across sessions.
 
 ---
 
-## AI Markdown Files
+## Getting Started
 
-Modern development projects often contain Markdown files that define agent behavior, coding rules, prompts, skills, memory, and context. Markr detects and highlights common AI docs, including:
+**VS Code**
+1. Open the Extensions panel (`Ctrl+Shift+X` / `Cmd+Shift+X`)
+2. Search for **Markr**
+3. Click **Install**
 
-- `AGENTS.md`
-- `SKILL.md` and `skills.md`
-- `CLAUDE.md`, `codex.md`, `gemini.md`, and Copilot instruction files
-- Cursor, Windsurf, Aider, prompt, rule, memory, and context Markdown files
+**Cursor / VSCodium / Open VSX**
+Same search — pulls from [Open VSX Registry](https://open-vsx.org/extension/Apptware-Product-Lab/markr).
 
-AI docs open directly into split edit mode, show a clear type badge, and stay grouped at the top of the file panel. The split can be resized, and switching to preview is remembered for that file during the session. Use the **Source** toolbar action to jump from Markr into the normal VS Code Markdown editor whenever you want the full editor experience.
-
----
-
-## Markdown Rendering
-
-Markr supports the Markdown features expected in modern documentation:
-
-- Headings, lists, tables, blockquotes, links, images, and inline code
-- Fenced code blocks with syntax highlighting
-- GitHub-style task lists
-- GitHub alerts: `NOTE`, `TIP`, `IMPORTANT`, `WARNING`, and `CAUTION`
-- Mermaid diagrams through fenced `mermaid` blocks
-- Frontmatter display for Markdown files that use metadata
+**First use**
+Open any `.md` file → press `Cmd+Shift+M` (macOS) or `Ctrl+Shift+M` (Windows/Linux).
 
 ---
 
-## Editing Tools
+## Keyboard Shortcuts
 
-Use split edit mode when you want to make quick changes without leaving the preview. The formatting toolbar supports common Markdown actions such as bold, italic, headings, links, images, lists, code, quotes, and horizontal rules.
+| Action | Mac | Windows / Linux |
+|--------|-----|-----------------|
+| Open Markr Preview | `Cmd+Shift+M` | `Ctrl+Shift+M` |
 
-Changes are saved back to the active Markdown file.
-
----
-
-## Export Tools
-
-Markr includes practical export actions directly in the toolbar:
-
-| Action | Use |
-|---|---|
-| Source | Open the current file in the VS Code Markdown editor |
-| Copy Markdown | Copy the source Markdown |
-| Copy HTML | Copy the rendered HTML |
-| Export HTML | Save a standalone HTML file |
-| Print | Open a print-ready view |
-| Export PDF | Generate a PDF using Chrome or Edge |
+Also available via:
+- The **preview icon** in the editor title bar when a `.md` file is open
+- Right-click any `.md` file in Explorer → **Open Markr Preview**
+- The Command Palette → **Markr: Open Markr Preview**
 
 ---
 
 ## Settings
 
 | Setting | Default | Description |
-|---|---:|---|
-| `markr.scrollSync` | `true` | Sync the preview to the editor cursor |
-| `markr.showTOC` | `true` | Show the table of contents when preview opens |
-| `markr.maxWorkspaceFiles` | `500` | Maximum Markdown files shown in the workspace file panel |
+|---------|---------|-------------|
+| `markr.scrollSync` | `true` | Sync preview scroll with editor cursor |
+| `markr.showTOC` | `true` | Show TOC sidebar when preview opens |
+| `markr.maxWorkspaceFiles` | `500` | Max `.md` files shown in the workspace browser |
 
 ---
 
 ## Requirements
 
-- VS Code `1.80.0` or newer
-- Internet access for Mermaid rendering from jsDelivr
-- Chrome, Edge, or Chromium for direct PDF export
-
-All non-Mermaid preview features work offline.
+- VS Code `1.80.0` or higher
+- Internet connection for Mermaid rendering *(all other features work fully offline)*
+- Chrome, Edge, or Chromium for direct PDF export *(falls back to browser print otherwise)*
 
 ---
 
-## Feedback
+## Contributing
 
-Report issues or request features on GitHub:
+Markr is open source and contributions are welcome.
 
-https://github.com/Apptware-Product-Labs/markr/issues
+```bash
+git clone https://github.com/Apptware-Product-Labs/markr.git
+cd markr
+npm install
+npm run build     # development build
+npm run watch     # rebuild on change
+npm run package   # package .vsix
+```
+
+1. Fork the repo and create a branch: `git checkout -b feat/your-feature`
+2. Make your changes and run `npm run build` to verify
+3. Open a pull request with a clear description of what you changed and why
+
+For bugs or feature requests → [open an issue](https://github.com/Apptware-Product-Labs/markr/issues).
 
 ---
 
-Built by Apptware Product Lab. Licensed under MIT.
+## Roadmap
+
+- [ ] Custom theme editor
+- [ ] Table of Contents depth control
+- [ ] Markdown linting indicators
+- [ ] Image optimisation on paste
+
+---
+
+## License
+
+MIT — free for personal and commercial use. See [LICENSE](LICENSE).
+
+---
+
+<div align="center">
+
+Built with ❤️ by **[Apptware Labs Pvt Ltd](https://apptware.com)**
+
+*Apptware Labs is a product and engineering studio building open-source developer tools*  
+*alongside enterprise software products for teams that care about quality.*
+
+<br/>
+
+**Our Products**
+
+[Markr](https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr) &nbsp;·&nbsp; Syncrra &nbsp;·&nbsp; BenchMark &nbsp;·&nbsp; HireFlow
+
+<br/>
+
+[🌐 apptware.com](https://apptware.com) &nbsp;·&nbsp; [GitHub](https://github.com/Apptware-Product-Labs) &nbsp;·&nbsp; [LinkedIn](https://www.linkedin.com/company/apptware)
+
+</div>
