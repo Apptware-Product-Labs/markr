@@ -873,6 +873,7 @@ body.has-tabs #fmt-toolbar { top: 78px; }
 const SCRIPT = /* javascript */`
 (function () {
   const vsc = acquireVsCodeApi();
+  const scriptNonce = document.currentScript?.nonce || '';
 
   let currentMarkdown = (typeof __MD__ !== 'undefined') ? __MD__ : '';
   let filesCache  = (typeof __FILES__ !== 'undefined') ? [...__FILES__] : [];
@@ -1174,13 +1175,22 @@ const SCRIPT = /* javascript */`
   }
 
   function setupMermaid() {
-    const blocks = qsa('pre code.language-mermaid'); if (!blocks.length) return;
+    function looksLikeMermaid(text) {
+      return /^(graph|flowchart|sequenceDiagram|classDiagram|stateDiagram(?:-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|gitGraph|quadrantChart|requirementDiagram|C4Context|C4Container|C4Component|C4Dynamic)\\b/.test(String(text || '').trim());
+    }
+    const blocks = qsa('pre code').filter(block =>
+      block.classList.contains('language-mermaid') || looksLikeMermaid(block.textContent)
+    );
+    if (!blocks.length) return;
+    blocks.forEach(block => block.classList.add('markr-mermaid-source'));
     const script = document.createElement('script'); script.type = 'module';
+    if (scriptNonce) script.nonce = scriptNonce;
     script.textContent = [
       "import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';",
-      "const dark = document.documentElement.getAttribute('data-m') === 'dark';",
+      "const mode = document.documentElement.getAttribute('data-m');",
+      "const dark = mode === 'dark' || mode === 'linear';",
       "mermaid.initialize({ startOnLoad: false, theme: dark ? 'dark' : 'default', securityLevel: 'loose' });",
-      "document.querySelectorAll('pre code.language-mermaid').forEach(async block => {",
+      "document.querySelectorAll('pre code.markr-mermaid-source').forEach(async block => {",
       "  const pre = block.parentElement; if (!pre) return;",
       "  const wrap = document.createElement('div'); wrap.className = 'mermaid-wrap';",
       "  const div = document.createElement('div'); div.className = 'mermaid';",
