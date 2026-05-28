@@ -34,6 +34,33 @@ Whether you're writing documentation, maintaining a README, managing AI agent co
 
 ---
 
+## Screenshots
+
+<img src="images/screenshots/01-preview-dark.png" alt="Markr dark preview with TOC" width="100%" />
+
+<br/>
+
+<div align="center">
+<img src="images/screenshots/02-toc-panel.png" alt="Live Table of Contents" width="49%" />
+<img src="images/screenshots/03-mermaid-diagrams.png" alt="Mermaid diagrams" width="49%" />
+</div>
+
+<br/>
+
+<div align="center">
+<img src="images/screenshots/04-github-alerts.png" alt="GitHub-style alerts" width="49%" />
+<img src="images/screenshots/05-syntax-highlighting.png" alt="Syntax highlighting" width="49%" />
+</div>
+
+<br/>
+
+<div align="center">
+<img src="images/screenshots/06-notion-theme.png" alt="Notion White theme" width="49%" />
+<img src="images/screenshots/07-split-edit.png" alt="Split edit mode" width="49%" />
+</div>
+
+---
+
 ## Why Markr?
 
 | | Built-in VS Code Preview | Markr |
