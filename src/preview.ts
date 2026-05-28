@@ -775,7 +775,7 @@ pre:hover .copy-btn { opacity: 1; }
   position: relative; z-index: 1;
   background: var(--bg); border: 1px solid var(--border);
   border-radius: 12px; box-shadow: 0 24px 64px rgba(0,0,0,0.4);
-  max-width: 92vw; max-height: 88vh;
+  width: 96vw; height: 92vh;
   display: flex; flex-direction: column; overflow: hidden;
 }
 .mermaid-modal-header {
@@ -794,11 +794,17 @@ pre:hover .copy-btn { opacity: 1; }
   font-size: 11px; color: var(--text-muted); min-width: 36px; text-align: center;
 }
 .mermaid-modal-body {
-  overflow: auto; padding: 24px; flex: 1;
+  overflow: auto; padding: 32px; flex: 1;
   display: flex; align-items: flex-start; justify-content: center;
 }
 .mermaid-modal-body .mermaid-zoom-inner {
   transform-origin: top center; transition: transform 0.15s ease;
+  width: 100%;
+}
+/* Make the SVG inside the modal fill the available width */
+.mermaid-modal-body .mermaid-zoom-inner svg {
+  width: 100% !important; height: auto !important;
+  max-width: 100%;
 }
 .mermaid-modal-close {
   background: none; border: none; font-size: 18px; line-height: 1;
