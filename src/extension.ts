@@ -190,8 +190,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Clipboard is empty — copy some Markdown first.');
         return;
       }
-      const doc = await vscode.workspace.openTextDocument({ content: text, language: 'markdown' });
-      MarkdownPreviewPanel.createOrShow(doc);
+      await MarkdownPreviewPanel.showClipboard(text);
     })
   );
 
