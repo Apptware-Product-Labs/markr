@@ -7,6 +7,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.7.1] — 2026-05-29
+
+### Fixed
+- **Clipboard preview layout shift**: clicking "Preview Clipboard" no longer adds a tab or triggers the tab-bar, preventing the `margin-top` layout shift that made the content area jump. Clipboard content is now a pure overlay with no effect on the tab state
+- **Clipboard dismiss restores previous file**: clicking "Dismiss" on the clipboard banner now correctly restores the previously open file's content, title, AI badge, edit mode, and TOC — instead of leaving the clipboard content in the viewport with a hidden banner
+- **Tracked document preserved across clipboard preview**: the extension now keeps `this._document` pointing at the real on-disk file during a clipboard preview, so scroll-sync, save, and "Open in editor" continue to work correctly after dismissing
+- **`Cmd+Shift+P` / `Ctrl+Shift+P` shows the clipboard banner**: the keyboard shortcut path now routes through the same overlay mechanism as the toolbar button — the "Clipboard preview" banner is always shown and the content is never silently mixed into the file history
+
+---
+
 ## [3.7.0] — 2026-05-29
 
 ### Added

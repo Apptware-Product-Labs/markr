@@ -1886,7 +1886,26 @@ const SCRIPT = /* javascript */`
     if (clipboardMarkdown) vsc.postMessage({ type: 'saveClipboardAs', markdown: clipboardMarkdown });
   });
   qs('#btn-dismiss-clipboard')?.addEventListener('click', () => {
-    qs('#clipboard-banner')?.classList.remove('open');
+    const banner = qs('#clipboard-banner');
+    if (banner) banner.classList.remove('open');
+    clipboardMarkdown = '';
+    // Restore the active tab's file so the user is back to what they had open
+    const prevTab = tabs.find(t => t.uri === activeTabUri);
+    if (prevTab) {
+      currentMarkdown = prevTab.markdown;
+      const body = qs('#scroller .markdown-body'); if (body) body.innerHTML = prevTab.html;
+      const spBody = qs('#split-preview .markdown-body'); if (spBody) spBody.innerHTML = prevTab.html;
+      const fnEl = qs('.fname'); if (fnEl) fnEl.textContent = prevTab.filename;
+      const aiBadge = qs('.ai-badge');
+      if (aiBadge) {
+        aiBadge.textContent = prevTab.aiKind ? '✦ ' + prevTab.aiKind : '✦ AI';
+        aiBadge.style.display = prevTab.isAiConfig ? '' : 'none';
+      }
+      updateStats(currentMarkdown);
+      buildTOC(); addCopyButtons(); setupHeadingAnchors();
+      if (qs('#scroller .language-mermaid')) setupMermaid();
+      if (prevTab.isAiConfig && !isAutoEditDismissed(prevTab.uri)) { if (!editMode) enterEditMode(); }
+    }
   });
   qs('#btn-copy-md')?.addEventListener('click', () => vsc.postMessage({ type: 'copyMarkdown' }));
   qs('#btn-source')?.addEventListener('click', () => {
@@ -2055,6 +2074,30 @@ const SCRIPT = /* javascript */`
   window.addEventListener('message', ev => {
     const msg = ev.data;
     if (msg.type === 'fileLoaded') {
+      // ── Clipboard preview: pure overlay — never modify tabs, activeTabUri or currentUri ──
+      if (msg.isClipboard) {
+        clipboardMarkdown = msg.markdown;
+        currentMarkdown   = msg.markdown;
+        const cbBody = qs('#scroller .markdown-body'); if (cbBody) cbBody.innerHTML = msg.html;
+        const cbFn = qs('.fname'); if (cbFn) cbFn.textContent = '📋 Clipboard';
+        const cbBadge = qs('.ai-badge'); if (cbBadge) cbBadge.style.display = 'none';
+        updateStats(msg.markdown);
+        const banner = qs('#clipboard-banner'); if (banner) banner.classList.add('open');
+        resetHistory(); markClean();
+        // Exit edit mode so the textarea doesn't show over clipboard content
+        if (editMode) exitEditMode(false, false, false);
+        qs('#scroller').scrollTop = 0;
+        buildTOC(); addCopyButtons(); setupHeadingAnchors();
+        if (qs('#scroller .language-mermaid')) setupMermaid();
+        return; // ← do NOT touch tabs / activeTabUri — no layout shift
+      }
+
+      // ── Normal file loaded ──────────────────────────────────────────────────
+      // Close clipboard banner if it was open (user opened a real file)
+      const cbBannerNormal = qs('#clipboard-banner');
+      if (cbBannerNormal) cbBannerNormal.classList.remove('open');
+      clipboardMarkdown = '';
+
       let tab = tabs.find(t => t.uri === msg.uri);
       if (!tab) {
         tab = { uri: msg.uri, filename: msg.filename, html: msg.html, markdown: msg.markdown, isAiConfig: msg.isAiConfig, aiKind: msg.aiKind || '', scrollTop: 0 };
@@ -2077,10 +2120,6 @@ const SCRIPT = /* javascript */`
         aiBadge.style.display = msg.isAiConfig ? '' : 'none';
       }
       updateStats(msg.markdown);
-      // Clipboard banner
-      const banner = qs('#clipboard-banner');
-      if (banner) banner.classList.toggle('open', !!msg.isClipboard);
-      if (msg.isClipboard) clipboardMarkdown = msg.markdown;
       // Reset undo/redo history and dirty state whenever a new file is loaded
       resetHistory();
       markClean();
@@ -2297,6 +2336,46 @@ export class MarkdownPreviewPanel {
     p._panel.webview.postMessage({ type: 'updateFiles', files });
   }
 
+  /**
+   * Show clipboard content as a temporary overlay in the current (or new) panel.
+   * Called both from the markr.pastePreview command and the webview toolbar button.
+   * Does NOT change this._document so scroll-sync / save stay pointed at the real file.
+   */
+  public static async showClipboard(text: string): Promise<void> {
+    if (MarkdownPreviewPanel.currentPanel) {
+      MarkdownPreviewPanel.currentPanel._panel.reveal(undefined, true);
+      MarkdownPreviewPanel.currentPanel._sendClipboardPreview(text);
+      return;
+    }
+    // No panel open — create one using the clipboard text as a placeholder document.
+    const doc = await vscode.workspace.openTextDocument({ content: text, language: 'markdown' });
+    MarkdownPreviewPanel.createOrShow(doc);
+    // After panel construction, immediately override with clipboard overlay so the
+    // banner shows and the user can save to a real .md file.
+    setTimeout(() => { MarkdownPreviewPanel.currentPanel?._sendClipboardPreview(text); }, 300);
+  }
+
+  /** Send clipboard preview to the webview as a temporary overlay (no tab mutation). */
+  public _sendClipboardPreview(text: string): void {
+    const rawText = text;
+    const { meta, body } = extractFrontmatter(rawText);
+    const rendered = applyGithubAlerts(marked.parse(body) as string);
+    const stats = docStats(rawText);
+    this._panel.webview.postMessage({
+      type: 'fileLoaded',
+      uri: 'clipboard:preview',   // sentinel URI — never stored in tabs[]
+      filename: 'Clipboard',
+      html: (meta ? renderFrontmatter(meta) : '') + rendered,
+      markdown: rawText,
+      isAiConfig: false,
+      isClipboard: true,
+      tokStr: tokenEstimate(stats.chars),
+      statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
+      words: stats.words,
+      readMins: Math.max(1, Math.ceil(stats.words / 200)),
+    });
+  }
+
   private constructor(panel: vscode.WebviewPanel, document: vscode.TextDocument) {
     this._panel = panel;
     this._document = document;
@@ -2317,25 +2396,10 @@ export class MarkdownPreviewPanel {
           vscode.window.showInformationMessage('Clipboard is empty — copy some Markdown first.');
           return;
         }
-        const doc = await vscode.workspace.openTextDocument({ content: text, language: 'markdown' });
-        this._document = doc;
-        const rawText = doc.getText();
-        const { meta, body } = extractFrontmatter(rawText);
-        const rendered = applyGithubAlerts(marked.parse(body) as string);
-        const stats = docStats(rawText);
-        this._panel.webview.postMessage({
-          type: 'fileLoaded',
-          uri: doc.uri.toString(),
-          filename: 'Clipboard',
-          html: (meta ? renderFrontmatter(meta) : '') + rendered,
-          markdown: rawText,
-          isAiConfig: false,
-          isClipboard: true,
-          tokStr: tokenEstimate(stats.chars),
-          statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
-          words: stats.words,
-          readMins: Math.max(1, Math.ceil(stats.words / 200)),
-        });
+        // IMPORTANT: do NOT change this._document — clipboard is a temporary overlay.
+        // The tracked document must stay the same so edits, saves, and scroll-sync
+        // continue to work correctly after the user dismisses the clipboard banner.
+        this._sendClipboardPreview(text);
       }
       if (msg.type === 'saveClipboardAs') {
         const defaultDir = vscode.workspace.workspaceFolders?.[0]?.uri
