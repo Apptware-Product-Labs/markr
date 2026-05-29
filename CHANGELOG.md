@@ -7,6 +7,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.7.2] — 2026-05-29
+
+### Changed
+- **"Preview Clipboard" is now a paste & edit panel**: clicking the button (or pressing `Cmd/Ctrl+Shift+P`) opens the markdown in split-edit mode — the raw text is in the left textarea (editable), the live rendered preview is on the right. Users can paste, edit, and type freely before saving
+- **No more silent clipboard reads**: the content is always visible and editable — no more surprise "random text from a file" appearing. Whatever is in the clipboard is loaded into the editor where you can see and change it before it becomes a real file
+- **Edits stay in the clipboard pane**: typing in the paste editor never modifies the real file you had open. The extension now routes clipboard edits through a render-only path (no disk writes) until you explicitly press "Save as .md"
+- **Save uses latest content**: "Save as .md" saves whatever is currently in the editor at the time of clicking — including any edits made after pasting
+- **Close restores previous state**: closing the clipboard panel restores your previous file, title, TOC, and edit mode exactly as they were
+
+---
+
 ## [3.7.1] — 2026-05-29
 
 ### Fixed

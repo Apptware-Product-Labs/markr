@@ -1880,15 +1880,24 @@ const SCRIPT = /* javascript */`
   // ── Toolbar buttons ────────────────────────────────────────────────────────
   // Clipboard markdown for save-as flow
   let clipboardMarkdown = '';
+  let isClipboardMode = false;  // true while clipboard overlay is active
+  let prevEditModeBeforeClipboard = false; // remember whether user was in edit mode before clipboard
   qs('#btn-paste-preview')?.addEventListener('click', () => vsc.postMessage({ type: 'pastePreview' }));
   qs('#btn-save-file')?.addEventListener('click', () => saveFile());
   qs('#btn-save-clipboard')?.addEventListener('click', () => {
-    if (clipboardMarkdown) vsc.postMessage({ type: 'saveClipboardAs', markdown: clipboardMarkdown });
+    // Use currentMarkdown so we save any edits the user has typed since pasting
+    const md = (currentMarkdown || clipboardMarkdown).trim() ? (currentMarkdown || clipboardMarkdown) : clipboardMarkdown;
+    if (md.trim()) vsc.postMessage({ type: 'saveClipboardAs', markdown: md });
   });
   qs('#btn-dismiss-clipboard')?.addEventListener('click', () => {
     const banner = qs('#clipboard-banner');
     if (banner) banner.classList.remove('open');
+    isClipboardMode = false;
     clipboardMarkdown = '';
+    // Tell extension: clipboard mode is over — edits to the textarea belong to the real file again
+    vsc.postMessage({ type: 'dismissClipboard' });
+    // Exit split-edit mode WITHOUT flushing (don't write clipboard content to the original file)
+    if (editMode) exitEditMode(false, false, false);
     // Restore the active tab's file so the user is back to what they had open
     const prevTab = tabs.find(t => t.uri === activeTabUri);
     if (prevTab) {
@@ -1904,8 +1913,14 @@ const SCRIPT = /* javascript */`
       updateStats(currentMarkdown);
       buildTOC(); addCopyButtons(); setupHeadingAnchors();
       if (qs('#scroller .language-mermaid')) setupMermaid();
-      if (prevTab.isAiConfig && !isAutoEditDismissed(prevTab.uri)) { if (!editMode) enterEditMode(); }
+      // Restore previous edit state: re-enter edit mode if the previous file had it active
+      if (prevTab.isAiConfig && !isAutoEditDismissed(prevTab.uri)) {
+        if (!editMode) enterEditMode();
+      } else if (prevEditModeBeforeClipboard) {
+        if (!editMode) enterEditMode();
+      }
     }
+    prevEditModeBeforeClipboard = false;
   });
   qs('#btn-copy-md')?.addEventListener('click', () => vsc.postMessage({ type: 'copyMarkdown' }));
   qs('#btn-source')?.addEventListener('click', () => {
@@ -2004,7 +2019,14 @@ const SCRIPT = /* javascript */`
     const si = qs('#save-status'); if (si) si.className = 'save-status';
     if (notify) vsc.postMessage({ type: 'modeChange', mode: 'preview' });
   }
-  qs('#btn-edit')?.addEventListener('click', () => { editMode ? exitEditMode() : enterEditMode(); });
+  qs('#btn-edit')?.addEventListener('click', () => {
+    if (editMode) {
+      // In clipboard mode: don't mark the underlying real file as "auto-edit dismissed"
+      exitEditMode(!isClipboardMode);
+    } else {
+      enterEditMode();
+    }
+  });
   qs('#split-preview')?.addEventListener('click', e => {
     if (!editMode) return;
     if (e.target.closest('a,button,pre,code,input,textarea,select')) return;
@@ -2076,24 +2098,38 @@ const SCRIPT = /* javascript */`
     if (msg.type === 'fileLoaded') {
       // ── Clipboard preview: pure overlay — never modify tabs, activeTabUri or currentUri ──
       if (msg.isClipboard) {
+        prevEditModeBeforeClipboard = editMode; // remember so dismiss can restore
+        isClipboardMode = true;
         clipboardMarkdown = msg.markdown;
         currentMarkdown   = msg.markdown;
-        const cbBody = qs('#scroller .markdown-body'); if (cbBody) cbBody.innerHTML = msg.html;
+
+        // Update title & badge (no AI badge for clipboard)
         const cbFn = qs('.fname'); if (cbFn) cbFn.textContent = '📋 Clipboard';
         const cbBadge = qs('.ai-badge'); if (cbBadge) cbBadge.style.display = 'none';
         updateStats(msg.markdown);
+
+        // Show the banner
         const banner = qs('#clipboard-banner'); if (banner) banner.classList.add('open');
+
         resetHistory(); markClean();
-        // Exit edit mode so the textarea doesn't show over clipboard content
-        if (editMode) exitEditMode(false, false, false);
-        qs('#scroller').scrollTop = 0;
-        buildTOC(); addCopyButtons(); setupHeadingAnchors();
-        if (qs('#scroller .language-mermaid')) setupMermaid();
-        return; // ← do NOT touch tabs / activeTabUri — no layout shift
+
+        // Enter split-edit mode so the user can paste / edit markdown and see it rendered live.
+        // exitEditMode is intentionally NOT called — we want the textarea to be visible.
+        if (!editMode) enterEditMode();
+        const ea = qs('#edit-area');
+        if (ea) { ea.value = msg.markdown; ea.focus(); }
+
+        // Seed the split-preview with the already-rendered HTML from the extension
+        const cbSpBody = qs('#split-preview .markdown-body');
+        if (cbSpBody) cbSpBody.innerHTML = msg.html;
+
+        return; // ← do NOT touch tabs / activeTabUri — no layout shift, no tab bar change
       }
 
       // ── Normal file loaded ──────────────────────────────────────────────────
       // Close clipboard banner if it was open (user opened a real file)
+      isClipboardMode = false;
+      prevEditModeBeforeClipboard = false;
       const cbBannerNormal = qs('#clipboard-banner');
       if (cbBannerNormal) cbBannerNormal.classList.remove('open');
       clipboardMarkdown = '';
@@ -2294,6 +2330,7 @@ export class MarkdownPreviewPanel {
   private _document: vscode.TextDocument;
   private readonly _disposables: vscode.Disposable[] = [];
   private _editMode = false;
+  private _clipboardMode = false;   // true while clipboard preview is the active overlay
   private _filesCache: FileEntry[] = [];
   private _filesCacheValid = false;
   private _renderTimer: ReturnType<typeof setTimeout> | undefined;
@@ -2357,6 +2394,7 @@ export class MarkdownPreviewPanel {
 
   /** Send clipboard preview to the webview as a temporary overlay (no tab mutation). */
   public _sendClipboardPreview(text: string): void {
+    this._clipboardMode = true;
     const rawText = text;
     const { meta, body } = extractFrontmatter(rawText);
     const rendered = applyGithubAlerts(marked.parse(body) as string);
@@ -2409,6 +2447,7 @@ export class MarkdownPreviewPanel {
           filters: { 'Markdown files': ['md'] },
         });
         if (!saveUri) return;
+        this._clipboardMode = false; // clipboard content is now a real file
         await vscode.workspace.fs.writeFile(saveUri, Buffer.from(msg.markdown, 'utf-8'));
         // Reload as a real on-disk file (banner will close because isClipboard is absent)
         const doc = await vscode.workspace.openTextDocument(saveUri);
@@ -2454,8 +2493,14 @@ export class MarkdownPreviewPanel {
         });
       }
       if (msg.type === 'edit') {
-        // Live preview update only — no disk write until user explicitly saves.
         this._editMode = true;
+        // Clipboard mode: just re-render, never write to the real document on disk
+        if (this._clipboardMode) {
+          const html = applyGithubAlerts(marked.parse(msg.content) as string);
+          this._panel.webview.postMessage({ type: 'updateSplitPreview', html });
+          return;
+        }
+        // Normal edit: live preview update only — no disk write until user explicitly saves.
         let doc = this._document;
         if (msg.uri) {
           try {
@@ -2471,6 +2516,9 @@ export class MarkdownPreviewPanel {
         // No workspace.save() here — user must press ⌘S or click the Save button
         const html = applyGithubAlerts(marked.parse(msg.content) as string);
         this._panel.webview.postMessage({ type: 'updateSplitPreview', html });
+      }
+      if (msg.type === 'dismissClipboard') {
+        this._clipboardMode = false;
       }
       if (msg.type === 'saveFile') {
         // Explicit save triggered by the user (⌘S or Save button).
@@ -2878,11 +2926,11 @@ export class MarkdownPreviewPanel {
     <div id="clipboard-banner">
       <span class="cb-label">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
-        Clipboard preview — not saved to disk
+        Paste &amp; preview — type or paste markdown on the left · not saved to disk
       </span>
       <div class="cb-actions">
-        <button class="cb-save" id="btn-save-clipboard" title="Pick a location and save this as a .md file">Save as .md file</button>
-        <button class="cb-dismiss" id="btn-dismiss-clipboard" title="Dismiss this banner">Dismiss</button>
+        <button class="cb-save" id="btn-save-clipboard" title="Save the current content as a .md file">Save as .md</button>
+        <button class="cb-dismiss" id="btn-dismiss-clipboard" title="Close clipboard preview and return to your file">Close</button>
       </div>
     </div>
     <div id="main">
