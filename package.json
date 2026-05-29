@@ -1,8 +1,8 @@
 {
   "name": "markr",
   "displayName": "Markr – Markdown Preview",
-  "description": "Markdown preview & viewer for VS Code — GitHub-style rendering, Mermaid diagrams, split editing, live TOC, AI docs support, themes, and PDF export",
-  "version": "3.6.3",
+  "description": "Markdown preview & AI config editor for VS Code — Activity Bar panel, CLAUDE.md / .cursorrules / Copilot / Windsurf support, GitHub rendering, Mermaid, split editing, TOC, themes, PDF export",
+  "version": "3.7.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
@@ -34,40 +34,61 @@
   "keywords": [
     "markdown",
     "markdown preview",
+    "markdown editor",
     "markdown viewer",
-    "markdown reader",
     "markdown-preview",
-    "github-markdown",
     "github markdown",
     "md preview",
-    "md",
+    "ai config editor",
+    "ai config",
+    "claude code",
+    "claude",
+    "cursorrules",
+    "copilot",
+    "windsurf",
+    "cursor",
     "mermaid",
-    "gfm",
     "toc",
     "diagrams",
     "notebook",
-    "reader",
     "viewer",
     "editor",
     "pdf export",
     "split editor",
-    "documentation",
     "preview",
     "markr",
     "ai",
     "agents",
     "skills",
-    "claude",
-    "copilot",
-    "cursor",
     "ai docs",
     "llm"
   ],
   "activationEvents": [
-    "onLanguage:markdown"
+    "onLanguage:markdown",
+    "onView:markrExplorer",
+    "onCommand:markr.newAiConfig",
+    "onCommand:markr.openFile"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "markr-sidebar",
+          "title": "Markr",
+          "icon": "images/markr-sidebar.svg"
+        }
+      ]
+    },
+    "views": {
+      "markr-sidebar": [
+        {
+          "id": "markrExplorer",
+          "name": "Markdown & AI Configs",
+          "contextualTitle": "Markr"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "markr.openPreview",
@@ -86,9 +107,46 @@
         "title": "Paste Markdown to Preview",
         "category": "Markr",
         "icon": "$(clippy)"
+      },
+      {
+        "command": "markr.openFile",
+        "title": "Open in Markr",
+        "category": "Markr",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "markr.newAiConfig",
+        "title": "New AI Config File",
+        "category": "Markr",
+        "icon": "$(add)"
+      },
+      {
+        "command": "markr.refreshExplorer",
+        "title": "Refresh Explorer",
+        "category": "Markr",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "markr.newAiConfig",
+          "when": "view == markrExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "markr.refreshExplorer",
+          "when": "view == markrExplorer",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "markr.openFile",
+          "when": "view == markrExplorer && viewItem =~ /markrFile/",
+          "group": "inline"
+        }
+      ],
       "editor/title": [
         {
           "command": "markr.openPreview",

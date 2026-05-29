@@ -4,9 +4,9 @@
 
 # Markr
 
-### The Markdown preview VS Code deserves.
+### The Markdown preview & AI config editor VS Code deserves.
 
-**GitHub-accurate rendering · Live TOC · Syntax highlighting · Mermaid · Multi-tab · Themes · Export**
+**GitHub-accurate rendering · Activity Bar panel · AI config wizard · Mermaid · Multi-tab · Themes · Export**
 
 <br/>
 
@@ -26,38 +26,46 @@
 
 ## What is Markr?
 
-Markr is a free, open-source Markdown preview extension for VS Code and Cursor. It renders your `.md` files exactly as GitHub does — clean typography, accurate colors, beautiful tables — with a full suite of power features built in.
+Markr is a free, open-source Markdown preview and AI config editor for VS Code and Cursor. It renders your `.md` files exactly as GitHub does — clean typography, accurate colors, beautiful tables — and goes further with a dedicated Activity Bar panel, full split-edit mode, and first-class support for AI documentation files.
 
-Whether you're writing documentation, maintaining a README, managing AI agent configs, or working in a large Markdown-heavy repo, Markr gives you a significantly better experience than the built-in preview. No configuration. No fuss.
+Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot workspace instructions, maintaining a README, or working in a Markdown-heavy repo, Markr gives you a dramatically better experience than the built-in preview.
 
-**Open any `.md` file. Press `Cmd+Shift+M`. That's it.**
+**Click the Markr icon in the Activity Bar. Or open any `.md` file and press `Cmd+Shift+M`.**
 
 ---
 
 ## Screenshots
 
-<img src="images/screenshots/01-preview-dark.png" alt="Markr dark preview with TOC" width="100%" />
+<!-- Hero: full-width preview -->
+<img src="images/screenshots/01-preview-dark.png" alt="Markr — dark preview with live TOC and workspace browser" width="100%" />
+<p align="center"><sub>Dark theme · Live Table of Contents · Workspace file browser · Word count & reading time</sub></p>
 
 <br/>
 
-<div align="center">
-<img src="images/screenshots/02-toc-panel.png" alt="Live Table of Contents" width="49%" />
-<img src="images/screenshots/03-mermaid-diagrams.png" alt="Mermaid diagrams" width="49%" />
-</div>
-
-<br/>
-
-<div align="center">
-<img src="images/screenshots/04-github-alerts.png" alt="GitHub-style alerts" width="49%" />
-<img src="images/screenshots/05-syntax-highlighting.png" alt="Syntax highlighting" width="49%" />
-</div>
-
-<br/>
-
+<!-- Themes & Editing -->
 <div align="center">
 <img src="images/screenshots/06-notion-theme.png" alt="Notion White theme" width="49%" />
-<img src="images/screenshots/07-split-edit.png" alt="Split edit mode" width="49%" />
+<img src="images/screenshots/07-split-edit.png" alt="Split edit mode with live preview" width="49%" />
 </div>
+<p align="center"><sub>✦ Notion White theme &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ Split edit mode — editor + live preview side by side</sub></p>
+
+<br/>
+
+<!-- Diagrams & Syntax -->
+<div align="center">
+<img src="images/screenshots/03-mermaid-diagrams.png" alt="Mermaid diagrams — flowchart, Gantt, sequence" width="49%" />
+<img src="images/screenshots/05-syntax-highlighting.png" alt="Syntax highlighting — 190+ languages" width="49%" />
+</div>
+<p align="center"><sub>✦ Mermaid diagrams with fullscreen expand &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ Syntax highlighting — 190+ languages</sub></p>
+
+<br/>
+
+<!-- Alerts & TOC -->
+<div align="center">
+<img src="images/screenshots/04-github-alerts.png" alt="GitHub-style NOTE / WARNING / TIP alerts" width="49%" />
+<img src="images/screenshots/02-toc-panel.png" alt="Collapsible TOC panel with scroll spy" width="49%" />
+</div>
+<p align="center"><sub>✦ GitHub alerts — NOTE, WARNING, TIP, CAUTION &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ Collapsible TOC panel with scroll spy</sub></p>
 
 ---
 
@@ -65,6 +73,8 @@ Whether you're writing documentation, maintaining a README, managing AI agent co
 
 | | Built-in VS Code Preview | Markr |
 |---|:---:|:---:|
+| **Activity Bar panel** | ✗ | ✅ Access without opening a file |
+| **New AI config wizard** | ✗ | ✅ CLAUDE.md, .cursorrules & more |
 | GitHub-accurate styling | Partial | ✅ Pixel-perfect |
 | Live Table of Contents | ✗ | ✅ Collapsible, scroll spy |
 | Multi-tab navigation | ✗ | ✅ Open multiple files |
@@ -72,13 +82,12 @@ Whether you're writing documentation, maintaining a README, managing AI agent co
 | Mermaid diagrams | ✗ | ✅ Flowcharts, Gantt & more |
 | Syntax highlighting | Basic | ✅ 190+ languages |
 | Copy code buttons | ✗ | ✅ Hover to reveal |
-| Heading anchor links | ✗ | ✅ Click to copy |
 | Word count + reading time | ✗ | ✅ Always visible |
 | Export to HTML / PDF | ✗ | ✅ One click |
 | Themes | VS Code only | ✅ Light, Dark, Notion, Linear |
 | Focus / reading mode | ✗ | ✅ Distraction-free |
 | Split edit mode | ✗ | ✅ Preview + editor side by side |
-| AI config file support | ✗ | ✅ AGENTS.md, CLAUDE.md & more |
+| AI config file support | ✗ | ✅ CLAUDE.md, .cursorrules, Copilot & more |
 
 ---
 
@@ -90,10 +99,13 @@ Headings, tables, blockquotes, task lists, strikethrough, footnotes, inline code
 ### 📑 Live Table of Contents
 Auto-generated from your headings the moment you open the file. Scroll spy highlights the active section in real time. Click any item to jump there. Collapse it with one button.
 
-### 🗂 Workspace File Browser
+### 🗂 Activity Bar Panel — Always There
+Markr lives in the VS Code / Cursor sidebar as a dedicated panel — no file needs to be open first. The panel shows two sections: **AI Configs** (auto-detected, with tool labels) and **Workspace** (all other `.md` files). Click any entry to open it. The `+` button launches the **New AI Config wizard**.
+
+### 📂 Workspace File Browser
 Browse and switch between all `.md` files in your workspace without leaving the preview. Files are grouped by folder, AI config files are pinned at the top, and the browser handles large repos (500+ files) without blocking.
 
-### 📂 Multi-Tab Navigation
+### 🗃 Multi-Tab Navigation
 Open multiple Markdown files in tabs — just like your editor. Switching between previously-opened files is instant with no round-trip to the extension host.
 
 ### 🎨 Syntax Highlighting — 190+ Languages
@@ -102,8 +114,26 @@ TypeScript, Python, Go, Rust, Java, SQL, YAML, Bash, Dockerfile — every langua
 ### 🔀 Mermaid Diagrams
 Drop a `mermaid` block in your Markdown and Markr renders it live. Flowcharts, sequence diagrams, Gantt charts, class diagrams, and pie charts — all supported.
 
-### ✦ AI Config File Support
-Markr detects and highlights AI documentation files — `AGENTS.md`, `CLAUDE.md`, `SKILL.md`, Cursor rules, Copilot instructions, and more. They open directly into split edit mode so you can read and edit simultaneously.
+### ✦ AI Config Editor — First Class
+
+Markr is built for AI developers. The Activity Bar panel automatically separates your AI config files from regular docs so you can find and edit them instantly.
+
+**Supported out of the box:**
+
+| File | Tool |
+|------|------|
+| `CLAUDE.md`, `claude.local.md` | Claude Code |
+| `.cursorrules`, `cursor.md` | Cursor |
+| `.github/copilot-instructions.md` | GitHub Copilot |
+| `.windsurfrules`, `windsurf.md` | Windsurf |
+| `agent.md`, `agents.md`, `skill.md` | Claude Agents / Skills |
+| `system-prompt.md`, `prompt.md` | Generic AI prompts |
+| `aider.md` | Aider |
+| `codex.md` | OpenAI Codex |
+
+**New AI Config wizard** — click `+` in the Markr panel and pick a template. Markr creates the file (with a useful starter template) and opens it in split edit mode immediately. No more blank files, no more Googling the format.
+
+All AI config files open automatically in **split edit mode** — preview on the right, fully-featured editor on the left. Live token count in the toolbar tells you exactly how much context window you're using.
 
 ### ⚡ Scroll Sync
 Move your cursor in the editor — the preview scrolls to match. Always in context, never lost.
@@ -142,8 +172,11 @@ Switch between four themes from the toolbar — **Markr Light**, **Markr Dark**,
 **Cursor / VSCodium / Open VSX**
 Same search — pulls from [Open VSX Registry](https://open-vsx.org/extension/Apptware-Product-Lab/markr).
 
-**First use**
-Open any `.md` file → press `Cmd+Shift+M` (macOS) or `Ctrl+Shift+M` (Windows/Linux).
+**First use — three ways to open Markr**
+
+1. **Activity Bar** — click the Markr icon in the sidebar. Browse all Markdown and AI config files. Click any entry to open it.
+2. **Keyboard shortcut** — `Cmd+Shift+M` (macOS) / `Ctrl+Shift+M` (Windows/Linux). Works with or without a `.md` file open. If no Markdown file is active it shows a workspace Quick Pick.
+3. **Editor title bar** — the preview icon appears when a `.md` file is open.
 
 ---
 
@@ -152,11 +185,13 @@ Open any `.md` file → press `Cmd+Shift+M` (macOS) or `Ctrl+Shift+M` (Windows/L
 | Action | Mac | Windows / Linux |
 |--------|-----|-----------------|
 | Open Markr Preview | `Cmd+Shift+M` | `Ctrl+Shift+M` |
+| Paste Markdown from clipboard | `Cmd+Shift+P` | `Ctrl+Shift+P` |
 
 Also available via:
+- The **Markr icon** in the Activity Bar (no file needs to be open)
 - The **preview icon** in the editor title bar when a `.md` file is open
 - Right-click any `.md` file in Explorer → **Open Markr Preview**
-- The Command Palette → **Markr: Open Markr Preview**
+- Command Palette → **Markr: New AI Config File** to create a starter config
 
 ---
 
