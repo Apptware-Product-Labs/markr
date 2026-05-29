@@ -7,6 +7,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.7.0] — 2026-05-29
+
+### Added
+- **Activity Bar panel**: Markr now appears in the VS Code / Cursor sidebar as a dedicated panel — no need to open a Markdown file first. The panel shows two sections: **AI Configs** (CLAUDE.md, .cursorrules, copilot-instructions.md, agent.md, etc.) and **Workspace** (all other `.md` files). Click any file to open it in Markr instantly
+- **New AI Config wizard** (`+` button in panel): creates a starter file for CLAUDE.md, `.cursorrules`, `.github/copilot-instructions.md`, `agent.md`, `system-prompt.md`, or `.windsurfrules` — each with a high-quality template. Creates parent directories automatically (e.g. `.github/`). Handles existing files gracefully with a "file already exists — open it?" prompt
+- **Smart `Cmd+Shift+M` without a file open**: invoking the command from any editor now shows a full workspace Quick Pick sorted AI configs first, instead of showing an error message
+- **Refresh button** in the panel header for on-demand re-scan
+
+---
+
 ## [3.6.3] — 2026-05-28
 
 ### Fixed

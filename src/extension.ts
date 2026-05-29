@@ -1,23 +1,189 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { MarkdownPreviewPanel } from './preview';
+import { MarkrExplorerProvider, AI_CONFIG_TEMPLATES } from './markrExplorer';
 
 export function activate(context: vscode.ExtensionContext) {
+
+  // ── Activity Bar Explorer ──────────────────────────────────────────────────
+  const explorerProvider = new MarkrExplorerProvider();
+  const treeView = vscode.window.createTreeView('markrExplorer', {
+    treeDataProvider: explorerProvider,
+    showCollapseAll: true,
+  });
+  context.subscriptions.push(treeView);
+
+  // ── Commands ───────────────────────────────────────────────────────────────
+
+  // openPreview: smart fallback — if no .md file is active, show workspace quick-pick
   context.subscriptions.push(
-    vscode.commands.registerCommand('markr.openPreview', () => {
+    vscode.commands.registerCommand('markr.openPreview', async () => {
       const editor = vscode.window.activeTextEditor;
-      if (!editor || editor.document.languageId !== 'markdown') {
-        vscode.window.showInformationMessage('Open a Markdown (.md) file to use Markr.');
+      if (editor?.document.languageId === 'markdown') {
+        MarkdownPreviewPanel.createOrShow(editor.document);
         return;
       }
-      MarkdownPreviewPanel.createOrShow(editor.document);
-    }),
+      // No markdown file active — show workspace picker
+      const wsFolders = vscode.workspace.workspaceFolders;
+      if (!wsFolders?.length) {
+        vscode.window.showInformationMessage('Open a workspace or a Markdown file to use Markr.');
+        return;
+      }
+      const maxFiles = vscode.workspace.getConfiguration('markr').get<number>('maxWorkspaceFiles', 500);
+      const uris = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'Markr: scanning workspace…', cancellable: false },
+        () => vscode.workspace.findFiles('**/*.md', '{**/node_modules/**,**/.git/**,**/.next/**,**/dist/**}', maxFiles)
+      );
+      if (!uris.length) {
+        const action = await vscode.window.showInformationMessage(
+          'No Markdown files found. Create an AI config?', 'New AI Config', 'Dismiss'
+        );
+        if (action === 'New AI Config') vscode.commands.executeCommand('markr.newAiConfig');
+        return;
+      }
+      // Sort: AI config names first (alphabetically), then regular docs
+      const AI_NAMES = new Set(['claude.md','claude.local.md','.cursorrules','copilot-instructions.md','agent.md','agents.md','skill.md','skills.md','system-prompt.md','prompt.md','prompts.md','instructions.md','rules.md']);
+      uris.sort((a, b) => {
+        const an = path.basename(a.fsPath).toLowerCase();
+        const bn = path.basename(b.fsPath).toLowerCase();
+        const aAi = AI_NAMES.has(an) ? 0 : 1;
+        const bAi = AI_NAMES.has(bn) ? 0 : 1;
+        if (aAi !== bAi) return aAi - bAi;
+        return vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b));
+      });
+      const items = uris.map(uri => ({
+        label: path.basename(uri.fsPath),
+        description: vscode.workspace.asRelativePath(uri),
+        uri,
+      }));
+      const picked = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Open a Markdown file in Markr…',
+        matchOnDescription: true,
+      });
+      if (!picked) return;
+      const doc = await vscode.workspace.openTextDocument(picked.uri);
+      MarkdownPreviewPanel.createOrShow(doc);
+    })
+  );
 
+  // openFile: called from tree view item click or context menu
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markr.openFile', async (uri: vscode.Uri) => {
+      try {
+        const doc = await vscode.workspace.openTextDocument(uri);
+        MarkdownPreviewPanel.createOrShow(doc);
+      } catch (e) {
+        vscode.window.showErrorMessage(`Markr: could not open file — ${e instanceof Error ? e.message : String(e)}`);
+      }
+    })
+  );
+
+  // newAiConfig: wizard to create a new AI config file from a template
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markr.newAiConfig', async () => {
+      // Step 1: pick type
+      const typeOptions = Object.entries(AI_CONFIG_TEMPLATES).map(([key, t]) => ({
+        label: `$(star) ${t.filename}`,
+        description: t.description,
+        detail: `Creates ${t.filename} with a starter template`,
+        key,
+        filename: t.filename,
+        kind: t.kind,
+        template: t.template,
+      }));
+      const customOption = {
+        label: '$(file-add) Custom name…',
+        description: 'Create a new Markdown file with a custom name',
+        detail: 'You will be prompted for the filename',
+        key: '__custom__',
+        filename: '',
+        kind: '',
+        template: '',
+      };
+
+      const allOptions = [...typeOptions, customOption];
+
+      const picked = await vscode.window.showQuickPick(allOptions, {
+        placeHolder: 'Choose an AI config type…',
+        matchOnDescription: true,
+        matchOnDetail: true,
+      });
+      if (!picked) return;
+
+      // Step 2: determine filename
+      let filename = picked.filename;
+      if (picked.key === '__custom__') {
+        const input = await vscode.window.showInputBox({
+          prompt: 'Enter filename (e.g. my-prompt.md)',
+          placeHolder: 'filename.md',
+          validateInput: v =>
+            !v?.trim() ? 'Filename cannot be empty' :
+            !v.trim().match(/\.(md|txt|yaml|yml|json)$|^\.[a-z]+rules?$|^\.[a-z]+config$/) && !v.trim().includes('.') ?
+              'File should have an extension (e.g. .md)' : null,
+        });
+        if (!input) return;
+        filename = input.trim();
+      }
+
+      // Step 3: determine target folder
+      const wsFolders = vscode.workspace.workspaceFolders;
+      let targetFolder: vscode.Uri;
+      if (!wsFolders?.length) {
+        const result = await vscode.window.showOpenDialog({
+          canSelectFiles: false, canSelectFolders: true, canSelectMany: false,
+          openLabel: 'Choose folder to create file in',
+        });
+        if (!result?.[0]) return;
+        targetFolder = result[0];
+      } else if (wsFolders.length === 1) {
+        targetFolder = wsFolders[0].uri;
+      } else {
+        const folderPick = await vscode.window.showQuickPick(
+          wsFolders.map(f => ({ label: f.name, description: f.uri.fsPath, uri: f.uri })),
+          { placeHolder: 'Which workspace folder?' }
+        );
+        if (!folderPick) return;
+        targetFolder = folderPick.uri;
+      }
+
+      const fileUri = vscode.Uri.joinPath(targetFolder, filename);
+
+      // Step 4: check if file exists
+      let fileExists = false;
+      try { await vscode.workspace.fs.stat(fileUri); fileExists = true; } catch {}
+
+      if (fileExists) {
+        const action = await vscode.window.showWarningMessage(
+          `${filename} already exists. Open it in Markr?`, { modal: false }, 'Open', 'Cancel'
+        );
+        if (action !== 'Open') return;
+      } else {
+        // Create parent directories if needed (e.g. .github/)
+        const parentUri = vscode.Uri.joinPath(fileUri, '..');
+        try { await vscode.workspace.fs.createDirectory(parentUri); } catch {}
+        // Write template content
+        const templateContent = picked.template || `# ${filename.replace(/\.[^.]+$/, '')}\n\n`;
+        await vscode.workspace.fs.writeFile(fileUri, Buffer.from(templateContent, 'utf-8'));
+        // Small delay so the file watcher picks it up before we open
+        await new Promise(r => setTimeout(r, 100));
+      }
+
+      const doc = await vscode.workspace.openTextDocument(fileUri);
+      MarkdownPreviewPanel.createOrShow(doc);
+    })
+  );
+
+  // openShowcase
+  context.subscriptions.push(
     vscode.commands.registerCommand('markr.openShowcase', async () => {
       const uri = vscode.Uri.joinPath(context.extensionUri, 'samples', 'markr-showcase.md');
       const doc = await vscode.workspace.openTextDocument(uri);
       MarkdownPreviewPanel.createOrShow(doc);
-    }),
+    })
+  );
 
+  // pastePreview
+  context.subscriptions.push(
     vscode.commands.registerCommand('markr.pastePreview', async () => {
       const text = await vscode.env.clipboard.readText();
       if (!text.trim()) {
@@ -26,23 +192,24 @@ export function activate(context: vscode.ExtensionContext) {
       }
       const doc = await vscode.workspace.openTextDocument({ content: text, language: 'markdown' });
       MarkdownPreviewPanel.createOrShow(doc);
-    }),
+    })
+  );
 
-    // Live update as you type
+  // refreshExplorer
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markr.refreshExplorer', () => {
+      explorerProvider.refresh();
+    })
+  );
+
+  // ── Document listeners ─────────────────────────────────────────────────────
+  context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument(({ document }) => {
-      if (document.languageId === 'markdown') {
-        MarkdownPreviewPanel.update(document);
-      }
+      if (document.languageId === 'markdown') MarkdownPreviewPanel.update(document);
     }),
-
-    // Follow active editor
     vscode.window.onDidChangeActiveTextEditor(editor => {
-      if (editor?.document.languageId === 'markdown') {
-        MarkdownPreviewPanel.update(editor.document);
-      }
+      if (editor?.document.languageId === 'markdown') MarkdownPreviewPanel.update(editor.document);
     }),
-
-    // Scroll sync: cursor moves → preview scrolls to nearest heading
     vscode.window.onDidChangeTextEditorSelection(event => {
       const cfg = vscode.workspace.getConfiguration('markr');
       if (!cfg.get<boolean>('scrollSync', true)) return;
@@ -50,15 +217,18 @@ export function activate(context: vscode.ExtensionContext) {
         const line = event.selections[0].active.line;
         MarkdownPreviewPanel.syncScroll(event.textEditor.document, line);
       }
-    }),
+    })
   );
 
-  // Watch workspace for .md file additions/deletions → refresh file panel
+  // ── File watcher ───────────────────────────────────────────────────────────
   const watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
   const refresh = () => {
     if (refreshTimer) clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(() => MarkdownPreviewPanel.refreshFiles(), 250);
+    refreshTimer = setTimeout(() => {
+      MarkdownPreviewPanel.refreshFiles();
+      explorerProvider.refresh();  // also refresh the Activity Bar tree
+    }, 300);
   };
   watcher.onDidCreate(refresh);
   watcher.onDidDelete(refresh);
