@@ -568,7 +568,58 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 .sb-section.collapsed .sb-chevron { transform: rotate(-90deg); }
 .sb-body { overflow-y: auto; overflow-x: hidden; padding: 2px 0 8px; }
 .sb-section.collapsed .sb-body { display: none; }
+.sb-section.collapsed #file-search-wrap { display: none; }
 .sb-ai-label { padding: 6px 12px 2px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); opacity: 0.7; font-family: ui-monospace, monospace; }
+
+/* File search input */
+#file-search-wrap {
+  display: flex; align-items: center; gap: 5px;
+  margin: 5px 10px 3px; padding: 4px 8px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 5px; flex-shrink: 0;
+}
+#file-search-wrap:focus-within { border-color: var(--accent); }
+.file-search-icon { opacity: 0.35; flex-shrink: 0; }
+#file-search {
+  flex: 1; border: none; outline: none; background: transparent;
+  font-size: 11.5px; color: var(--text); padding: 0; font-family: inherit;
+}
+#file-search::placeholder { color: var(--text-faint); }
+#file-search-clear {
+  display: none; border: none; background: transparent;
+  color: var(--text-faint); cursor: pointer; font-size: 14px;
+  line-height: 1; padding: 0 1px; border-radius: 3px;
+  flex-shrink: 0;
+}
+#file-search-clear.visible { display: block; }
+#file-search-clear:hover { color: var(--text); background: var(--bg-hover); }
+.files-empty { padding: 10px 14px; font-size: 11.5px; color: var(--text-faint); line-height: 1.5; }
+.files-empty em { color: var(--accent); font-style: normal; font-weight: 600; }
+
+/* Skeleton loader — shown while workspace files are being scanned */
+@keyframes sk-pulse { 0%,100% { opacity: 0.35; } 50% { opacity: 0.8; } }
+.file-skeleton { padding: 6px 0; }
+.sk-row {
+  height: 20px; border-radius: 3px; margin: 4px 12px;
+  background: var(--bg-hover);
+  animation: sk-pulse 1.5s ease-in-out infinite;
+}
+.sk-row:nth-child(1) { width: 55%; animation-delay: 0s; }
+.sk-row:nth-child(2) { width: 80%; animation-delay: 0.12s; }
+.sk-row:nth-child(3) { width: 65%; animation-delay: 0.24s; }
+.sk-row:nth-child(4) { width: 48%; animation-delay: 0.36s; }
+.sk-row:nth-child(5) { width: 72%; animation-delay: 0.48s; }
+.sk-row:nth-child(6) { width: 58%; animation-delay: 0.60s; }
+.sk-scanning {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px 8px; font-size: 11px; color: var(--text-faint);
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.sk-spinner {
+  width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
+  border: 1.5px solid var(--border); border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
 .file-dir {
   width: 100%; display: flex; align-items: center; gap: 5px;
   padding: 6px 10px 3px calc(10px + (var(--depth, 0) * 12px));
@@ -992,6 +1043,7 @@ const SCRIPT = /* javascript */`
   let isDirty     = false;   // true when there are unsaved changes on disk
   let editTimer, saveTimer;
   const collapsedFolders = new Set();
+  let fileFilter = '';       // live search query for the Notebooks panel
 
   // ── Custom undo / redo history ─────────────────────────────────────────────
   // document.execCommand('undo') is deprecated and unreliable in VS Code's webview.
@@ -1164,28 +1216,61 @@ const SCRIPT = /* javascript */`
   function renderFileList(files) {
     const container = qs('#files-list');
     if (!container) return;
+
+    // ── Loading state: animated skeleton rows ──────────────────────────────
     if (filesLoading) {
-      container.innerHTML = '<div style="padding:8px 14px;font-size:11.5px;color:var(--text-faint)">Loading workspace files…</div>';
+      container.innerHTML =
+        '<div class="file-skeleton">' +
+        '<div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div>' +
+        '<div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div>' +
+        '</div>' +
+        '<div class="sk-scanning"><div class="sk-spinner"></div>Scanning workspace…</div>';
       return;
     }
-    if (!files || !files.length) {
-      container.innerHTML = '<div style="padding:8px 14px;font-size:11.5px;color:var(--text-faint)">No .md files in workspace</div>';
+
+    // ── Filter: apply search query ─────────────────────────────────────────
+    let displayFiles = files || [];
+    if (fileFilter) {
+      const q = fileFilter.toLowerCase();
+      displayFiles = displayFiles.filter(f =>
+        f.label.toLowerCase().includes(q) || (f.relPath || '').toLowerCase().includes(q)
+      );
+    }
+
+    if (!displayFiles.length) {
+      container.innerHTML = fileFilter
+        ? '<div class="files-empty">No files matching <em>' + escHtml(fileFilter) + '</em></div>'
+        : '<div class="files-empty">No .md files in workspace</div>';
       return;
     }
-    const aiFiles    = files.filter(f => f.isAiConfig);
-    const otherFiles = files.filter(f => !f.isAiConfig);
+
+    const aiFiles    = displayFiles.filter(f => f.isAiConfig);
+    const otherFiles = displayFiles.filter(f => !f.isAiConfig);
     let html = '';
     if (aiFiles.length) {
       html += '<div class="sb-ai-label">✦ AI Docs</div>';
       aiFiles.forEach(f => { html += fileItemHtml(f); });
     }
-    const tree = buildFileTree(otherFiles);
-    if (tree.files.length) {
-      if (aiFiles.length) html += '<div class="sb-ai-label" style="margin-top:4px;color:var(--text-faint)">Other</div>';
-      tree.files.forEach(f => { html += fileItemHtml(f, 0); });
+
+    if (fileFilter) {
+      // Flat list when filtering — skip folder tree grouping
+      if (otherFiles.length) {
+        if (aiFiles.length) html += '<div class="sb-ai-label" style="margin-top:4px;color:var(--text-faint)">Other</div>';
+        otherFiles.forEach(f => { html += fileItemHtml(f, 0); });
+      }
+    } else {
+      // Normal grouped folder-tree view
+      const tree = buildFileTree(otherFiles);
+      if (tree.files.length) {
+        if (aiFiles.length) html += '<div class="sb-ai-label" style="margin-top:4px;color:var(--text-faint)">Other</div>';
+        tree.files.forEach(f => { html += fileItemHtml(f, 0); });
+      }
+      html += renderTree(tree, 0);
     }
-    html += renderTree(tree, 0);
+
     container.innerHTML = html;
+
+    // Attach click listeners (same for filtered and normal modes)
     qsa('.file-dir', container).forEach(el => {
       el.addEventListener('click', () => {
         const dir = el.getAttribute('data-dir');
@@ -2002,6 +2087,26 @@ const SCRIPT = /* javascript */`
   });
 
   qs('#btn-new-file')?.addEventListener('click', e => { e.stopPropagation(); vsc.postMessage({ type: 'newFile' }); });
+
+  // ── Notebook file search / filter ─────────────────────────────────────────
+  let filterDebounce;
+  qs('#file-search')?.addEventListener('input', e => {
+    clearTimeout(filterDebounce);
+    fileFilter = e.target.value.trim();
+    qs('#file-search-clear')?.classList.toggle('visible', fileFilter.length > 0);
+    filterDebounce = setTimeout(() => renderFileList(filesCache), 120);
+  });
+  qs('#file-search-clear')?.addEventListener('click', () => {
+    fileFilter = '';
+    const inp = qs('#file-search');
+    if (inp) { inp.value = ''; inp.focus(); }
+    qs('#file-search-clear')?.classList.remove('visible');
+    renderFileList(filesCache);
+  });
+  // Pressing Escape inside the search box clears and closes it
+  qs('#file-search')?.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { qs('#file-search-clear')?.click(); e.stopPropagation(); }
+  });
 
   let focusMode = false;
   qs('#btn-focus')?.addEventListener('click', () => {
@@ -3008,6 +3113,11 @@ export class MarkdownPreviewPanel {
         <span class="sb-title">Notebooks</span>
         <button class="sb-action" id="btn-new-file" title="New file">+</button>
         <span class="sb-chevron">${ICON.chevron}</span>
+      </div>
+      <div id="file-search-wrap">
+        <svg class="file-search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="file-search" type="text" placeholder="Filter files…" autocomplete="off" spellcheck="false">
+        <button id="file-search-clear" title="Clear filter">×</button>
       </div>
       <div class="sb-body" id="files-list"></div>
     </div>

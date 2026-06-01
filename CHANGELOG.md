@@ -7,6 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.7.5] — 2026-06-01
+
+### Added
+- **File search / filter in Notebooks panel**: a search box now sits below the "Notebooks" section header. Type to filter files instantly — matches against both filename and path. Shows a flat list while filtering (no folder tree) for quick scanning. Press `×` or `Escape` to clear
+- **Skeleton loading state**: the "Loading workspace files…" plain text is replaced by animated skeleton rows (pulse shimmer) plus a spinning indicator and "Scanning workspace…" label — clearly communicates background scanning without blocking the UI
+
+---
+
 ## [3.7.4] — 2026-06-01
 
 ### Fixed
