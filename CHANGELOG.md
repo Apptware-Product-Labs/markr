@@ -7,6 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.7.4] — 2026-06-01
+
+### Fixed
+- **Mermaid diagrams not rendering in clipboard preview**: sequence diagrams, Gantt charts, and all other Mermaid blocks now render correctly in the split-preview pane when content is pasted via Preview Clipboard. Previously the diagram showed as a raw code block because `setupMermaid()` was never called after seeding the split-preview
+- **Mermaid not rendering in split-edit mode**: Mermaid diagrams now also render in the right-hand preview pane when editing any file (AI config or otherwise) in split-edit mode — previously they showed as code blocks while editing
+
+---
+
 ## [3.7.3] — 2026-06-01
 
 ### Added

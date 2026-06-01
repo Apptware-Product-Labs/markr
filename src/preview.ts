@@ -2213,6 +2213,9 @@ const SCRIPT = /* javascript */`
         // Seed the split-preview with the already-rendered HTML from the extension
         const cbSpBody = qs('#split-preview .markdown-body');
         if (cbSpBody) cbSpBody.innerHTML = msg.html;
+        // Set up helpers on the split-preview content (copy buttons, anchors, Mermaid diagrams)
+        addCopyButtons(); setupHeadingAnchors();
+        if (qs('#split-preview .language-mermaid')) setupMermaid();
 
         return; // ← do NOT touch tabs / activeTabUri — no layout shift, no tab bar change
       }
@@ -2276,10 +2279,14 @@ const SCRIPT = /* javascript */`
       const sp = qs('#split-preview .markdown-body');
       if (sp) sp.innerHTML = msg.html;
       if (spEl) spEl.scrollTop = prevSpST;
+      // Always set up helpers on the split-preview (visible in both edit and preview mode)
+      addCopyButtons(); setupHeadingAnchors();
+      if (qs('#split-preview .language-mermaid')) setupMermaid();
       if (!editMode) {
+        // Also update the main scroller when in pure preview mode
         const body = qs('#scroller .markdown-body');
         if (body) body.innerHTML = msg.html;
-        buildTOC(); addCopyButtons(); setupHeadingAnchors();
+        buildTOC();
         if (qs('#scroller .language-mermaid')) setupMermaid();
       }
     }
