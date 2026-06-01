@@ -7,6 +7,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.7.3] — 2026-06-01
+
+### Added
+- **Copy Mermaid diagram as PNG image**: every rendered diagram now has a "🖼 Copy image" button (appears on hover, top-right of the diagram). Click it and the diagram is copied to your clipboard as a high-resolution PNG (2× retina) — ready to paste into Notion, Slack, Google Docs, email, or anywhere else
+- **Copy image in the fullscreen modal**: the expanded diagram modal also has a "🖼 Copy image" button in the controls bar so you can copy while zoomed in
+- **Download fallback**: if the Clipboard API is blocked (permissions / browser), the button automatically downloads `diagram.png` instead of silently failing
+- **Theme-aware background**: the PNG fill colour matches the active Markr theme (white for Light/Notion, dark for Dark/Linear) so diagrams look correct when pasted
+
+---
+
 ## [3.7.2] — 2026-05-29
 
 ### Changed

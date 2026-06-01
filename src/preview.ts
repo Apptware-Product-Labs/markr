@@ -792,16 +792,20 @@ pre:hover .copy-btn { opacity: 1; }
 .markdown-body details summary { display: list-item; cursor: pointer; font-weight: 600; }
 /* Mermaid diagrams */
 .mermaid-wrap { margin-bottom: 16px; position: relative; }
-.mermaid-wrap:hover .mermaid-zoom-btn { opacity: 1; }
 .mermaid { text-align: center; overflow-x: auto; cursor: zoom-in; }
-.mermaid-zoom-btn {
+/* Button group — floats top-right on hover, contains Copy + Expand */
+.mermaid-btn-group {
   position: absolute; top: 8px; right: 8px;
+  display: flex; gap: 4px; align-items: center;
   opacity: 0; transition: opacity 0.15s;
-  background: var(--bg-panel); border: 1px solid var(--border);
-  border-radius: 6px; padding: 3px 7px; font-size: 11px;
-  color: var(--text-muted); cursor: pointer; line-height: 1.4;
 }
-.mermaid-zoom-btn:hover { background: var(--bg-hover); color: var(--text); }
+.mermaid-wrap:hover .mermaid-btn-group { opacity: 1; }
+.mermaid-zoom-btn, .mermaid-copy-btn {
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 8px; font-size: 11px;
+  color: var(--text-muted); cursor: pointer; line-height: 1.4; white-space: nowrap;
+}
+.mermaid-zoom-btn:hover, .mermaid-copy-btn:hover { background: var(--bg-hover); color: var(--text); }
 
 /* Mermaid fullscreen modal */
 .mermaid-modal {
@@ -1447,11 +1451,21 @@ const SCRIPT = /* javascript */`
       "document.querySelectorAll('pre code.markr-mermaid-source').forEach(async block => {",
       "  const pre = block.parentElement; if (!pre) return;",
       "  const wrap = document.createElement('div'); wrap.className = 'mermaid-wrap';",
+      "  const btnGroup = document.createElement('div'); btnGroup.className = 'mermaid-btn-group';",
+      "  const copyBtn = document.createElement('button'); copyBtn.className = 'mermaid-copy-btn';",
+      "  copyBtn.title = 'Copy as PNG image'; copyBtn.textContent = '\\uD83D\\uDDBC Copy image';",
       "  const zoomBtn = document.createElement('button'); zoomBtn.className = 'mermaid-zoom-btn';",
-      "  zoomBtn.title = 'Expand diagram'; zoomBtn.textContent = '⤢ Expand';",
+      "  zoomBtn.title = 'Expand diagram'; zoomBtn.textContent = '\\u2922 Expand';",
       "  const div = document.createElement('div'); div.className = 'mermaid';",
       "  div.textContent = block.textContent || '';",
-      "  wrap.appendChild(zoomBtn); wrap.appendChild(div); pre.replaceWith(wrap);",
+      "  btnGroup.appendChild(copyBtn); btnGroup.appendChild(zoomBtn);",
+      "  wrap.appendChild(btnGroup); wrap.appendChild(div); pre.replaceWith(wrap);",
+      "  // Copy button: fire a custom event so the main SCRIPT handles canvas/clipboard logic",
+      "  copyBtn.addEventListener('click', e => {",
+      "    e.stopPropagation();",
+      "    const svg = div.querySelector('svg'); if (!svg) return;",
+      "    document.dispatchEvent(new CustomEvent('markr-copy-diagram', { detail: { svg, btn: copyBtn } }));",
+      "  });",
       "  // click diagram or expand button → open modal",
       "  function openModal() {",
       "    const svg = div.querySelector('svg'); if (!svg) return;",
@@ -2090,6 +2104,83 @@ const SCRIPT = /* javascript */`
   // ESC to close
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeMermaidModal();
+  });
+
+  // ── Mermaid: Copy diagram as PNG ───────────────────────────────────────────
+  // Renders the SVG into a 2× canvas (retina quality) and copies to clipboard.
+  // Falls back to PNG download if the Clipboard API is unavailable.
+  async function svgToPngBlob(svg) {
+    const rect = svg.getBoundingClientRect();
+    const nw = Math.max(Math.round(rect.width)  || parseInt(svg.getAttribute('width')  || '0'), 1) || 800;
+    const nh = Math.max(Math.round(rect.height) || parseInt(svg.getAttribute('height') || '0'), 1) || 400;
+    const scale = 2; // 2× for retina sharpness
+    const canvas = document.createElement('canvas');
+    canvas.width  = nw * scale;
+    canvas.height = nh * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+    // Fill background matching current Markr theme
+    const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#ffffff';
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, nw, nh);
+    // Clone + normalise the SVG so it has explicit width/height/viewBox
+    const clone = svg.cloneNode(true);
+    clone.setAttribute('width',  nw);
+    clone.setAttribute('height', nh);
+    if (!clone.getAttribute('viewBox')) clone.setAttribute('viewBox', '0 0 ' + nw + ' ' + nh);
+    // Use base64 data URL — most reliable in VS Code webview sandbox
+    const svgStr    = new XMLSerializer().serializeToString(clone);
+    const svgB64    = btoa(unescape(encodeURIComponent(svgStr)));
+    const dataUrl   = 'data:image/svg+xml;base64,' + svgB64;
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, nw, nh);
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/png');
+      };
+      img.onerror = () => reject(new Error('SVG image load failed'));
+      img.src = dataUrl;
+    });
+  }
+
+  async function copyDiagramImage(btn, svg) {
+    const orig = btn.textContent;
+    btn.textContent = '…';
+    btn.disabled = true;
+    try {
+      const blob = await svgToPngBlob(svg);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      btn.textContent = '✓ Copied!';
+    } catch {
+      // Clipboard write blocked (e.g. permissions) → fall back to PNG download
+      try {
+        const blob = await svgToPngBlob(svg);
+        const a = document.createElement('a');
+        a.download = 'diagram.png';
+        a.href = URL.createObjectURL(blob);
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        btn.textContent = '⬇ Saved';
+      } catch {
+        btn.textContent = orig;
+        btn.disabled = false;
+        return;
+      }
+    }
+    btn.disabled = false;
+    setTimeout(() => { btn.textContent = orig; }, 2200);
+  }
+
+  // Inline copy buttons fire this custom event from inside the Mermaid ES module
+  document.addEventListener('markr-copy-diagram', e => {
+    copyDiagramImage(e.detail.btn, e.detail.svg);
+  });
+
+  // Modal "Copy image" button copies the SVG currently shown in the zoom viewer
+  qs('#mermaid-copy-img')?.addEventListener('click', () => {
+    const svg = qs('#mermaid-zoom-inner svg');
+    const btn = qs('#mermaid-copy-img');
+    if (svg && btn) copyDiagramImage(btn, svg);
   });
 
   // ── Messages from extension ────────────────────────────────────────────────
@@ -2955,6 +3046,8 @@ export class MarkdownPreviewPanel {
         <span class="zoom-level" id="mermaid-zoom-level">100%</span>
         <button id="mermaid-zoom-in"  title="Zoom in">+</button>
         <button id="mermaid-zoom-reset" title="Reset zoom">Reset</button>
+        <div style="width:1px;height:16px;background:var(--border);margin:0 4px;flex-shrink:0"></div>
+        <button id="mermaid-copy-img" title="Copy diagram as PNG image">🖼 Copy image</button>
         <button class="mermaid-modal-close" id="mermaid-modal-close">✕</button>
       </div>
     </div>
