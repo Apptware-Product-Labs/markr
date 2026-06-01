@@ -6,7 +6,7 @@
 
 ### The Markdown preview & AI config editor VS Code deserves.
 
-**GitHub-accurate rendering · Activity Bar panel · AI config wizard · Mermaid · Multi-tab · Themes · Export**
+**GitHub-accurate rendering · Activity Bar panel · AI config wizard · Mermaid · Copy diagrams as PNG · Paste & preview · Multi-tab · Themes · Export**
 
 <br/>
 
@@ -56,7 +56,7 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 <img src="images/screenshots/03-mermaid-diagrams.png" alt="Mermaid diagrams — flowchart, Gantt, sequence" width="49%" />
 <img src="images/screenshots/05-syntax-highlighting.png" alt="Syntax highlighting — 190+ languages" width="49%" />
 </div>
-<p align="center"><sub>✦ Mermaid diagrams with fullscreen expand &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ Syntax highlighting — 190+ languages</sub></p>
+<p align="center"><sub>✦ Mermaid diagrams — expand fullscreen, copy as PNG &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ Syntax highlighting — 190+ languages</sub></p>
 
 <br/>
 
@@ -79,7 +79,9 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 | Live Table of Contents | ✗ | ✅ Collapsible, scroll spy |
 | Multi-tab navigation | ✗ | ✅ Open multiple files |
 | Workspace file browser | ✗ | ✅ Grouped by folder |
-| Mermaid diagrams | ✗ | ✅ Flowcharts, Gantt & more |
+| Mermaid diagrams | ✗ | ✅ Flowcharts, Gantt, sequence & more |
+| Copy diagram as PNG | ✗ | ✅ One click — paste into Notion, Slack, Docs |
+| Paste & preview markdown | ✗ | ✅ Paste any markdown, edit, save as file |
 | Syntax highlighting | Basic | ✅ 190+ languages |
 | Copy code buttons | ✗ | ✅ Hover to reveal |
 | Word count + reading time | ✗ | ✅ Always visible |
@@ -111,8 +113,24 @@ Open multiple Markdown files in tabs — just like your editor. Switching betwee
 ### 🎨 Syntax Highlighting — 190+ Languages
 TypeScript, Python, Go, Rust, Java, SQL, YAML, Bash, Dockerfile — every language highlighted with GitHub's exact color tokens, in both light and dark themes.
 
-### 🔀 Mermaid Diagrams
+### 🔀 Mermaid Diagrams — with PNG Export
 Drop a `mermaid` block in your Markdown and Markr renders it live. Flowcharts, sequence diagrams, Gantt charts, class diagrams, and pie charts — all supported.
+
+Hover over any diagram to reveal two buttons:
+- **🖼 Copy image** — renders the diagram to a high-resolution PNG (2× retina) and copies it directly to your clipboard. Paste straight into Notion, Slack, Google Docs, email, or any design tool. The PNG background matches your current Markr theme.
+- **⤢ Expand** — opens the diagram fullscreen with zoom in/out and Ctrl+scroll support. The **Copy image** button is also available inside the fullscreen modal.
+
+> If clipboard write is blocked by your OS permissions, Markr automatically downloads `diagram.png` instead.
+
+### 📋 Paste & Preview Markdown
+Got markdown from Claude, ChatGPT, a PR comment, or any AI tool? Click **Preview Clipboard** in the toolbar (or press `Cmd/Ctrl+Shift+P`) and Markr opens a split edit panel:
+
+- **Left** — an editable textarea pre-filled with your clipboard content. Paste more, edit, rewrite.
+- **Right** — the live rendered preview, updating as you type.
+- **Save as .md** — pick a location and save the content as a real file in your workspace.
+- **Close** — dismisses the panel and returns you to whatever file you had open, with no changes made to it.
+
+The clipboard panel is completely isolated — it never modifies your open files.
 
 ### ✦ AI Config Editor — First Class
 
@@ -141,12 +159,13 @@ Move your cursor in the editor — the preview scrolls to match. Always in conte
 ### 🛠 Toolbar
 
 ```
-◈ Markr  ·  filename.md      3 min read · 580 words    [Source] [MD] [HTML] [Print] [PDF] [≡] [⊡]
+◈ Markr  ·  filename.md      3 min read · 580 words    [Source] [Preview Clipboard] [MD] [HTML] [Print] [PDF] [≡] [⊡]
 ```
 
 | Button | What it does |
 |--------|--------------|
 | `Source` | Jump to VS Code's built-in editor for this file |
+| `Preview Clipboard` | Open a paste & edit panel — pre-fills with clipboard content, live preview on the right |
 | `MD` | Copy raw Markdown to clipboard |
 | `HTML` | Copy rendered HTML to clipboard |
 | `Print` | Print-ready layout |
