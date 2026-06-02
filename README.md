@@ -6,7 +6,7 @@
 
 ### The Markdown preview & AI config editor VS Code deserves.
 
-**GitHub-accurate rendering · Activity Bar panel · AI config wizard · Mermaid · Copy diagrams as PNG · Paste & preview · Multi-tab · Themes · Export**
+**GitHub-accurate rendering · Activity Bar panel · AI config wizard · Mermaid · Copy anything as PNG · Rich copy to Slack/Docs · Paste & preview · Multi-tab · Themes · Export**
 
 <br/>
 
@@ -80,8 +80,11 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 | Multi-tab navigation | ✗ | ✅ Open multiple files |
 | Workspace file browser | ✗ | ✅ Grouped by folder |
 | Mermaid diagrams | ✗ | ✅ Flowcharts, Gantt, sequence & more |
-| Copy diagram as PNG | ✗ | ✅ One click — paste into Notion, Slack, Docs |
-| Paste & preview markdown | ✗ | ✅ Paste any markdown, edit, save as file |
+| Copy diagram / table / code as PNG | ✗ | ✅ Hover → 📷 Image — paste into Figma, Slack, anywhere |
+| Rich copy (Cmd+C) | ✗ | ✅ Pastes formatted content into Slack, Docs, Notion |
+| Copy table as formatted HTML | ✗ | ✅ Hover → Copy table — Slack renders it as a real table |
+| Paste & preview markdown | ✗ | ✅ Paste any markdown, edit live, save as file |
+| File search in sidebar | ✗ | ✅ Filter workspace files instantly |
 | Syntax highlighting | Basic | ✅ 190+ languages |
 | Copy code buttons | ✗ | ✅ Hover to reveal |
 | Word count + reading time | ✗ | ✅ Always visible |
@@ -113,7 +116,7 @@ Open multiple Markdown files in tabs — just like your editor. Switching betwee
 ### 🎨 Syntax Highlighting — 190+ Languages
 TypeScript, Python, Go, Rust, Java, SQL, YAML, Bash, Dockerfile — every language highlighted with GitHub's exact color tokens, in both light and dark themes.
 
-### 🔀 Mermaid Diagrams — with PNG Export
+### 🔀 Mermaid Diagrams — Render, Expand, Copy as PNG
 Drop a `mermaid` block in your Markdown and Markr renders it live. Flowcharts, sequence diagrams, Gantt charts, class diagrams, and pie charts — all supported.
 
 Hover over any diagram to reveal two buttons:
@@ -121,6 +124,25 @@ Hover over any diagram to reveal two buttons:
 - **⤢ Expand** — opens the diagram fullscreen with zoom in/out and Ctrl+scroll support. The **Copy image** button is also available inside the fullscreen modal.
 
 > If clipboard write is blocked by your OS permissions, Markr automatically downloads `diagram.png` instead.
+
+### 📊 Copy Tables as Rich Text or PNG Image
+
+Hover any table to reveal two buttons:
+
+| Button | What it copies | Best for |
+|--------|---------------|----------|
+| **Copy table** | Rich HTML + tab-separated text | Slack, Google Chat, Google Docs, Notion — pastes as a **real formatted table** |
+| **📷 Image** | 2× retina PNG with theme colours | Figma, Confluence, mobile apps, anywhere HTML paste doesn't work |
+
+The **rich copy (Cmd+C)** also works on any selection — select a table, a list, a code block, bold text, a heading — and paste it into any chat or doc app. The formatting (bold, tables, code, lists) is preserved automatically via `text/html`. A brief toast confirms when formatted content was copied.
+
+### 💻 Copy Code Blocks as PNG Image
+
+Every code block already has a **Copy** button (plain text). Now there's also a **📷 Image** button that renders the code block to a clean PNG — monospaced font, your current theme background, 2× retina resolution. Paste code screenshots into design tools, PR descriptions, or slide decks.
+
+### 🔍 File Search in Notebooks Panel
+
+A search box sits below the **Notebooks** section header in the sidebar. Type to filter all workspace Markdown files instantly — matches against both filename and path. Shows a flat list while filtering for fast scanning. Press `×` or `Escape` to clear.
 
 ### 📋 Paste & Preview Markdown
 Got markdown from Claude, ChatGPT, a PR comment, or any AI tool? Click **Preview Clipboard** in the toolbar (or press `Cmd/Ctrl+Shift+P`) and Markr opens a split edit panel:
