@@ -833,11 +833,25 @@ pre:hover .copy-btn { opacity: 1; }
 .markdown-body .task-list-item input[type="checkbox"] { margin: 0 .5em 0 -1.6em; vertical-align: middle; accent-color: var(--accent); }
 .markdown-body img { max-width: 100%; border-style: none; border-radius: 6px; }
 .markdown-body hr { height: 1px; padding: 0; margin: 24px 0; background: var(--border); border: 0; }
-.markdown-body table { border-spacing: 0; border-collapse: collapse; display: block; width: max-content; max-width: 100%; overflow: auto; margin-bottom: 16px; border-radius: 6px; border: 1px solid var(--border); }
+.table-wrap { position: relative; margin-bottom: 16px; overflow-x: auto; }
+.table-wrap .copy-btn { top: 5px; right: 5px; }
+.table-wrap:hover .copy-btn { opacity: 1; }
+.markdown-body table { border-spacing: 0; border-collapse: collapse; display: block; width: max-content; max-width: 100%; overflow: auto; margin-bottom: 0; border-radius: 6px; border: 1px solid var(--border); }
 .markdown-body table th { font-weight: 600; padding: 8px 14px; border-bottom: 2px solid var(--border); text-align: left; background: var(--bg-subtle); }
 .markdown-body table td { padding: 7px 14px; border-bottom: 1px solid var(--border-faint); }
 .markdown-body table tr:last-child td { border-bottom: none; }
 .markdown-body table tr:nth-child(2n) td { background: var(--bg-subtle); }
+
+/* Rich-copy toast — shown briefly when Cmd+C copies formatted content */
+#rich-copy-toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(8px);
+  background: var(--bg-panel); border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 14px; font-size: 11.5px; color: var(--text-muted);
+  z-index: 9999; pointer-events: none; opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  white-space: nowrap;
+}
+#rich-copy-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .markdown-body kbd { display: inline-block; padding: 3px 5px; font-family: ui-monospace, monospace; font-size: 11px; line-height: 10px; color: var(--text); vertical-align: middle; background: var(--bg-subtle); border: 1px solid var(--border); border-radius: 4px; box-shadow: inset 0 -1px 0 var(--border); }
 .markdown-body details { display: block; margin-bottom: 16px; }
 .markdown-body details summary { display: list-item; cursor: pointer; font-weight: 600; }
@@ -1457,23 +1471,68 @@ const SCRIPT = /* javascript */`
   })();
 
   // ── Copy buttons ───────────────────────────────────────────────────────────
+  // SVG icons reused for copy buttons
+  const COPY_ICON  = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  const CHECK_ICON = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
+  function makeCopyBtn(label) {
+    const btn = document.createElement('button');
+    btn.className = 'copy-btn';
+    btn.innerHTML = COPY_ICON + ' ' + label;
+    return btn;
+  }
+  function flashCopyBtn(btn, label) {
+    btn.innerHTML = CHECK_ICON + ' Copied!';
+    btn.classList.add('done');
+    setTimeout(() => { btn.innerHTML = COPY_ICON + ' ' + label; btn.classList.remove('done'); }, 2200);
+  }
+
+  // Convert an HTML table to tab-separated text (paste into spreadsheets)
+  function tableToTsv(table) {
+    return [...table.querySelectorAll('tr')].map(row =>
+      [...row.querySelectorAll('th,td')].map(cell => cell.textContent?.trim().replace(/\t/g, ' ') || '').join('\\t')
+    ).join('\\n');
+  }
+
   function addCopyButtons() {
+    // ── Code block copy (plain text) ────────────────────────────────────────
     qsa('pre').forEach(pre => {
-      const btn = document.createElement('button');
-      btn.className = 'copy-btn';
-      btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy';
+      if (pre.querySelector('.copy-btn')) return; // already added
+      const btn = makeCopyBtn('Copy');
       btn.addEventListener('click', () => {
         const code = pre.querySelector('code');
-        navigator.clipboard.writeText(code ? code.textContent || '' : '').then(() => {
-          btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> Copied';
-          btn.classList.add('done');
-          setTimeout(() => {
-            btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"/></svg> Copy';
-            btn.classList.remove('done');
-          }, 2200);
-        });
+        navigator.clipboard.writeText(code ? code.textContent || '' : '').then(() => flashCopyBtn(btn, 'Copy'));
       });
       pre.appendChild(btn);
+    });
+
+    // ── Table copy (rich HTML + TSV fallback) ───────────────────────────────
+    qsa('.markdown-body table').forEach(table => {
+      if (table.closest('.table-wrap')) return; // already wrapped
+      const wrap = document.createElement('div');
+      wrap.className = 'table-wrap';
+      table.parentNode?.insertBefore(wrap, table);
+      wrap.appendChild(table);
+
+      const btn = makeCopyBtn('Copy table');
+      btn.addEventListener('click', async () => {
+        const html = table.outerHTML;
+        const tsv  = tableToTsv(table);
+        try {
+          // Write both HTML (Slack/Docs) and plain text (spreadsheets)
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'text/html':  new Blob([html], { type: 'text/html' }),
+              'text/plain': new Blob([tsv],  { type: 'text/plain' }),
+            })
+          ]);
+        } catch {
+          // Fallback: copy as TSV (works in all spreadsheet apps)
+          await navigator.clipboard.writeText(tsv);
+        }
+        flashCopyBtn(btn, 'Copy table');
+      });
+      wrap.appendChild(btn);
     });
   }
 
@@ -2286,6 +2345,46 @@ const SCRIPT = /* javascript */`
     const svg = qs('#mermaid-zoom-inner svg');
     const btn = qs('#mermaid-copy-img');
     if (svg && btn) copyDiagramImage(btn, svg);
+  });
+
+  // ── Rich copy: intercept Cmd+C in the preview to include text/html ───────
+  // When the user selects content in the markdown preview and copies, we write
+  // both text/html and text/plain to the clipboard. Slack, Google Chat, Notion,
+  // Linear, GitHub, Google Docs all pick up text/html and preserve tables,
+  // bold, lists, code blocks, etc. Plain text is the fallback for everything else.
+  let richCopyToastTimer;
+  function showRichToast(msg) {
+    const toast = qs('#rich-copy-toast');
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(richCopyToastTimer);
+    richCopyToastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+  }
+
+  document.addEventListener('copy', e => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return;
+    // Only enhance copy when the selection originates inside a markdown-body preview
+    // (not inside the textarea editor — that should copy plain text as-is)
+    const anchor = sel.anchorNode;
+    const bodies = qsa('.markdown-body');
+    const inPreview = bodies.some(b => b.contains(anchor));
+    if (!inPreview) return;
+    // Clone the selected DOM fragment and serialise as HTML
+    const range = sel.getRangeAt(0);
+    const frag  = range.cloneContents();
+    const div   = document.createElement('div');
+    div.appendChild(frag);
+    try {
+      e.clipboardData?.setData('text/html',  div.innerHTML);
+      e.clipboardData?.setData('text/plain', sel.toString());
+      e.preventDefault();
+      // Only show toast when the selection is non-trivial (contains a block element)
+      if (div.querySelector('table,pre,ul,ol,blockquote,h1,h2,h3,h4,h5,h6,strong,em,code')) {
+        showRichToast('✓ Copied with formatting — paste into Slack, Docs, Notion…');
+      }
+    } catch {}
   });
 
   // ── Messages from extension ────────────────────────────────────────────────
@@ -3151,6 +3250,7 @@ export class MarkdownPreviewPanel {
 </div>
 
 <button id="top-btn" title="Back to top">${ICON.arrowUp}</button>
+<div id="rich-copy-toast">✓ Copied with formatting</div>
 
 <!-- Mermaid zoom modal -->
 <div class="mermaid-modal" id="mermaid-modal">

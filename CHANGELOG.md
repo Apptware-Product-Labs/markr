@@ -7,6 +7,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.7.6] — 2026-06-02
+
+### Added
+- **Rich copy — paste formatted content into Slack, Google Chat, Notion, Docs**: selecting any text in the preview and pressing `Cmd/Ctrl+C` now copies both `text/html` (full formatting) and `text/plain` to the clipboard. Tables, bold, lists, code, headings, blockquotes — all preserved when pasting into any app that supports rich text. A subtle toast confirms when formatted content was copied
+- **Table "Copy table" button**: hovering a table reveals a "Copy table" button (top-right, same as code blocks). Copies the table as HTML for rich apps (Slack renders it as a real table) and as tab-separated text for spreadsheet apps (Excel, Google Sheets)
+
+### Fixed
+- Table `margin-bottom` spacing preserved correctly after wrapping tables for the copy button
+
+---
+
 ## [3.7.5] — 2026-06-01
 
 ### Added
