@@ -7,6 +7,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.7.7] — 2026-06-02
+
+### Added
+- **"Copy as image" on every table and code block**: hover any table or code block to reveal two buttons — "Copy table" (rich HTML/TSV for chat apps) and "📷 Image" (PNG for anywhere HTML paste doesn't work — Figma, mobile apps, screenshots, Confluence). Uses SVG `foreignObject` rendering at 2× retina resolution with the current Markr theme colours baked in
+- The `📷 Image` button falls back to downloading `markr-export.png` if the Clipboard API is unavailable
+
+### Changed
+- Copy buttons on code blocks are now grouped in a flex row alongside the new Image button — cleaner layout, same hover-reveal behaviour
+
+---
+
 ## [3.7.6] — 2026-06-02
 
 ### Added

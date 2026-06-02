@@ -813,14 +813,13 @@ h4:hover .h-anchor,h5:hover .h-anchor,h6:hover .h-anchor { opacity: 1; }
 .markdown-body pre { position: relative; margin: 0 0 16px; padding: 16px; overflow: auto; font-size: 84%; line-height: 1.65; background: var(--code-bg); border-radius: 8px; border: 1px solid var(--border); }
 .markdown-body pre code { padding: 0; margin: 0; background: transparent; border-radius: 0; font-size: 100%; white-space: pre; word-break: normal; overflow-wrap: normal; color: inherit; }
 .copy-btn {
-  position: absolute; top: 7px; right: 7px; padding: 3px 6px; font-size: 11px; font-family: inherit;
+  padding: 3px 6px; font-size: 11px; font-family: inherit;
   border: none; border-radius: 4px; background: transparent; color: var(--text-muted);
-  cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s, background 0.15s;
-  display: flex; align-items: center; gap: 3px; line-height: 1.5;
+  cursor: pointer; transition: color 0.15s, background 0.15s;
+  display: flex; align-items: center; gap: 3px; line-height: 1.5; white-space: nowrap;
 }
-pre:hover .copy-btn { opacity: 1; }
 .copy-btn:hover { color: var(--text); background: var(--bg-hover); }
-.copy-btn.done { color: var(--success); opacity: 1; }
+.copy-btn.done { color: var(--success); }
 .markdown-body blockquote { margin: 0 0 16px; padding: 10px 16px; color: var(--text-muted); border-left: 3px solid var(--accent); background: var(--accent-bg); border-radius: 0 6px 6px 0; }
 .markdown-body blockquote > :first-child { margin-top: 0; }
 .markdown-body blockquote > :last-child { margin-bottom: 0; }
@@ -834,8 +833,24 @@ pre:hover .copy-btn { opacity: 1; }
 .markdown-body img { max-width: 100%; border-style: none; border-radius: 6px; }
 .markdown-body hr { height: 1px; padding: 0; margin: 24px 0; background: var(--border); border: 0; }
 .table-wrap { position: relative; margin-bottom: 16px; overflow-x: auto; }
-.table-wrap .copy-btn { top: 5px; right: 5px; }
-.table-wrap:hover .copy-btn { opacity: 1; }
+/* Button group for table — flex row at top-right, same hover-reveal pattern as Mermaid */
+.el-btn-group {
+  position: absolute; top: 5px; right: 5px; z-index: 2;
+  display: flex; gap: 3px; align-items: center;
+  opacity: 0; transition: opacity 0.15s;
+}
+.table-wrap:hover .el-btn-group,
+pre:hover .el-btn-group { opacity: 1; }
+/* Buttons inside a group don't need absolute positioning */
+.el-btn-group .copy-btn { position: static; opacity: 1; }
+.img-copy-btn {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 6px; font-size: 11px; font-family: inherit;
+  border: none; border-radius: 4px; background: transparent; color: var(--text-muted);
+  cursor: pointer; transition: color 0.15s, background 0.15s; line-height: 1.5; white-space: nowrap;
+}
+.img-copy-btn:hover { color: var(--text); background: var(--bg-hover); }
+.img-copy-btn.done { color: var(--success); }
 .markdown-body table { border-spacing: 0; border-collapse: collapse; display: block; width: max-content; max-width: 100%; overflow: auto; margin-bottom: 0; border-radius: 6px; border: 1px solid var(--border); }
 .markdown-body table th { font-weight: 600; padding: 8px 14px; border-bottom: 2px solid var(--border); text-align: left; background: var(--bg-subtle); }
 .markdown-body table td { padding: 7px 14px; border-bottom: 1px solid var(--border-faint); }
@@ -1474,6 +1489,7 @@ const SCRIPT = /* javascript */`
   // SVG icons reused for copy buttons
   const COPY_ICON  = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
   const CHECK_ICON = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>';
+  const IMG_ICON   = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
 
   function makeCopyBtn(label) {
     const btn = document.createElement('button');
@@ -1481,10 +1497,22 @@ const SCRIPT = /* javascript */`
     btn.innerHTML = COPY_ICON + ' ' + label;
     return btn;
   }
+  function makeImgBtn() {
+    const btn = document.createElement('button');
+    btn.className = 'img-copy-btn';
+    btn.title = 'Copy as PNG image — paste into Figma, Slack, anywhere';
+    btn.innerHTML = IMG_ICON + ' Image';
+    return btn;
+  }
   function flashCopyBtn(btn, label) {
     btn.innerHTML = CHECK_ICON + ' Copied!';
     btn.classList.add('done');
     setTimeout(() => { btn.innerHTML = COPY_ICON + ' ' + label; btn.classList.remove('done'); }, 2200);
+  }
+  function flashImgBtn(btn) {
+    btn.innerHTML = CHECK_ICON + ' Copied!';
+    btn.classList.add('done');
+    setTimeout(() => { btn.innerHTML = IMG_ICON + ' Image'; btn.classList.remove('done'); }, 2200);
   }
 
   // Convert an HTML table to tab-separated text (paste into spreadsheets)
@@ -1494,19 +1522,134 @@ const SCRIPT = /* javascript */`
     ).join('\\n');
   }
 
+  // ── Element → PNG ─────────────────────────────────────────────────────────
+  // Renders any HTML element to a retina-quality PNG using SVG foreignObject.
+  // All CSS variables are resolved to real colour values before embedding so
+  // the image looks identical to the Markr preview in every theme.
+  // NOTE: uses string concatenation throughout — no backtick template literals
+  // because this function lives inside the outer SCRIPT backtick template literal.
+  async function elementToImageBlob(el) {
+    var pad  = 20;
+    var rect = el.getBoundingClientRect();
+    var w    = Math.ceil(rect.width)  + pad * 2;
+    var h    = Math.ceil(rect.height) + pad * 2;
+    var scale = 2;
+
+    var cs  = getComputedStyle(document.documentElement);
+    var get = function(v) { return cs.getPropertyValue(v).trim(); };
+    var bg          = get('--bg')           || '#ffffff';
+    var border      = get('--border')       || '#e5e7eb';
+    var borderFaint = get('--border-faint') || '#f0eeec';
+    var text        = get('--text')         || '#1a1614';
+    var textMuted   = get('--text-muted')   || '#6b7280';
+    var bgSubtle    = get('--bg-subtle')    || '#f9f9f9';
+    var accent      = get('--accent')       || '#f97316';
+    var codeBg      = get('--code-bg')      || bg;
+    var isTable = el.tagName === 'TABLE';
+    var isPre   = el.tagName === 'PRE';
+    var ff = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    var mono = 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
+
+    // Build self-contained CSS — no CSS variables (foreignObject can't resolve them)
+    var css = '* { box-sizing: border-box; }'
+      + 'html, body { margin: 0; padding: 0; background: ' + bg + '; }'
+      + 'body { padding: ' + pad + 'px; font-family: ' + ff + '; font-size: 14px; line-height: 1.6; color: ' + text + '; }'
+      + (isTable
+          ? 'table { border-spacing: 0; border-collapse: collapse; border-radius: 6px; border: 1px solid ' + border + '; overflow: hidden; }'
+          + 'th { font-weight: 600; padding: 8px 14px; border-bottom: 2px solid ' + border + '; text-align: left; background: ' + bgSubtle + '; color: ' + text + '; white-space: nowrap; }'
+          + 'td { padding: 7px 14px; border-bottom: 1px solid ' + borderFaint + '; color: ' + text + '; }'
+          + 'tr:last-child td { border-bottom: none; }'
+          + 'tr:nth-child(2n) td { background: ' + bgSubtle + '; }'
+          : '')
+      + (isPre
+          ? 'pre { margin: 0; padding: 18px; border-radius: 8px; background: ' + codeBg + '; border: 1px solid ' + borderFaint + '; }'
+          + 'code { font-family: ' + mono + '; font-size: 13px; line-height: 1.7; color: ' + text + '; white-space: pre-wrap; }'
+          : '')
+      + 'blockquote { margin: 0; padding: 10px 16px; color: ' + textMuted + '; border-left: 3px solid ' + accent + '; background: rgba(249,115,22,0.06); border-radius: 0 6px 6px 0; }'
+      + 'strong { font-weight: 600; } em { font-style: italic; }'
+      + 'code { font-family: ' + mono + '; font-size: 12px; background: ' + codeBg + '; padding: 1px 4px; border-radius: 3px; border: 1px solid ' + borderFaint + '; }'
+      + 'p { margin: 0 0 8px; } p:last-child { margin-bottom: 0; }';
+
+    // For code blocks: use plain text (hljs classes won't resolve inside foreignObject)
+    var bodyContent = isPre
+      ? '<pre><code>' + escHtml(el.querySelector('code') ? el.querySelector('code').textContent || '' : el.textContent || '') + '</code></pre>'
+      : el.outerHTML;
+
+    var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">'
+      + '<foreignObject x="0" y="0" width="' + w + '" height="' + h + '">'
+      + '<html xmlns="http://www.w3.org/1999/xhtml">'
+      + '<head><meta charset="utf-8"/><style>' + css + '</style></head>'
+      + '<body>' + bodyContent + '</body>'
+      + '</html></foreignObject></svg>';
+
+    var svgB64  = btoa(unescape(encodeURIComponent(svgStr)));
+    var dataUrl = 'data:image/svg+xml;base64,' + svgB64;
+    var canvas  = document.createElement('canvas');
+    canvas.width  = w * scale;
+    canvas.height = h * scale;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+
+    return new Promise(function(resolve, reject) {
+      var img = new Image();
+      img.onload = function() {
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function(b) { b ? resolve(b) : reject(new Error('toBlob failed')); }, 'image/png');
+      };
+      img.onerror = function() { reject(new Error('SVG foreignObject render failed')); };
+      img.src = dataUrl;
+    });
+  }
+
+  async function copyElementAsImage(btn, el) {
+    const origHtml = btn.innerHTML;
+    btn.innerHTML  = '…'; btn.disabled = true;
+    try {
+      const blob = await elementToImageBlob(el);
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      flashImgBtn(btn);
+    } catch {
+      // Clipboard API blocked — download PNG instead
+      try {
+        const blob = await elementToImageBlob(el);
+        const a    = document.createElement('a');
+        a.download = 'markr-export.png';
+        a.href = URL.createObjectURL(blob);
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        btn.innerHTML = CHECK_ICON + ' Saved';
+        btn.classList.add('done');
+        setTimeout(() => { btn.innerHTML = origHtml; btn.classList.remove('done'); btn.disabled = false; }, 2200);
+        return;
+      } catch { btn.innerHTML = origHtml; }
+    }
+    btn.disabled = false;
+  }
+
   function addCopyButtons() {
-    // ── Code block copy (plain text) ────────────────────────────────────────
+    // ── Code block: [Copy] [📷 Image] ───────────────────────────────────────
     qsa('pre').forEach(pre => {
-      if (pre.querySelector('.copy-btn')) return; // already added
-      const btn = makeCopyBtn('Copy');
-      btn.addEventListener('click', () => {
+      if (pre.querySelector('.copy-btn, .el-btn-group')) return; // already added
+      const group = document.createElement('div');
+      group.className = 'el-btn-group';
+
+      const copyBtn = makeCopyBtn('Copy');
+      copyBtn.addEventListener('click', () => {
         const code = pre.querySelector('code');
-        navigator.clipboard.writeText(code ? code.textContent || '' : '').then(() => flashCopyBtn(btn, 'Copy'));
+        navigator.clipboard.writeText(code ? code.textContent || '' : '').then(() => flashCopyBtn(copyBtn, 'Copy'));
       });
-      pre.appendChild(btn);
+
+      const imgBtn = makeImgBtn();
+      imgBtn.addEventListener('click', () => copyElementAsImage(imgBtn, pre));
+
+      group.appendChild(copyBtn);
+      group.appendChild(imgBtn);
+      pre.appendChild(group);
     });
 
-    // ── Table copy (rich HTML + TSV fallback) ───────────────────────────────
+    // ── Table: wrap + [Copy table] [📷 Image] ───────────────────────────────
     qsa('.markdown-body table').forEach(table => {
       if (table.closest('.table-wrap')) return; // already wrapped
       const wrap = document.createElement('div');
@@ -1514,12 +1657,14 @@ const SCRIPT = /* javascript */`
       table.parentNode?.insertBefore(wrap, table);
       wrap.appendChild(table);
 
-      const btn = makeCopyBtn('Copy table');
-      btn.addEventListener('click', async () => {
+      const group = document.createElement('div');
+      group.className = 'el-btn-group';
+
+      const copyBtn = makeCopyBtn('Copy table');
+      copyBtn.addEventListener('click', async () => {
         const html = table.outerHTML;
         const tsv  = tableToTsv(table);
         try {
-          // Write both HTML (Slack/Docs) and plain text (spreadsheets)
           await navigator.clipboard.write([
             new ClipboardItem({
               'text/html':  new Blob([html], { type: 'text/html' }),
@@ -1527,12 +1672,17 @@ const SCRIPT = /* javascript */`
             })
           ]);
         } catch {
-          // Fallback: copy as TSV (works in all spreadsheet apps)
           await navigator.clipboard.writeText(tsv);
         }
-        flashCopyBtn(btn, 'Copy table');
+        flashCopyBtn(copyBtn, 'Copy table');
       });
-      wrap.appendChild(btn);
+
+      const imgBtn = makeImgBtn();
+      imgBtn.addEventListener('click', () => copyElementAsImage(imgBtn, table));
+
+      group.appendChild(copyBtn);
+      group.appendChild(imgBtn);
+      wrap.appendChild(group);
     });
   }
 
