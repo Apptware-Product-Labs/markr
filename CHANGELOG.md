@@ -7,6 +7,38 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.8.0] — 2026-06-03
+
+### Summary
+Milestone release consolidating all v3.7.x features, GIF demos, and bug fixes into a clean publish.
+
+### Added (since v3.7.0)
+- **Activity Bar panel** — browse AI configs and workspace files without opening a markdown file first
+- **New AI Config wizard** — `+` button creates CLAUDE.md, .cursorrules, copilot-instructions.md, agent.md etc. with quality starter templates
+- **Copy any table as rich HTML** — hover any table → "Copy table" → pastes as a real formatted table in Slack, Google Chat, Google Docs, Notion
+- **Copy any table / code block / diagram as PNG** — hover → 📷 Image → 2× retina PNG to clipboard; falls back to PNG download if clipboard API is blocked
+- **Rich copy (Cmd+C)** — selecting content in the preview and pressing Cmd+C writes `text/html` + `text/plain`; formatting is preserved when pasting into Slack, Docs, Notion
+- **Paste & Preview clipboard panel** — click Preview Clipboard (or Cmd+Shift+P) to open markdown in a split edit pane; edit live, Mermaid renders on the right, save as .md
+- **File search in Notebooks panel** — search box filters workspace .md files by name or path; press Esc to clear
+- **Skeleton loading state** — animated shimmer rows replace the invisible "loading" text while workspace files scan
+- **Mermaid copy as PNG** — hover any diagram → 🖼 Copy image or ⤢ Expand with zoom + copy in modal
+
+### Fixed (since v3.7.0)
+- **Mermaid theme re-renders on theme switch** — switching Light/Dark/Notion/Linear now immediately updates all diagram colours; previously colours stayed stale until you navigated away and back
+- **Mermaid renders in clipboard preview and split-edit mode** — diagrams in clipboard content and AI-config split-edit panes now render correctly
+- **Gantt chart syntax error** — Unicode arrow characters (`→`) in task names caused a parser error; replaced with ASCII-safe text in demo files
+- **Clipboard preview layout shift** — clipboard content no longer adds a tab entry, preventing the tab-bar from appearing and shifting the layout
+- **Clipboard Dismiss restores previous file** — clicking Close/Dismiss on the clipboard banner now fully restores the previous file, title, AI badge, TOC, and edit mode state
+- **AI config file switching stale content** — switching between CLAUDE.md / agent.md / skill.md files while in edit mode now correctly loads the new file's content into the textarea
+
+### Changed
+- README restructured: **GIFs come first** in a dedicated "See it in action" section — Activity Bar → Table copy → Diagram PNG → Paste & Preview → File search — all at consistent 100% width
+- GIFs loaded via GitHub raw URLs (not bundled in `.vsix`) — keeps package at ~1.8 MB instead of 58 MB
+- Demo sample files added to `samples/` folder for testing all features
+- `.vscodeignore` updated to exclude large GIF files from the installed extension bundle
+
+---
+
 ## [3.7.9] — 2026-06-03
 
 ### Changed
