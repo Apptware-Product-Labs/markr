@@ -34,7 +34,34 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 
 ---
 
-## Screenshots & Demo
+## See it in action
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-04-activity-bar.gif" alt="Activity Bar panel — open AI configs without opening a file" width="100%" />
+<p align="center"><sub>✦ Click the Markr icon in the Activity Bar — browse and open CLAUDE.md, .cursorrules, or any .md file without opening a file first</sub></p>
+
+<br/>
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-01-table-copy-slack.gif" alt="Hover any table — Copy table or Copy as image" width="100%" />
+<p align="center"><sub>✦ Hover any table → "Copy table" → paste into Slack, Google Chat, or Docs as a real formatted table</sub></p>
+
+<br/>
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-02-diagram-copy-png.gif" alt="Copy Mermaid diagram as PNG — paste into Figma, Notion, anywhere" width="100%" />
+<p align="center"><sub>✦ Hover any Mermaid diagram → 🖼 Copy image → paste as a 2× retina PNG anywhere — Figma, Notion, Confluence, Slack</sub></p>
+
+<br/>
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-03-paste-preview.gif" alt="Paste markdown from Claude or ChatGPT — edit live, Mermaid renders, save as .md" width="100%" />
+<p align="center"><sub>✦ Copy markdown from Claude or ChatGPT → Preview Clipboard → edit in split pane → Mermaid renders live → save as .md</sub></p>
+
+<br/>
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-05-file-search.gif" alt="File search — type to filter workspace markdown files instantly" width="100%" />
+<p align="center"><sub>✦ Type in the Notebooks panel search box to filter all workspace .md files instantly</sub></p>
+
+---
+
+## Screenshots
 
 <!-- Hero: full-width preview -->
 <img src="images/screenshots/01-preview-dark.png" alt="Markr — dark preview with live TOC and workspace browser" width="100%" />
@@ -102,8 +129,6 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 
 Markr lives in the VS Code / Cursor sidebar as a dedicated panel — no file needs to be open first. The panel shows two sections: **AI Configs** (auto-detected, with tool labels) and **Workspace** (all other `.md` files). Click any entry to open it. The `+` button launches the **New AI Config wizard**.
 
-<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-04-activity-bar.gif" alt="Activity Bar panel — open AI configs without a file" width="100%" />
-<p align="center"><sub>Click the Markr icon in the Activity Bar — browse and open any AI config or markdown file instantly</sub></p>
 
 ---
 
@@ -111,7 +136,6 @@ Markr lives in the VS Code / Cursor sidebar as a dedicated panel — no file nee
 
 A search box sits below the **Notebooks** section header in the sidebar. Type to filter all workspace Markdown files instantly — matches against both filename and path. Shows a flat list while filtering for fast scanning. Press `×` or `Escape` to clear.
 
-<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-05-file-search.gif" alt="File search — filter workspace markdown files instantly" width="60%" />
 
 ---
 
@@ -126,8 +150,6 @@ Hover any table to reveal two buttons:
 
 The **rich copy (Cmd+C)** also works on any selection — select a table, a list, a code block, bold text, a heading — and paste it into any chat or doc app. The formatting is preserved automatically. A brief toast confirms when formatted content was copied.
 
-<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-01-table-copy-slack.gif" alt="Copy table — hover, click Copy table, paste into Slack as a formatted table" width="100%" />
-<p align="center"><sub>Hover any table → "Copy table" → paste into Slack, Google Chat, or Docs — formatting fully preserved</sub></p>
 
 ---
 
@@ -139,8 +161,6 @@ Hover over any diagram to reveal two buttons:
 - **🖼 Copy image** — renders the diagram to a high-resolution PNG (2× retina) and copies it directly to your clipboard. Paste straight into Notion, Slack, Google Docs, email, or any design tool. The PNG background matches your current Markr theme.
 - **⤢ Expand** — opens the diagram fullscreen with zoom in/out and Ctrl+scroll support. The **Copy image** button is also available inside the fullscreen modal.
 
-<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-02-diagram-copy-png.gif" alt="Copy Mermaid diagram as PNG — hover, click Copy image, paste anywhere" width="100%" />
-<p align="center"><sub>Hover any diagram → 🖼 Copy image → paste directly into Notion, Figma, Confluence, or Slack</sub></p>
 
 > If clipboard write is blocked by your OS permissions, Markr automatically downloads `diagram.png` instead.
 
@@ -163,8 +183,6 @@ Got markdown from Claude, ChatGPT, a PR comment, or any AI tool? Click **Preview
 
 The clipboard panel is completely isolated — it never modifies your open files.
 
-<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-03-paste-preview.gif" alt="Paste & Preview — paste markdown from Claude, edit live, Mermaid renders in preview" width="100%" />
-<p align="center"><sub>Copy any markdown from Claude or ChatGPT → Preview Clipboard → edit live → save as a real .md file</sub></p>
 
 ---
 
