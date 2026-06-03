@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr – Markdown Preview",
   "description": "Markdown preview & AI config editor for VS Code — Activity Bar panel, CLAUDE.md / .cursorrules / Copilot / Windsurf support, GitHub rendering, Mermaid, split editing, TOC, themes, PDF export",
-  "version": "3.7.7",
+  "version": "3.7.8",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",

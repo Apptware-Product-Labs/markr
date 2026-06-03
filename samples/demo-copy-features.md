@@ -61,11 +61,11 @@ gantt
     title Markr Download Milestones
     dateFormat YYYY-MM-DD
     section Growth
-    0 → 500 downloads     :done, 2026-03-01, 2026-04-01
-    500 → 1k downloads    :done, 2026-04-01, 2026-04-25
-    1k → 2k downloads     :done, 2026-04-25, 2026-05-20
-    2k → 5k downloads     :active, 2026-05-20, 2026-06-30
-    5k → 10k downloads    :2026-06-30, 2026-08-01
+    0 to 500 downloads    :done, 2026-03-01, 2026-04-01
+    500 to 1k downloads   :done, 2026-04-01, 2026-04-25
+    1k to 2k downloads    :done, 2026-04-25, 2026-05-20
+    2k to 5k downloads    :active, 2026-05-20, 2026-06-30
+    5k to 10k downloads   :crit, 2026-06-30, 2026-08-01
 ```
 
 ---

@@ -7,6 +7,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.7.8] — 2026-06-03
+
+### Fixed
+- **Mermaid theme change now re-renders diagrams instantly**: switching between Markr themes (Light → Dark → Notion → Linear) now immediately updates all rendered Mermaid diagrams with the correct colour palette. Previously diagrams kept the original theme colours until you navigated to another file and back. Each diagram's source is now stored in `data-mermaid-src` and the Mermaid module re-initialises + re-runs on every `markr-theme-change` event
+- **Gantt chart syntax error with Unicode arrows**: task names containing `→` (U+2192) caused a Mermaid parser syntax error. Fixed in the demo files by replacing with `to` (ASCII)
+
+### Changed
+- README screenshots section updated to use existing screenshots — GIFs are now properly embedded inline within their respective feature sections (no broken image links)
+- Demo sample files updated: Gantt chart task names use ASCII-safe text
+
+---
+
 ## [3.7.7] — 2026-06-02
 
 ### Added

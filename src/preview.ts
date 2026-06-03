@@ -1752,6 +1752,7 @@ const SCRIPT = /* javascript */`
       "  zoomBtn.title = 'Expand diagram'; zoomBtn.textContent = '\\u2922 Expand';",
       "  const div = document.createElement('div'); div.className = 'mermaid';",
       "  div.textContent = block.textContent || '';",
+      "  div.dataset.mermaidSrc = block.textContent || '';  // persisted source for theme re-renders",
       "  btnGroup.appendChild(copyBtn); btnGroup.appendChild(zoomBtn);",
       "  wrap.appendChild(btnGroup); wrap.appendChild(div); pre.replaceWith(wrap);",
       "  // Copy button: fire a custom event so the main SCRIPT handles canvas/clipboard logic",
@@ -1791,6 +1792,21 @@ const SCRIPT = /* javascript */`
       "  zoomBtn.addEventListener('click', openModal);",
       "});",
       "try { await mermaid.run(); } catch(e) { console.warn('Mermaid:', e); }",
+      "// Re-render all diagrams instantly when the Markr theme changes",
+      "document.addEventListener('markr-theme-change', async (e) => {",
+      "  const newMode = e.detail.mode;",
+      "  const newCfg = themeConfigs[newMode] || themeConfigs.light;",
+      "  mermaid.initialize({ startOnLoad: false, ...newCfg, securityLevel: 'loose' });",
+      "  // Reset every .mermaid div back to its original source so mermaid.run() re-renders it",
+      "  document.querySelectorAll('.mermaid').forEach(div => {",
+      "    const src = div.dataset.mermaidSrc;",
+      "    if (!src) return;",
+      "    div.innerHTML = '';",
+      "    div.textContent = src;",
+      "    div.removeAttribute('data-processed');",
+      "  });",
+      "  try { await mermaid.run(); } catch(e) { console.warn('Mermaid re-render:', e); }",
+      "});",
     ].join('\\n');
     document.head.appendChild(script);
   }
@@ -2253,6 +2269,8 @@ const SCRIPT = /* javascript */`
     try { localStorage.setItem('markr-theme', t); } catch {}
     qsa('.theme-opt').forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-theme') === t));
     qs('#theme-menu')?.classList.remove('open');
+    // Re-render Mermaid diagrams with the new theme's colour palette immediately
+    document.dispatchEvent(new CustomEvent('markr-theme-change', { detail: { mode: t } }));
   }
   qs('#btn-theme')?.addEventListener('click', e => {
     e.stopPropagation();
