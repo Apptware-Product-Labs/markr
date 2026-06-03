@@ -7,6 +7,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.7.9] — 2026-06-03
+
+### Changed
+- Version bump — `markr-3.7.8.vsix` published to VS Code Marketplace and Open VSX
+- GIF demo files (`gif-01` through `gif-05`) committed to the repository; README now references them via absolute GitHub raw URLs so they render on the Marketplace overview page without being bundled into the `.vsix`
+- `.vscodeignore` updated to exclude `images/screenshots/*.gif` — keeps the installed extension package at ~1.8 MB instead of 58 MB
+- Demo markdown samples (`demo-ai-workflow.md`, `demo-claude-md.md`, `demo-copy-features.md`) added to `samples/` for testing and marketing content
+
+---
+
 ## [3.7.8] — 2026-06-03
 
 ### Fixed
