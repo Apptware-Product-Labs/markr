@@ -36,18 +36,31 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 
 ## Screenshots
 
-<!-- Hero: full-width preview -->
-<img src="images/screenshots/01-preview-dark.png" alt="Markr — dark preview with live TOC and workspace browser" width="100%" />
-<p align="center"><sub>Dark theme · Live Table of Contents · Workspace file browser · Word count & reading time</sub></p>
+<!-- Hero: full-width preview — save as: images/screenshots/08-hero-dark.png -->
+<img src="images/screenshots/08-hero-dark.png" alt="Markr — dark preview with AI config split edit, token counter and workspace browser" width="100%" />
+<p align="center"><sub>Dark theme · AI config split edit · Live token counter · Workspace file browser · Table of Contents</sub></p>
 
 <br/>
 
-<!-- Themes & Editing -->
+<!-- Activity Bar + CLAUDE.md split edit -->
 <div align="center">
-<img src="images/screenshots/06-notion-theme.png" alt="Notion White theme" width="49%" />
-<img src="images/screenshots/07-split-edit.png" alt="Split edit mode with live preview" width="49%" />
+<!-- save as: images/screenshots/09-activity-bar-panel.png -->
+<img src="images/screenshots/09-activity-bar-panel.png" alt="Activity Bar panel — AI Configs and Workspace sections" width="49%" />
+<!-- save as: images/screenshots/10-claude-md-split.png -->
+<img src="images/screenshots/10-claude-md-split.png" alt="CLAUDE.md in split edit mode with live token counter" width="49%" />
 </div>
-<p align="center"><sub>✦ Notion White theme &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ Split edit mode — editor + live preview side by side</sub></p>
+<p align="center"><sub>✦ Activity Bar panel — browse AI configs without opening a file &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ CLAUDE.md in split edit with live token counter</sub></p>
+
+<br/>
+
+<!-- Copy features -->
+<div align="center">
+<!-- save as: images/screenshots/11-table-copy-hover.png -->
+<img src="images/screenshots/11-table-copy-hover.png" alt="Table copy — Copy table and Copy as image buttons on hover" width="49%" />
+<!-- save as: images/screenshots/12-paste-preview.png -->
+<img src="images/screenshots/12-paste-preview.png" alt="Paste & Preview panel — clipboard content in split edit mode" width="49%" />
+</div>
+<p align="center"><sub>✦ Hover any table → Copy as rich HTML or PNG image &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ Paste & Preview — paste from Claude, edit live, save as .md</sub></p>
 
 <br/>
 
@@ -56,7 +69,17 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 <img src="images/screenshots/03-mermaid-diagrams.png" alt="Mermaid diagrams — flowchart, Gantt, sequence" width="49%" />
 <img src="images/screenshots/05-syntax-highlighting.png" alt="Syntax highlighting — 190+ languages" width="49%" />
 </div>
-<p align="center"><sub>✦ Mermaid diagrams — expand fullscreen, copy as PNG &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ Syntax highlighting — 190+ languages</sub></p>
+<p align="center"><sub>✦ Mermaid diagrams — render, expand fullscreen, copy as PNG &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ Syntax highlighting — 190+ languages</sub></p>
+
+<br/>
+
+<!-- Themes & File Search -->
+<div align="center">
+<img src="images/screenshots/06-notion-theme.png" alt="Notion White theme" width="49%" />
+<!-- save as: images/screenshots/13-file-search.png -->
+<img src="images/screenshots/13-file-search.png" alt="File search in the Notebooks sidebar panel" width="49%" />
+</div>
+<p align="center"><sub>✦ Notion White theme &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ File search — filter workspace .md files instantly</sub></p>
 
 <br/>
 
@@ -98,32 +121,26 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 
 ## Features
 
-### 📄 GitHub-Style Rendering
-Headings, tables, blockquotes, task lists, strikethrough, footnotes, inline code, fenced code blocks — all rendered exactly as GitHub does. Automatically switches between light and dark with your VS Code theme.
-
-### 📑 Live Table of Contents
-Auto-generated from your headings the moment you open the file. Scroll spy highlights the active section in real time. Click any item to jump there. Collapse it with one button.
-
 ### 🗂 Activity Bar Panel — Always There
+
 Markr lives in the VS Code / Cursor sidebar as a dedicated panel — no file needs to be open first. The panel shows two sections: **AI Configs** (auto-detected, with tool labels) and **Workspace** (all other `.md` files). Click any entry to open it. The `+` button launches the **New AI Config wizard**.
 
-### 📂 Workspace File Browser
-Browse and switch between all `.md` files in your workspace without leaving the preview. Files are grouped by folder, AI config files are pinned at the top, and the browser handles large repos (500+ files) without blocking.
+<!-- GIF: click Activity Bar icon → panel opens → click CLAUDE.md → split edit opens with token counter -->
+<!-- save as: images/screenshots/gif-04-activity-bar.gif -->
+<img src="images/screenshots/gif-04-activity-bar.gif" alt="Activity Bar panel — open AI configs without a file" width="100%" />
+<p align="center"><sub>Click the Markr icon in the Activity Bar — browse and open any AI config or markdown file instantly</sub></p>
 
-### 🗃 Multi-Tab Navigation
-Open multiple Markdown files in tabs — just like your editor. Switching between previously-opened files is instant with no round-trip to the extension host.
+---
 
-### 🎨 Syntax Highlighting — 190+ Languages
-TypeScript, Python, Go, Rust, Java, SQL, YAML, Bash, Dockerfile — every language highlighted with GitHub's exact color tokens, in both light and dark themes.
+### 🔍 File Search in Notebooks Panel
 
-### 🔀 Mermaid Diagrams — Render, Expand, Copy as PNG
-Drop a `mermaid` block in your Markdown and Markr renders it live. Flowcharts, sequence diagrams, Gantt charts, class diagrams, and pie charts — all supported.
+A search box sits below the **Notebooks** section header in the sidebar. Type to filter all workspace Markdown files instantly — matches against both filename and path. Shows a flat list while filtering for fast scanning. Press `×` or `Escape` to clear.
 
-Hover over any diagram to reveal two buttons:
-- **🖼 Copy image** — renders the diagram to a high-resolution PNG (2× retina) and copies it directly to your clipboard. Paste straight into Notion, Slack, Google Docs, email, or any design tool. The PNG background matches your current Markr theme.
-- **⤢ Expand** — opens the diagram fullscreen with zoom in/out and Ctrl+scroll support. The **Copy image** button is also available inside the fullscreen modal.
+<!-- GIF: type in search box → files filter live → press Esc to reset -->
+<!-- save as: images/screenshots/gif-05-file-search.gif -->
+<img src="images/screenshots/gif-05-file-search.gif" alt="File search — filter workspace markdown files instantly" width="60%" />
 
-> If clipboard write is blocked by your OS permissions, Markr automatically downloads `diagram.png` instead.
+---
 
 ### 📊 Copy Tables as Rich Text or PNG Image
 
@@ -134,25 +151,55 @@ Hover any table to reveal two buttons:
 | **Copy table** | Rich HTML + tab-separated text | Slack, Google Chat, Google Docs, Notion — pastes as a **real formatted table** |
 | **📷 Image** | 2× retina PNG with theme colours | Figma, Confluence, mobile apps, anywhere HTML paste doesn't work |
 
-The **rich copy (Cmd+C)** also works on any selection — select a table, a list, a code block, bold text, a heading — and paste it into any chat or doc app. The formatting (bold, tables, code, lists) is preserved automatically via `text/html`. A brief toast confirms when formatted content was copied.
+The **rich copy (Cmd+C)** also works on any selection — select a table, a list, a code block, bold text, a heading — and paste it into any chat or doc app. The formatting is preserved automatically. A brief toast confirms when formatted content was copied.
+
+<!-- GIF: hover table → Copy table → switch to Slack → paste → table renders beautifully -->
+<!-- save as: images/screenshots/gif-01-table-copy-slack.gif -->
+<img src="images/screenshots/gif-01-table-copy-slack.gif" alt="Copy table — hover, click Copy table, paste into Slack as a formatted table" width="100%" />
+<p align="center"><sub>Hover any table → "Copy table" → paste into Slack, Google Chat, or Docs — formatting fully preserved</sub></p>
+
+---
+
+### 🔀 Mermaid Diagrams — Render, Expand, Copy as PNG
+
+Drop a `mermaid` block in your Markdown and Markr renders it live. Flowcharts, sequence diagrams, Gantt charts, class diagrams, and pie charts — all supported.
+
+Hover over any diagram to reveal two buttons:
+- **🖼 Copy image** — renders the diagram to a high-resolution PNG (2× retina) and copies it directly to your clipboard. Paste straight into Notion, Slack, Google Docs, email, or any design tool. The PNG background matches your current Markr theme.
+- **⤢ Expand** — opens the diagram fullscreen with zoom in/out and Ctrl+scroll support. The **Copy image** button is also available inside the fullscreen modal.
+
+<!-- GIF: hover Mermaid diagram → 🖼 Copy image → paste into Notion/Figma as PNG -->
+<!-- save as: images/screenshots/gif-02-diagram-copy-png.gif -->
+<img src="images/screenshots/gif-02-diagram-copy-png.gif" alt="Copy Mermaid diagram as PNG — hover, click Copy image, paste anywhere" width="100%" />
+<p align="center"><sub>Hover any diagram → 🖼 Copy image → paste directly into Notion, Figma, Confluence, or Slack</sub></p>
+
+> If clipboard write is blocked by your OS permissions, Markr automatically downloads `diagram.png` instead.
+
+---
 
 ### 💻 Copy Code Blocks as PNG Image
 
 Every code block already has a **Copy** button (plain text). Now there's also a **📷 Image** button that renders the code block to a clean PNG — monospaced font, your current theme background, 2× retina resolution. Paste code screenshots into design tools, PR descriptions, or slide decks.
 
-### 🔍 File Search in Notebooks Panel
-
-A search box sits below the **Notebooks** section header in the sidebar. Type to filter all workspace Markdown files instantly — matches against both filename and path. Shows a flat list while filtering for fast scanning. Press `×` or `Escape` to clear.
+---
 
 ### 📋 Paste & Preview Markdown
+
 Got markdown from Claude, ChatGPT, a PR comment, or any AI tool? Click **Preview Clipboard** in the toolbar (or press `Cmd/Ctrl+Shift+P`) and Markr opens a split edit panel:
 
 - **Left** — an editable textarea pre-filled with your clipboard content. Paste more, edit, rewrite.
-- **Right** — the live rendered preview, updating as you type.
+- **Right** — the live rendered preview, updating as you type. Mermaid diagrams render live.
 - **Save as .md** — pick a location and save the content as a real file in your workspace.
 - **Close** — dismisses the panel and returns you to whatever file you had open, with no changes made to it.
 
 The clipboard panel is completely isolated — it never modifies your open files.
+
+<!-- GIF: copy Claude response → Cmd+Shift+P → split panel opens → Mermaid renders on right → type to edit -->
+<!-- save as: images/screenshots/gif-03-paste-preview.gif -->
+<img src="images/screenshots/gif-03-paste-preview.gif" alt="Paste & Preview — paste markdown from Claude, edit live, Mermaid renders in preview" width="100%" />
+<p align="center"><sub>Copy any markdown from Claude or ChatGPT → Preview Clipboard → edit live → save as a real .md file</sub></p>
+
+---
 
 ### ✦ AI Config Editor — First Class
 
@@ -174,6 +221,23 @@ Markr is built for AI developers. The Activity Bar panel automatically separates
 **New AI Config wizard** — click `+` in the Markr panel and pick a template. Markr creates the file (with a useful starter template) and opens it in split edit mode immediately. No more blank files, no more Googling the format.
 
 All AI config files open automatically in **split edit mode** — preview on the right, fully-featured editor on the left. Live token count in the toolbar tells you exactly how much context window you're using.
+
+---
+
+### 📄 GitHub-Style Rendering
+Headings, tables, blockquotes, task lists, strikethrough, footnotes, inline code, fenced code blocks — all rendered exactly as GitHub does. Automatically switches between light and dark with your VS Code theme.
+
+### 📑 Live Table of Contents
+Auto-generated from your headings the moment you open the file. Scroll spy highlights the active section in real time. Click any item to jump there. Collapse it with one button.
+
+### 📂 Workspace File Browser
+Browse and switch between all `.md` files in your workspace without leaving the preview. Files are grouped by folder, AI config files are pinned at the top, and the browser handles large repos (500+ files) without blocking.
+
+### 🗃 Multi-Tab Navigation
+Open multiple Markdown files in tabs — just like your editor. Switching between previously-opened files is instant with no round-trip to the extension host.
+
+### 🎨 Syntax Highlighting — 190+ Languages
+TypeScript, Python, Go, Rust, Java, SQL, YAML, Bash, Dockerfile — every language highlighted with GitHub's exact color tokens, in both light and dark themes.
 
 ### ⚡ Scroll Sync
 Move your cursor in the editor — the preview scrolls to match. Always in context, never lost.
