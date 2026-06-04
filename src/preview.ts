@@ -3075,6 +3075,14 @@ export class MarkdownPreviewPanel {
           }
         }
         this._document = doc;
+        // Guard: skip applyEdit if the content is identical to the current document.
+        // Without this guard, VS Code marks the file as modified (shows ●) even when
+        // the webview sends the initial content on first load with no user changes.
+        if (msg.content === doc.getText()) {
+          const html = applyGithubAlerts(marked.parse(msg.content) as string);
+          this._panel.webview.postMessage({ type: 'updateSplitPreview', html });
+          return;
+        }
         const edit = new vscode.WorkspaceEdit();
         edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), msg.content);
         await vscode.workspace.applyEdit(edit); // keep VS Code document in sync (shows ● dot)

@@ -7,6 +7,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.9.1] — 2026-06-03
+
+### Fixed
+- **No more false unsaved changes on open**: opening any file in Markr no longer shows the ● (unsaved changes) dot in the VS Code tab. The `edit` handler now guards against calling `applyEdit()` when the webview content is identical to the current document — which was happening on every file open due to the initial edit-mode sync
+
+### Changed
+- **Activity Bar icon updated**: the Markr sidebar icon (monochrome, shown in VS Code's Activity Bar) is now a document shape with folded corner and AI sparkle — matching the brand logo design from `icon.png`
+
+---
+
 ## [3.9.0] — 2026-06-03
 
 ### Added
