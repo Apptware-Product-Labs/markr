@@ -7,6 +7,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.9.0] — 2026-06-03
+
+### Added
+- **Agent Watch — real-time live preview**: Markr now watches the file directly on disk using `fs.watch`. When Claude Code, Codex, Cursor, or any AI agent edits your CLAUDE.md, .cursorrules, agent.md, or any `.md` file **without you saving**, the preview refreshes automatically (300ms debounce). No save required. No VS Code event needed.
+- **Live badge in toolbar**: a subtle `⬤ Live` indicator appears in the toolbar for every real file. When the agent edits the file, it pulses green and shows `⬤ Updated` for 3 seconds — a clear signal that Markr caught the change
+- **Token delta badge**: when the file grows or shrinks, a `+N tok` / `−N tok` badge appears next to the stats for 8 seconds — immediately tells you the context cost of the agent's edit
+- **Block-level diff highlighting**: new sections added by the agent flash green with a brief left-border animation before fading to normal. You can see exactly what the agent wrote
+
+---
+
 ## [3.8.1] — 2026-06-03
 
 ### Added

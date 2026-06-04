@@ -497,6 +497,35 @@ body:not(.edit-mode) #btn-save-file { display: none; }
   padding: 3px 8px; font-size: 11px; font-family: inherit; cursor: pointer;
 }
 .cb-dismiss:hover { background: var(--bg-hover); color: var(--text); }
+/* Agent watch — live badge + diff animation */
+.live-badge {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px;
+  border-radius: 10px; font-size: 10.5px; font-weight: 600; flex-shrink: 0;
+  background: rgba(127,127,127,0.07); color: var(--text-faint);
+  border: 1px solid var(--border-faint); transition: background 0.3s, color 0.3s, border-color 0.3s;
+}
+.live-badge.active { background: rgba(34,197,94,0.12); color: #16a34a; border-color: rgba(34,197,94,0.3); }
+.live-dot {
+  width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0;
+}
+.live-badge.active .live-dot { animation: livepulse 0.8s ease-in-out infinite; }
+@keyframes livepulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(0.7); } }
+.tok-delta {
+  font-size: 10.5px; padding: 2px 7px; border-radius: 10px; font-weight: 600; flex-shrink: 0;
+  transition: opacity 0.5s;
+}
+.tok-delta.tok-pos { background: rgba(34,197,94,0.13); color: #16a34a; }
+.tok-delta.tok-neg { background: rgba(239,68,68,0.10); color: #dc2626; }
+/* New block added by agent — brief green flash fades to nothing */
+@keyframes agent-new-flash {
+  0%   { background: rgba(34,197,94,0.18); border-left-color: #22c55e; padding-left: 10px; }
+  70%  { background: rgba(34,197,94,0.08); border-left-color: rgba(34,197,94,0.4); }
+  100% { background: transparent; border-left-color: transparent; padding-left: 0; }
+}
+.markdown-body .agent-new {
+  border-left: 3px solid transparent;
+  animation: agent-new-flash 3s ease-out forwards;
+}
 .sep-v { width: 1px; height: 16px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
 .tb-btn {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px;
@@ -2662,6 +2691,59 @@ const SCRIPT = /* javascript */`
         if (qs('#scroller .language-mermaid')) setupMermaid();
       }
     }
+    if (msg.type === 'agentUpdate') {
+      // Real-time update from fs.watch — file changed on disk without a VS Code save
+      const body = qs('#scroller .markdown-body');
+      if (!body) return;
+
+      // Fingerprint existing top-level elements so we can detect new ones after the swap
+      const prevSet = new Set(
+        [...body.children].map(el => (el.textContent || '').trim().slice(0, 80))
+      );
+
+      // Swap in the new rendered HTML
+      body.innerHTML = msg.html;
+      currentMarkdown = msg.markdown;
+      updateStats(msg.markdown);
+
+      // Also update split-preview pane if in edit mode
+      const spBody = qs('#split-preview .markdown-body');
+      if (spBody) spBody.innerHTML = msg.html;
+
+      // Highlight blocks that are new (not present before the update)
+      [...body.children].forEach(el => {
+        const fp = (el.textContent || '').trim().slice(0, 80);
+        if (fp && !prevSet.has(fp)) { el.classList.add('agent-new'); }
+      });
+
+      // Re-run helpers on the new content
+      addCopyButtons(); setupHeadingAnchors(); buildTOC();
+      if (qs('#scroller .language-mermaid')) setupMermaid();
+
+      // ── Live badge: pulse green briefly to signal the agent edited the file ──
+      const badge = qs('#live-badge');
+      if (badge) {
+        badge.classList.add('active');
+        clearTimeout(window['_liveBadgeTimer']);
+        const label = qs('#live-label');
+        if (label) label.textContent = 'Updated';
+        window['_liveBadgeTimer'] = setTimeout(() => {
+          badge.classList.remove('active');
+          if (label) label.textContent = 'Live';
+        }, 3000);
+      }
+
+      // ── Token delta badge ──────────────────────────────────────────────────
+      const deltaEl = qs('#tok-delta');
+      if (deltaEl && msg.tokDelta) {
+        const d = msg.tokDelta;
+        deltaEl.textContent = (d > 0 ? '+' : '') + d + ' tok';
+        deltaEl.className = 'tok-delta ' + (d > 0 ? 'tok-pos' : 'tok-neg');
+        deltaEl.style.display = '';
+        clearTimeout(window['_tokDeltaTimer']);
+        window['_tokDeltaTimer'] = setTimeout(() => { deltaEl.style.display = 'none'; }, 8000);
+      }
+    }
     if (msg.type === 'saved') { showSaved(); }
     if (msg.type === 'updateFiles') {
       filesLoading = false;
@@ -2805,6 +2887,10 @@ export class MarkdownPreviewPanel {
   private _filesCacheValid = false;
   private _renderTimer: ReturnType<typeof setTimeout> | undefined;
   private _filesScanPromise: Promise<FileEntry[]> | undefined;
+  // ── Agent watch (real-time fs.watch) ──────────────────────────────────────
+  private _fsWatcher: fs.FSWatcher | null = null;
+  private _prevMarkdown = '';
+  private _lastFsChange = 0;
 
   public static createOrShow(document: vscode.TextDocument): void {
     const column = vscode.window.activeTextEditor ? vscode.ViewColumn.Beside : vscode.ViewColumn.One;
@@ -3055,6 +3141,8 @@ export class MarkdownPreviewPanel {
       this._renderTimer = undefined;
     }
     const rawText = this._document.getText();
+    this._prevMarkdown = rawText; // seed baseline for agent-watch diff
+    this._startFsWatch();         // (re-)start watching this file on disk
     const { meta, body: mdBody } = extractFrontmatter(rawText);
     const rendered = applyGithubAlerts(marked.parse(mdBody) as string);
     const frontmatterHtml = meta ? renderFrontmatter(meta) : '';
@@ -3297,6 +3385,8 @@ export class MarkdownPreviewPanel {
     </span>
     <span id="save-status" class="save-status"></span>
     <span id="diff-chip"></span>
+    <span id="live-badge" class="live-badge" title="Markr is watching this file — refreshes instantly when Claude or any agent edits it"><span class="live-dot"></span><span id="live-label">Live</span></span>
+    <span id="tok-delta" class="tok-delta" style="display:none"></span>
     <div class="sep-v"></div>
     <button id="btn-edit" class="tb-btn${autoEdit ? ' accent' : ''}" title="Split edit mode">${autoEdit ? '⚡ Edit' : 'Edit'}</button>
     <button id="btn-save-file" class="tb-btn" title="Save (⌘S / Ctrl+S)">Save</button>
@@ -3511,7 +3601,67 @@ export class MarkdownPreviewPanel {
 </html>`;
   }
 
+  // ── Agent Watch — real-time fs.watch so the preview refreshes while Claude/
+  // Codex edits the file without waiting for an explicit VS Code save event. ──
+
+  private _startFsWatch(): void {
+    this._stopFsWatch();
+    const filePath = this._document.uri.fsPath;
+    if (!filePath || this._document.uri.scheme !== 'file') return;
+    try {
+      this._fsWatcher = fs.watch(filePath, (event) => {
+        if (event !== 'change') return;
+        const now = Date.now();
+        if (now - this._lastFsChange < 300) return; // 300ms debounce
+        this._lastFsChange = now;
+        this._onFsChange();
+      });
+    } catch { /* file not watchable — silently skip */ }
+  }
+
+  private _stopFsWatch(): void {
+    try { this._fsWatcher?.close(); } catch {}
+    this._fsWatcher = null;
+  }
+
+  private _onFsChange(): void {
+    // Don't interfere while the user is actively editing or clipboard overlay is open
+    if (this._editMode || this._clipboardMode) return;
+    try {
+      const rawText = fs.readFileSync(this._document.uri.fsPath, 'utf-8');
+      if (rawText === this._prevMarkdown) return; // no real change
+
+      // Collect old block fingerprints for diff (first 80 chars of each blank-line block)
+      const prevBlocks = (this._prevMarkdown || '')
+        .split(/\n\n+/)
+        .map(b => b.trim().slice(0, 80))
+        .filter(Boolean);
+
+      this._prevMarkdown = rawText;
+
+      const { meta, body } = extractFrontmatter(rawText);
+      const rendered = applyGithubAlerts(marked.parse(body) as string);
+      const stats    = docStats(rawText);
+      const tokNow   = Math.round(stats.chars / 4);
+      const tokPrev  = Math.round((this._prevMarkdown.length) / 4); // recompute from current
+      const tokDelta = tokNow - Math.round(docStats(prevBlocks.join('\n\n')).chars / 4);
+
+      this._panel.webview.postMessage({
+        type: 'agentUpdate',
+        html: (meta ? renderFrontmatter(meta) : '') + rendered,
+        markdown: rawText,
+        tokStr: tokenEstimate(stats.chars),
+        words: stats.words,
+        tokDelta,
+        prevBlocks,
+        readMins: Math.max(1, Math.ceil(stats.words / 200)),
+        statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
+      });
+    } catch { /* read error — skip silently */ }
+  }
+
   public dispose(): void {
+    this._stopFsWatch();
     MarkdownPreviewPanel.currentPanel = undefined;
     this._panel.dispose();
     while (this._disposables.length) this._disposables.pop()?.dispose();
