@@ -7,6 +7,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.9.4] — 2026-06-05
+
+### Added
+- **Two-phase file scan**: root-level `.md` files appear in the Notebooks panel in under 20ms (no full workspace traversal needed). The deep scan runs in the background and updates the list once complete. Large repos no longer show a blank panel while scanning.
+
+### Changed
+- **SCM-style file list**: the Notebooks panel file list now matches VS Code's Source Control aesthetic — compact rows, filename left, parent folder right-aligned and dimmed. AI config files show their tool badge (Claude, Cursor, Agent) on the right. Cleaner, denser, easier to scan at a glance.
+
+---
+
 ## [3.9.3] — 2026-06-05
 
 ### Fixed

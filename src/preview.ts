@@ -598,7 +598,12 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 .sb-body { overflow-y: auto; overflow-x: hidden; padding: 2px 0 8px; }
 .sb-section.collapsed .sb-body { display: none; }
 .sb-section.collapsed #file-search-wrap { display: none; }
-.sb-ai-label { padding: 6px 12px 2px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); opacity: 0.7; font-family: ui-monospace, monospace; }
+.sb-ai-label {
+  padding: 8px 10px 2px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--text-faint); font-family: inherit;
+}
+.sb-ai-label.accent { color: var(--accent); opacity: 0.8; }
 
 /* File search input */
 #file-search-wrap {
@@ -649,36 +654,47 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
   border: 1.5px solid var(--border); border-top-color: var(--accent);
   animation: spin 0.8s linear infinite;
 }
+/* === File list — Source Control style ======================================
+   Compact rows: icon + filename left, path/badge right (dim).
+   Matches VS Code's SCM panel aesthetic. ===================================*/
 .file-dir {
-  width: 100%; display: flex; align-items: center; gap: 5px;
-  padding: 6px 10px 3px calc(10px + (var(--depth, 0) * 12px));
+  width: 100%; display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px 3px calc(8px + (var(--depth, 0) * 12px));
   border: none; background: transparent; cursor: pointer; text-align: left;
-  font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--text-faint); font-family: ui-monospace, monospace; white-space: nowrap;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-faint); white-space: nowrap; margin-top: 4px;
 }
 .file-dir:hover { background: var(--bg-hover); color: var(--text-muted); }
 .file-dir .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-.file-dir .folder-count { opacity: 0.7; font-size: 9px; }
-.folder-chevron { width: 10px; height: 10px; transition: transform 0.12s; flex-shrink: 0; }
+.file-dir .folder-count { font-size: 9px; color: var(--text-faint); margin-left: 3px; }
+.folder-chevron { width: 9px; height: 9px; transition: transform 0.12s; flex-shrink: 0; }
 .file-dir.collapsed .folder-chevron { transform: rotate(-90deg); }
 .file-item {
-  display: flex; align-items: center; padding: 4px 10px 4px calc(12px + (var(--depth, 0) * 12px)); gap: 6px;
-  font-size: 12px; font-family: ui-monospace, monospace; color: var(--text-muted);
-  cursor: pointer; border-left: 2px solid transparent;
-  transition: background 0.1s, color 0.1s, border-color 0.1s;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; user-select: none;
+  display: flex; align-items: center;
+  padding: 3px 8px 3px calc(10px + (var(--depth, 0) * 12px));
+  gap: 5px; font-size: 12.5px; font-family: inherit;
+  color: var(--text-muted); cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background 0.08s, color 0.08s, border-color 0.08s;
+  user-select: none; min-width: 0;
 }
 .file-item:hover { background: var(--bg-hover); color: var(--text); }
+.file-item:hover .file-path { opacity: 0.7; }
 .file-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-bg); }
-.file-item.ai svg { color: var(--accent); opacity: 0.8; }
-.file-item svg { flex-shrink: 0; opacity: 0.45; }
-.file-item.active svg { opacity: 1; }
-.file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-item svg { flex-shrink: 0; opacity: 0.4; }
+.file-item.active svg, .file-item.ai svg { opacity: 0.9; }
+.file-item.ai svg { color: var(--accent); }
+.file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* Right-side metadata — path or AI kind badge, dim and right-aligned like SCM */
+.file-path {
+  font-size: 10.5px; color: var(--text-faint); flex-shrink: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 90px; opacity: 0.5; transition: opacity 0.1s;
+}
 .file-ai-kind {
-  flex-shrink: 0; max-width: 58px; overflow: hidden; text-overflow: ellipsis;
-  font-size: 9px; line-height: 1; color: var(--accent);
+  flex-shrink: 0; font-size: 9px; line-height: 1; color: var(--accent);
   background: var(--accent-bg); border: 1px solid var(--accent-border);
-  border-radius: 3px; padding: 2px 4px;
+  border-radius: 3px; padding: 2px 5px; letter-spacing: 0.02em;
 }
 .toc-item { list-style: none; margin: 0; padding: 0; }
 .toc-item a {
@@ -1306,7 +1322,7 @@ const SCRIPT = /* javascript */`
     const otherFiles = displayFiles.filter(f => !f.isAiConfig);
     let html = '';
     if (aiFiles.length) {
-      html += '<div class="sb-ai-label">✦ AI Docs</div>';
+      html += '<div class="sb-ai-label accent">✦ AI Configs</div>';
       aiFiles.forEach(f => { html += fileItemHtml(f); });
     }
 
@@ -1388,13 +1404,22 @@ const SCRIPT = /* javascript */`
   }
 
   function fileItemHtml(f, depth = 0) {
+    // SCM-style: compact icon + filename left, path or AI-kind badge right (dim)
     const icon = f.isAiConfig
-      ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>'
-      : '<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h8l4 4v8H2V2z" opacity=".4"/><path d="M10 2v4h4"/></svg>';
+      ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>'
+      : '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h8l4 4v8H2V2z" opacity=".35"/><path d="M10 2v4h4"/></svg>';
+    // Right-side: AI kind badge OR parent directory (last segment only)
+    var right = '';
+    if (f.aiKind) {
+      right = '<span class="file-ai-kind">' + escHtml(f.aiKind) + '</span>';
+    } else if (f.dir) {
+      var lastDir = f.dir.split('/').pop() || f.dir;
+      right = '<span class="file-path">' + escHtml(lastDir) + '</span>';
+    }
     return '<div class="file-item' + (f.active ? ' active' : '') + (f.isAiConfig ? ' ai' : '')
       + '" data-uri="' + escHtml(f.uri) + '" title="' + escHtml(f.relPath) + '" style="--depth:' + depth + '">'
       + icon + '<span class="file-name">' + escHtml(f.label) + '</span>'
-      + (f.aiKind ? '<span class="file-ai-kind">' + escHtml(f.aiKind) + '</span>' : '') + '</div>';
+      + right + '</div>';
   }
 
   // ── TOC ────────────────────────────────────────────────────────────────────
@@ -3180,38 +3205,59 @@ export class MarkdownPreviewPanel {
     this._renderTimer = setTimeout(() => this._render(), 120);
   }
 
+  /** Map URIs → FileEntry objects (shared by both scan phases). */
+  private _mapUris(uris: vscode.Uri[]): FileEntry[] {
+    return uris
+      .sort((a, b) => vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)))
+      .map(uri => {
+        const relPath = vscode.workspace.asRelativePath(uri);
+        const parts   = relPath.split('/');
+        const label   = parts[parts.length - 1];
+        const dir     = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+        const aiKind  = aiDocKind(label, relPath);
+        return { label, relPath, uri: uri.toString(), active: false, dir, isAiConfig: !!aiKind, aiKind };
+      });
+  }
+
   private async _getWorkspaceFiles(): Promise<FileEntry[]> {
     if (!this._filesCacheValid) {
       try {
         if (this._filesScanPromise) {
           await this._filesScanPromise;
         } else {
-          this._filesScanPromise = (async () => {
-            const maxFiles = vscode.workspace.getConfiguration('markr').get<number>('maxWorkspaceFiles', 500);
-            const uris = await vscode.workspace.findFiles(
-              '**/*.md',
-              '{**/node_modules/**,**/.git/**,**/.vscode/**,**/.next/**,**/out/**,**/dist/**}',
-              maxFiles
-            );
-            this._filesCache = uris
-              .sort((a, b) => vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)))
-              .map(uri => {
-                const relPath = vscode.workspace.asRelativePath(uri);
-                const parts   = relPath.split('/');
-                const label   = parts[parts.length - 1];
-                const dir     = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-                const aiKind = aiDocKind(label, relPath);
-                return { label, relPath, uri: uri.toString(), active: false, dir, isAiConfig: !!aiKind, aiKind };
-              });
-            this._filesCacheValid = true;
-            return this._filesCache;
-          })();
+          const maxFiles = vscode.workspace.getConfiguration('markr').get<number>('maxWorkspaceFiles', 500);
+          const exclude  = '{**/node_modules/**,**/.git/**,**/.vscode/**,**/.next/**,**/out/**,**/dist/**,**/build/**,**/coverage/**}';
+
+          // ── Phase 1: root-level files (< 20ms on any repo) ──────────────────
+          // findFiles with a non-recursive pattern is orders of magnitude faster.
+          // Show these immediately so the sidebar isn't blank while the deep scan runs.
+          const wsFolders = vscode.workspace.workspaceFolders;
+          if (wsFolders?.length) {
+            const rootPattern = new vscode.RelativePattern(wsFolders[0], '*.md');
+            const rootUris    = await vscode.workspace.findFiles(rootPattern, exclude, 50);
+            if (rootUris.length) {
+              this._filesCache = this._mapUris(rootUris);
+              const cur = this._document.uri.toString();
+              this._filesCache.forEach(f => { f.active = f.uri === cur; });
+              // Push phase-1 results to the webview immediately — user sees the list now
+              this._panel.webview.postMessage({ type: 'updateFiles', files: this._filesCache });
+            }
+          }
+
+          // ── Phase 2: full deep scan in background ────────────────────────────
+          this._filesScanPromise = vscode.workspace
+            .findFiles('**/*.md', exclude, maxFiles)
+            .then(uris => {
+              this._filesCache     = this._mapUris(uris);
+              this._filesCacheValid = true;
+              return this._filesCache;
+            });
+
           await this._filesScanPromise;
         }
       } catch { this._filesCache = []; }
       finally { this._filesScanPromise = undefined; }
     }
-    // Update active flag in-place (no allocation)
     const currentUri = this._document.uri.toString();
     this._filesCache.forEach(f => { f.active = f.uri === currentUri; });
     return this._filesCache;
