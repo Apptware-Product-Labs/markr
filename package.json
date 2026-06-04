@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr – Markdown Preview",
   "description": "Markdown preview & AI config editor for VS Code — Activity Bar panel, CLAUDE.md / .cursorrules / Copilot / Windsurf support, GitHub rendering, Mermaid, split editing, TOC, themes, PDF export",
-  "version": "3.8.0",
+  "version": "3.8.1",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
@@ -125,6 +125,12 @@
         "title": "Refresh Explorer",
         "category": "Markr",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "markr.searchFiles",
+        "title": "Search Files",
+        "category": "Markr",
+        "icon": "$(search)"
       }
     ],
     "menus": {
@@ -135,9 +141,14 @@
           "group": "navigation@1"
         },
         {
-          "command": "markr.refreshExplorer",
+          "command": "markr.searchFiles",
           "when": "view == markrExplorer",
           "group": "navigation@2"
+        },
+        {
+          "command": "markr.refreshExplorer",
+          "when": "view == markrExplorer",
+          "group": "navigation@3"
         }
       ],
       "view/item/context": [

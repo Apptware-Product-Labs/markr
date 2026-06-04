@@ -7,6 +7,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.8.1] — 2026-06-03
+
+### Added
+- **Folder tree in Activity Bar panel**: the Workspace section now shows files grouped in a nested folder tree — directories are collapsible, sorted alphabetically with files inside each folder. Previously all files were shown as a flat list with a directory description
+- **Search button in Activity Bar panel**: a 🔍 search icon now appears in the Markr panel title bar. Clicking it opens a fuzzy Quick Pick over all workspace Markdown and AI config files — AI configs are pinned at the top, matches on both filename and path
+
+### Fixed
+- **Extension icon regenerated**: `icon.png` regenerated from `icon.svg` to ensure the marketplace icon and installed extension icon are consistent
+
+---
+
 ## [3.8.0] — 2026-06-03
 
 ### Summary

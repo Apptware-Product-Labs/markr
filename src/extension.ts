@@ -201,6 +201,36 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // searchFiles: fuzzy quick-pick over all workspace .md files
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markr.searchFiles', async () => {
+      const files = explorerProvider.getFiles();
+      if (!files.length) {
+        vscode.window.showInformationMessage('No Markdown files found in workspace.');
+        return;
+      }
+      // Sort AI configs first, then alphabetically
+      const sorted = [...files].sort((a, b) => {
+        if (a.isAiConfig !== b.isAiConfig) { return a.isAiConfig ? -1 : 1; }
+        return a.relPath.localeCompare(b.relPath);
+      });
+      const items = sorted.map(f => ({
+        label: (f.isAiConfig ? '$(star) ' : '$(file) ') + f.label,
+        description: f.relPath,
+        detail: f.aiKind ? `✦ ${f.aiKind}` : undefined,
+        uri: f.uri,
+      }));
+      const picked = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Search Markdown & AI config files…',
+        matchOnDescription: true,
+        matchOnDetail: true,
+      });
+      if (!picked) { return; }
+      const doc = await vscode.workspace.openTextDocument(picked.uri);
+      MarkdownPreviewPanel.createOrShow(doc);
+    })
+  );
+
   // ── Document listeners ─────────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument(({ document }) => {

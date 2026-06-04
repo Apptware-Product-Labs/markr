@@ -51,8 +51,6 @@ export class MarkrFileItem extends vscode.TreeItem {
     if (entry.isAiConfig) {
       this.iconPath = new vscode.ThemeIcon('star');
       this.description = entry.aiKind;
-    } else {
-      this.description = entry.dir || '';
     }
     this.contextValue = entry.isAiConfig ? 'markrAiFile' : 'markrFile';
     this.command = {
@@ -63,22 +61,79 @@ export class MarkrFileItem extends vscode.TreeItem {
   }
 }
 
+export class MarkrFolderItem extends vscode.TreeItem {
+  constructor(
+    label: string,
+    public readonly folderPath: string,
+    public readonly children: (MarkrFolderItem | MarkrFileItem)[],
+  ) {
+    super(label, vscode.TreeItemCollapsibleState.Collapsed);
+    this.iconPath = new vscode.ThemeIcon('folder');
+    this.tooltip = folderPath;
+    this.contextValue = 'markrFolder';
+    const total = countFolderFiles(children);
+    if (total > 0) { this.description = String(total); }
+  }
+}
+
+function countFolderFiles(items: (MarkrFolderItem | MarkrFileItem)[]): number {
+  return items.reduce((n, item) => {
+    if (item instanceof MarkrFolderItem) { return n + countFolderFiles(item.children); }
+    return n + 1;
+  }, 0);
+}
+
+// ─── Folder tree builder ──────────────────────────────────────────────────────
+
+interface FolderNode {
+  files: ExplorerFileEntry[];
+  dirs: Map<string, FolderNode>;
+}
+
+function buildFolderNode(files: ExplorerFileEntry[]): FolderNode {
+  const root: FolderNode = { files: [], dirs: new Map() };
+  for (const f of files) {
+    const parts = (f.dir || '').split('/').filter(Boolean);
+    let node = root;
+    for (const part of parts) {
+      if (!node.dirs.has(part)) { node.dirs.set(part, { files: [], dirs: new Map() }); }
+      node = node.dirs.get(part)!;
+    }
+    node.files.push(f);
+  }
+  return root;
+}
+
+function folderNodeToItems(
+  node: FolderNode,
+  basePath: string = '',
+): (MarkrFolderItem | MarkrFileItem)[] {
+  const items: (MarkrFolderItem | MarkrFileItem)[] = [];
+  // Subdirectories first (alphabetical)
+  for (const [name, child] of [...node.dirs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const childPath = basePath ? `${basePath}/${name}` : name;
+    const children = folderNodeToItems(child, childPath);
+    items.push(new MarkrFolderItem(name, childPath, children));
+  }
+  // Files inside this level (alphabetical)
+  for (const f of [...node.files].sort((a, b) => a.label.localeCompare(b.label))) {
+    items.push(new MarkrFileItem(f));
+  }
+  return items;
+}
+
 export class MarkrSectionItem extends vscode.TreeItem {
   constructor(
     label: string,
-    public readonly children: MarkrFileItem[],
+    public readonly children: (MarkrFolderItem | MarkrFileItem)[],
     collapsible?: vscode.TreeItemCollapsibleState,
     icon?: string,
   ) {
     super(
       label,
-      collapsible !== undefined
-        ? collapsible
-        : vscode.TreeItemCollapsibleState.Expanded,
+      collapsible !== undefined ? collapsible : vscode.TreeItemCollapsibleState.Expanded,
     );
-    if (icon) {
-      this.iconPath = new vscode.ThemeIcon(icon);
-    }
+    if (icon) { this.iconPath = new vscode.ThemeIcon(icon); }
     this.contextValue = 'markrSection';
   }
 }
@@ -97,6 +152,9 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
     this._scan();
   }
 
+  /** Expose all files for the search quick-pick command. */
+  getFiles(): ExplorerFileEntry[] { return this._files; }
+
   refresh(): void {
     this._files = [];
     this._loading = true;
@@ -105,7 +163,7 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
   }
 
   private _scan(): void {
-    if (this._scanPromise) return;
+    if (this._scanPromise) { return; }
     this._scanPromise = this._doScan().finally(() => {
       this._scanPromise = null;
       this._loading = false;
@@ -138,15 +196,15 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
     }
   }
 
-  getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
-    return element;
-  }
+  getTreeItem(element: vscode.TreeItem): vscode.TreeItem { return element; }
 
   getChildren(element?: vscode.TreeItem): vscode.ProviderResult<vscode.TreeItem[]> {
-    if (element instanceof MarkrSectionItem) {
-      return element.children;
-    }
+    // Expand section containers
+    if (element instanceof MarkrSectionItem) { return element.children; }
+    // Expand folder nodes
+    if (element instanceof MarkrFolderItem)  { return element.children; }
 
+    // ── Root level ──────────────────────────────────────────────────────────
     if (this._loading) {
       const loading = new vscode.TreeItem('Scanning workspace…', vscode.TreeItemCollapsibleState.None);
       loading.iconPath = new vscode.ThemeIcon('loading~spin');
@@ -168,33 +226,31 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
       return [info, hint];
     }
 
-    const aiFiles = this._files.filter(f => f.isAiConfig).map(f => new MarkrFileItem(f));
-    const docFiles = this._files.filter(f => !f.isAiConfig).map(f => new MarkrFileItem(f));
-
+    const aiEntries  = this._files.filter(f =>  f.isAiConfig);
+    const docEntries = this._files.filter(f => !f.isAiConfig);
     const sections: vscode.TreeItem[] = [];
 
-    if (aiFiles.length > 0) {
-      sections.push(
-        new MarkrSectionItem(
-          `AI Configs (${aiFiles.length})`,
-          aiFiles,
-          vscode.TreeItemCollapsibleState.Expanded,
-          'star',
-        ),
-      );
+    // ── AI Configs section (flat — these are always at repo root or well-known paths) ──
+    if (aiEntries.length > 0) {
+      sections.push(new MarkrSectionItem(
+        `AI Configs (${aiEntries.length})`,
+        aiEntries.map(f => new MarkrFileItem(f)),
+        vscode.TreeItemCollapsibleState.Expanded,
+        'star',
+      ));
     }
 
-    if (docFiles.length > 0) {
-      sections.push(
-        new MarkrSectionItem(
-          `Workspace (${docFiles.length})`,
-          docFiles,
-          docFiles.length <= 20
-            ? vscode.TreeItemCollapsibleState.Expanded
-            : vscode.TreeItemCollapsibleState.Collapsed,
-          'folder-opened',
-        ),
-      );
+    // ── Workspace section with folder tree ──────────────────────────────────
+    if (docEntries.length > 0) {
+      const treeItems = folderNodeToItems(buildFolderNode(docEntries));
+      sections.push(new MarkrSectionItem(
+        `Workspace (${docEntries.length})`,
+        treeItems,
+        docEntries.length <= 20
+          ? vscode.TreeItemCollapsibleState.Expanded
+          : vscode.TreeItemCollapsibleState.Collapsed,
+        'folder-opened',
+      ));
     }
 
     return sections;
