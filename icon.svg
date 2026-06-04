@@ -6,36 +6,40 @@
     </linearGradient>
   </defs>
 
-  <!-- Background with rounded corners -->
-  <rect width="128" height="128" rx="26" fill="url(#bg)"/>
+  <!-- Background -->
+  <rect width="128" height="128" rx="24" fill="url(#bg)"/>
 
-  <!--
-    Bold geometric M — path-based so it renders at any size without fonts.
-    Two vertical pillars + two diagonals meeting at a V in the centre.
-    Designed to be clearly readable at 16×16, 32×32, and 128×128.
-  -->
+  <!-- Document body with folded top-right corner -->
   <path
-    d="M18,102
-       L18,26
-       L36,26
-       L64,62
-       L92,26
-       L110,26
-       L110,102
-       L92,102
-       L92,54
-       L72,86
-       L56,86
-       L36,54
-       L36,102
-       Z"
+    d="M26 114 L26 14 L80 14 L102 36 L102 114 Z"
     fill="white"
+    opacity="0.12"
+  />
+  <path
+    d="M26 114 L26 14 L80 14 L102 36 L102 114 Z"
+    fill="none"
+    stroke="white"
+    stroke-width="4.5"
+    stroke-linejoin="round"
   />
 
-  <!-- AI sparkle — small 4-point star, bottom-right corner -->
+  <!-- Folded corner crease -->
   <path
-    d="M100,94 L102,88 L104,94 L110,96 L104,98 L102,104 L100,98 L94,96 Z"
+    d="M80 14 L80 36 L102 36"
+    fill="none"
+    stroke="white"
+    stroke-width="4.5"
+    stroke-linejoin="round"
+  />
+
+  <!-- Text lines (content) -->
+  <line x1="40" y1="58" x2="88" y2="58" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="40" y1="72" x2="88" y2="72" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <line x1="40" y1="86" x2="66" y2="86" stroke="white" stroke-width="4" stroke-linecap="round" opacity="0.6"/>
+
+  <!-- AI sparkle — 4-point star, bottom-right of doc -->
+  <path
+    d="M86,89 L88,84 L90,89 L95,91 L90,93 L88,98 L86,93 L81,91 Z"
     fill="white"
-    opacity="0.85"
   />
 </svg>
