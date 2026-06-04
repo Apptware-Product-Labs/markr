@@ -4,9 +4,9 @@
 
 # Markr
 
-### The Markdown preview & AI config editor VS Code deserves.
+### The AI config editor & Markdown preview VS Code deserves.
 
-**GitHub-accurate rendering · Activity Bar panel · AI config wizard · Mermaid · Copy anything as PNG · Rich copy to Slack/Docs · Paste & preview · Multi-tab · Themes · Export**
+**Agent Watch · Auto-opens AI configs · Real-time live preview · Copy anything as PNG · Rich copy to Slack/Docs · Mermaid · Paste & preview · Multi-tab · Themes · Export**
 
 <br/>
 
@@ -100,18 +100,21 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 
 | | Built-in VS Code Preview | Markr |
 |---|:---:|:---:|
-| **Activity Bar panel** | ✗ | ✅ Access without opening a file |
-| **New AI config wizard** | ✗ | ✅ CLAUDE.md, .cursorrules & more |
+| **AI configs open in Markr** | ✗ | ✅ CLAUDE.md, .cursorrules open only in Markr — no text editor |
+| **Agent Watch (real-time)** | ✗ | ✅ Preview refreshes while agent edits — no save needed |
+| **Live + token delta badge** | ✗ | ✅ See exactly what changed and how many tokens it cost |
+| **Activity Bar panel** | ✗ | ✅ Browse AI configs + folder tree without opening a file |
+| **New AI config wizard** | ✗ | ✅ CLAUDE.md, .cursorrules & more with starter templates |
 | GitHub-accurate styling | Partial | ✅ Pixel-perfect |
 | Live Table of Contents | ✗ | ✅ Collapsible, scroll spy |
 | Multi-tab navigation | ✗ | ✅ Open multiple files |
-| Workspace file browser | ✗ | ✅ Grouped by folder |
+| Workspace file browser | ✗ | ✅ Nested folder tree, grouped |
 | Mermaid diagrams | ✗ | ✅ Flowcharts, Gantt, sequence & more |
 | Copy diagram / table / code as PNG | ✗ | ✅ Hover → 📷 Image — paste into Figma, Slack, anywhere |
 | Rich copy (Cmd+C) | ✗ | ✅ Pastes formatted content into Slack, Docs, Notion |
 | Copy table as formatted HTML | ✗ | ✅ Hover → Copy table — Slack renders it as a real table |
 | Paste & preview markdown | ✗ | ✅ Paste any markdown, edit live, save as file |
-| File search in sidebar | ✗ | ✅ Filter workspace files instantly |
+| File search | ✗ | ✅ Instant fuzzy search across all workspace files |
 | Syntax highlighting | Basic | ✅ 190+ languages |
 | Copy code buttons | ✗ | ✅ Hover to reveal |
 | Word count + reading time | ✗ | ✅ Always visible |
@@ -119,11 +122,35 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 | Themes | VS Code only | ✅ Light, Dark, Notion, Linear |
 | Focus / reading mode | ✗ | ✅ Distraction-free |
 | Split edit mode | ✗ | ✅ Preview + editor side by side |
-| AI config file support | ✗ | ✅ CLAUDE.md, .cursorrules, Copilot & more |
+| AI config file support | ✗ | ✅ CLAUDE.md, .cursorrules, Copilot, Windsurf & more |
 
 ---
 
 ## Features
+
+### 🤖 Markr is the Editor for AI Config Files
+
+Opening CLAUDE.md, `.cursorrules`, `agent.md`, `skill.md`, `copilot-instructions.md`, `.windsurfrules`, or any AI config file from **anywhere** in VS Code (Explorer double-click, `Ctrl+P`, terminal, git checkout) now opens it **exclusively in Markr**. The VS Code text editor tab closes automatically — Markr's split-edit view becomes the full editor for these files.
+
+- **Left pane** — fully editable textarea with format toolbar, undo/redo, token counter
+- **Right pane** — live rendered preview that updates as you type
+- **No text editor clutter** — your workspace stays clean
+
+> Click **Source** in the Markr toolbar at any time to open the raw text editor if you need it.
+
+---
+
+### ⚡ Agent Watch — Real-Time Live Preview
+
+Markr watches your files directly on the filesystem using `fs.watch`. When **Claude Code, Codex, Cursor, or any AI agent** edits your CLAUDE.md without saving, the preview updates instantly.
+
+- **No save required** — Markr catches every keystroke the agent makes
+- **⬤ Live badge** — always visible in the toolbar, pulses green when an edit is detected
+- **⬤ Updated** — badge label changes and glows for 3 seconds on each agent edit
+- **+N tok / −N tok** — token delta badge shows the exact context cost of the agent's change for 8 seconds
+- **Block-level diff** — new sections added by the agent flash green before fading to normal — you see exactly what was written
+
+---
 
 ### 🗂 Activity Bar Panel — Always There
 
