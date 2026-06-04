@@ -376,7 +376,11 @@ For bugs or feature requests → [open an issue](https://github.com/Apptware-Pro
 
 ## License
 
-MIT — free for personal and commercial use. See [LICENSE](LICENSE).
+**Free for personal use.** Commercial use (organisations with 10+ users, product embedding, or white-labelling) requires a commercial licence.
+
+© 2026 Apptware Labs Pvt Ltd — All Rights Reserved. See [LICENSE](LICENSE) for full terms.
+
+For commercial licensing: [sumit.patil@apptware.com](mailto:sumit.patil@apptware.com)
 
 ---
 

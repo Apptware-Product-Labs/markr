@@ -2717,26 +2717,45 @@ const SCRIPT = /* javascript */`
       }
     }
     if (msg.type === 'agentUpdate') {
-      // Real-time update from fs.watch — file changed on disk without a VS Code save
-      const body = qs('#scroller .markdown-body');
-      if (!body) return;
-
-      // Fingerprint existing top-level elements so we can detect new ones after the swap
-      const prevSet = new Set(
-        [...body.children].map(el => (el.textContent || '').trim().slice(0, 80))
-      );
-
-      // Swap in the new rendered HTML
-      body.innerHTML = msg.html;
+      // Real-time update from fs.watch — file changed on disk (agent wrote it)
       currentMarkdown = msg.markdown;
       updateStats(msg.markdown);
 
-      // Also update split-preview pane if in edit mode
-      const spBody = qs('#split-preview .markdown-body');
-      if (spBody) spBody.innerHTML = msg.html;
+      // ── Update the visible preview ─────────────────────────────────────────
+      // In split-edit mode: update the right-hand split-preview pane
+      // In normal preview mode: update the main scroller
+      const targetBody = editMode
+        ? qs('#split-preview .markdown-body')
+        : qs('#scroller .markdown-body');
+      if (!targetBody) return;
+
+      // Fingerprint existing top-level elements so we can detect new ones after the swap
+      const prevSet = new Set(
+        [...targetBody.children].map(el => (el.textContent || '').trim().slice(0, 80))
+      );
+
+      targetBody.innerHTML = msg.html;
+
+      // ── In split-edit mode: also sync the textarea to disk content ─────────
+      // The agent wrote to disk — that IS the authoritative version.
+      // Syncing the textarea keeps the left pane in sync with what the agent wrote.
+      if (editMode) {
+        const ea = qs('#edit-area');
+        if (ea && ea.value !== msg.markdown) {
+          const ss = ea.selectionStart, se = ea.selectionEnd;
+          ea.value = msg.markdown;
+          // Restore cursor if possible (cursor may shift if agent inserted before it)
+          try { ea.setSelectionRange(ss, se); } catch {}
+        }
+        resetHistory(); markClean(); // reset undo stack to the agent's version
+      } else {
+        // Also keep split-preview in sync for non-edit-mode (defensive)
+        const spBody = qs('#split-preview .markdown-body');
+        if (spBody) spBody.innerHTML = msg.html;
+      }
 
       // Highlight blocks that are new (not present before the update)
-      [...body.children].forEach(el => {
+      [...targetBody.children].forEach(el => {
         const fp = (el.textContent || '').trim().slice(0, 80);
         if (fp && !prevSet.has(fp)) { el.classList.add('agent-new'); }
       });
@@ -3688,13 +3707,13 @@ export class MarkdownPreviewPanel {
   }
 
   private _onFsChange(): void {
-    // Don't interfere while the user is actively editing or clipboard overlay is open
-    if (this._editMode || this._clipboardMode) return;
+    // Skip clipboard overlay (user is previewing unrelated clipboard content)
+    if (this._clipboardMode) return;
     try {
       const rawText = fs.readFileSync(this._document.uri.fsPath, 'utf-8');
       if (rawText === this._prevMarkdown) return; // no real change
 
-      // Collect old block fingerprints for diff (first 80 chars of each blank-line block)
+      // Collect old block fingerprints for diff
       const prevBlocks = (this._prevMarkdown || '')
         .split(/\n\n+/)
         .map(b => b.trim().slice(0, 80))
@@ -3705,10 +3724,12 @@ export class MarkdownPreviewPanel {
       const { meta, body } = extractFrontmatter(rawText);
       const rendered = applyGithubAlerts(marked.parse(body) as string);
       const stats    = docStats(rawText);
-      const tokNow   = Math.round(stats.chars / 4);
-      const tokPrev  = Math.round((this._prevMarkdown.length) / 4); // recompute from current
-      const tokDelta = tokNow - Math.round(docStats(prevBlocks.join('\n\n')).chars / 4);
+      const tokDelta = Math.round(stats.chars / 4) - Math.round(docStats(prevBlocks.join('\n\n')).chars / 4);
 
+      // agentUpdate handles both preview-only mode AND split-edit mode:
+      // — in preview mode: updates the scroller
+      // — in split-edit mode (editMode=true): updates textarea + right pane
+      //   This is intentional — the agent wrote to disk, so disk IS the truth.
       this._panel.webview.postMessage({
         type: 'agentUpdate',
         html: (meta ? renderFrontmatter(meta) : '') + rendered,
@@ -3717,6 +3738,7 @@ export class MarkdownPreviewPanel {
         words: stats.words,
         tokDelta,
         prevBlocks,
+        isEditMode: this._editMode,
         readMins: Math.max(1, Math.ceil(stats.words / 200)),
         statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
       });

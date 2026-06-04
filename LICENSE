@@ -1,21 +1,41 @@
-MIT License
+Copyright (c) 2026 Apptware Labs Pvt Ltd. All Rights Reserved.
 
-Copyright (c) 2026 Apptware Labs Pvt Ltd
+MARKR — PROPRIETARY SOFTWARE LICENSE
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software and associated documentation files (the "Software") are the
+exclusive property of Apptware Labs Pvt Ltd ("Apptware Labs").
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+PERMITTED USE
+The Software may be installed and used free of charge for personal and
+non-commercial purposes within Visual Studio Code, Cursor, or any compatible
+editor that loads VS Code extensions.
 
+RESTRICTIONS
+You may NOT, without prior written permission from Apptware Labs:
+
+  1. Copy, modify, merge, publish, distribute, sublicense, or sell copies of
+     the Software or any substantial portion of it.
+  2. Reverse-engineer, decompile, or disassemble the compiled extension bundle.
+  3. Remove or alter any copyright notices, trademarks, or proprietary legends.
+  4. Use the Software or any part of it as the basis for a competing product.
+  5. Use the name "Markr", the Apptware Labs name, or associated logos without
+     prior written consent.
+
+COMMERCIAL USE
+Commercial use — including use within an organisation with more than 10 users,
+embedding in a commercial product, or white-labelling — requires a separate
+commercial licence. Contact: sumit.patil@apptware.com
+
+CONTRIBUTIONS
+By submitting a pull request or patch you agree that your contribution becomes
+the exclusive property of Apptware Labs and is governed by this licence.
+
+DISCLAIMER
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. IN NO EVENT SHALL
+APPTWARE LABS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING
+FROM THE USE OF THIS SOFTWARE.
+
+For commercial licensing enquiries: sumit.patil@apptware.com
+For the full terms visit: https://apptware.com/markr/license

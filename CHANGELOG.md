@@ -7,6 +7,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.9.5] — 2026-06-05
+
+### Fixed
+- **Agent Watch now works in split-edit mode**: the biggest bug — opening CLAUDE.md auto-enters split-edit mode (`editMode = true`), which caused `_onFsChange()` to return early with no update. Removed the `editMode` guard. When an agent edits the file on disk, Markr now: (1) updates the right-hand preview pane with green diff flash, (2) syncs the textarea to the agent's content, (3) fires the Live badge and token delta regardless of edit mode.
+
+### Changed
+- **License updated**: Markr is now proprietary — All Rights Reserved, free for personal use, commercial licence required for organisations (10+ users / product embedding / white-labelling). Contact sumit.patil@apptware.com for commercial terms.
+
+---
+
 ## [3.9.4] — 2026-06-05
 
 ### Added
