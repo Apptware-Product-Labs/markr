@@ -7,6 +7,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.9.1] — 2026-06-03
+
+### Added
+- **AI config files auto-open in Markr**: opening CLAUDE.md, .cursorrules, agent.md, skill.md, copilot-instructions.md, or any recognised AI config file anywhere in VS Code (Explorer double-click, terminal, Ctrl+P, etc.) now automatically opens it in Markr alongside the text editor — no click needed
+- **Search instant when warm, fast when cold**: `markr.searchFiles` now returns immediately from the cached file list (instant). If the cache isn't ready yet, it scans directly with a progress indicator so the picker is never empty or stuck
+
+### Fixed
+- **Faster workspace scan**: expanded the exclusion glob to skip `build/`, `coverage/`, `.turbo/`, `.cache/`, `tmp/`, `vendor/`, `public/`, and more — significantly reduces scan time in large monorepos and projects with build output directories
+
+---
+
 ## [3.9.0] — 2026-06-03
 
 ### Added

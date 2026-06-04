@@ -3,7 +3,7 @@ import * as path from 'path';
 import { MarkdownPreviewPanel } from './preview';
 import { MarkrExplorerProvider, AI_CONFIG_TEMPLATES } from './markrExplorer';
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
 
   // ── Activity Bar Explorer ──────────────────────────────────────────────────
   const explorerProvider = new MarkrExplorerProvider();
@@ -201,33 +201,80 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // searchFiles: fuzzy quick-pick over all workspace .md files
+  // searchFiles: instant when cache is warm, scans directly when cold
   context.subscriptions.push(
     vscode.commands.registerCommand('markr.searchFiles', async () => {
-      const files = explorerProvider.getFiles();
-      if (!files.length) {
-        vscode.window.showInformationMessage('No Markdown files found in workspace.');
-        return;
+      // Helper: show the quick-pick from a flat file list
+      async function showPick(entries: Array<{ label: string; relPath: string; uri: vscode.Uri; isAiConfig: boolean; aiKind: string }>) {
+        if (!entries.length) {
+          vscode.window.showInformationMessage('No Markdown files found in workspace.');
+          return;
+        }
+        const sorted = [...entries].sort((a, b) => {
+          if (a.isAiConfig !== b.isAiConfig) { return a.isAiConfig ? -1 : 1; }
+          return a.relPath.localeCompare(b.relPath);
+        });
+        const items = sorted.map(f => ({
+          label: (f.isAiConfig ? '$(star) ' : '$(file) ') + f.label,
+          description: f.relPath,
+          detail: f.aiKind ? `✦ ${f.aiKind}` : undefined,
+          uri: f.uri,
+        }));
+        const picked = await vscode.window.showQuickPick(items, {
+          placeHolder: 'Search Markdown & AI config files…',
+          matchOnDescription: true,
+          matchOnDetail: true,
+        });
+        if (!picked) { return; }
+        const doc = await vscode.workspace.openTextDocument(picked.uri);
+        MarkdownPreviewPanel.createOrShow(doc);
       }
-      // Sort AI configs first, then alphabetically
-      const sorted = [...files].sort((a, b) => {
-        if (a.isAiConfig !== b.isAiConfig) { return a.isAiConfig ? -1 : 1; }
-        return a.relPath.localeCompare(b.relPath);
+
+      // Use cached files immediately if available (instant, no scan needed)
+      const cached = explorerProvider.getFiles();
+      if (cached.length > 0) { await showPick(cached); return; }
+
+      // Cache is cold — scan directly so the user never sees an empty picker
+      const maxFiles = vscode.workspace.getConfiguration('markr').get<number>('maxWorkspaceFiles', 500);
+      const exclude = '{**/node_modules/**,**/.git/**,**/.vscode/**,**/.next/**,**/out/**,**/dist/**,**/build/**,**/coverage/**}';
+      const uris = await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'Markr: finding files…', cancellable: false },
+        () => vscode.workspace.findFiles('**/*.md', exclude, maxFiles),
+      );
+      const { AI_CONFIG_NAMES, aiDocKindExplorer } = await import('./markrExplorer');
+      const entries = uris.map(uri => {
+        const label   = path.basename(uri.fsPath);
+        const relPath = vscode.workspace.asRelativePath(uri);
+        const lower   = label.toLowerCase();
+        const isAiConfig = AI_CONFIG_NAMES.has(lower) || /^claude(\.local)?\.md$/i.test(lower);
+        return { label, relPath, uri, isAiConfig, aiKind: aiDocKindExplorer(label, relPath) };
       });
-      const items = sorted.map(f => ({
-        label: (f.isAiConfig ? '$(star) ' : '$(file) ') + f.label,
-        description: f.relPath,
-        detail: f.aiKind ? `✦ ${f.aiKind}` : undefined,
-        uri: f.uri,
-      }));
-      const picked = await vscode.window.showQuickPick(items, {
-        placeHolder: 'Search Markdown & AI config files…',
-        matchOnDescription: true,
-        matchOnDetail: true,
-      });
-      if (!picked) { return; }
-      const doc = await vscode.workspace.openTextDocument(picked.uri);
-      MarkdownPreviewPanel.createOrShow(doc);
+      await showPick(entries);
+    })
+  );
+
+  // ── Auto-open AI config files in Markr ────────────────────────────────────
+  // When the user opens CLAUDE.md, .cursorrules, agent.md, or any recognised
+  // AI config file in VS Code (from Explorer, CLI, or any other source),
+  // Markr opens automatically alongside it. No click needed.
+  const { AI_CONFIG_NAMES: AI_NAMES_AUTO } = await import('./markrExplorer');
+  let _autoOpenTimer: ReturnType<typeof setTimeout> | undefined;
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(editor => {
+      if (!editor || editor.document.languageId !== 'markdown') return;
+      const doc = editor.document;
+      const filename = path.basename(doc.uri.fsPath).toLowerCase();
+      const isAiConfig = AI_NAMES_AUTO.has(filename) || /^claude(\.local)?\.md$/i.test(filename);
+      if (!isAiConfig) return;
+      // Debounce to avoid re-triggering when Markr itself moves focus
+      clearTimeout(_autoOpenTimer);
+      _autoOpenTimer = setTimeout(() => {
+        // Only auto-open if the panel isn't already showing this file
+        const current = MarkdownPreviewPanel.currentPanel;
+        if (!current || current['_document']?.uri.toString() !== doc.uri.toString()) {
+          MarkdownPreviewPanel.createOrShow(doc);
+        }
+      }, 250);
     })
   );
 

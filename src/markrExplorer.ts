@@ -174,11 +174,17 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
   private async _doScan(): Promise<void> {
     try {
       const maxFiles = vscode.workspace.getConfiguration('markr').get<number>('maxWorkspaceFiles', 500);
-      const uris = await vscode.workspace.findFiles(
-        '**/*.md',
-        '{**/node_modules/**,**/.git/**,**/.vscode/**,**/.next/**,**/out/**,**/dist/**}',
-        maxFiles,
-      );
+      // Broad exclusion list keeps the scan fast even in large monorepos
+      const exclude = [
+        '**/node_modules/**', '**/.git/**', '**/.vscode/**',
+        '**/.next/**', '**/out/**', '**/dist/**', '**/build/**',
+        '**/coverage/**', '**/.turbo/**', '**/.cache/**',
+        '**/tmp/**', '**/temp/**', '**/.husky/**',
+        '**/storybook-static/**', '**/.svelte-kit/**',
+        '**/__pycache__/**', '**/.pytest_cache/**',
+        '**/vendor/**', '**/public/**',
+      ].join(',');
+      const uris = await vscode.workspace.findFiles('**/*.md', `{${exclude}}`, maxFiles);
       uris.sort((a, b) =>
         vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)),
       );
