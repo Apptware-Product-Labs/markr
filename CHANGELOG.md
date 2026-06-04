@@ -7,32 +7,22 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [3.9.2] — 2026-06-03
-
-### Changed
-- **Markr is now the full editor for AI config files**: when CLAUDE.md, .cursorrules, agent.md, skill.md, copilot-instructions.md, or any AI config file is opened anywhere in VS Code, Markr opens in the **same column** (replacing the text editor slot) and the plain text editor tab is automatically closed. Markr's split-edit mode becomes the only editor for these files — no text editor tab cluttering the workspace
-- **Source button loop guard**: clicking "Source" in the Markr toolbar to open the raw text editor works correctly — the auto-close is suppressed for 2 seconds so the text editor stays open after the user explicitly requested it
-
----
-
-## [3.9.1] — 2026-06-03
-
-### Added
-- **AI config files auto-open in Markr**: opening CLAUDE.md, .cursorrules, agent.md, skill.md, copilot-instructions.md, or any recognised AI config file anywhere in VS Code (Explorer double-click, terminal, Ctrl+P, etc.) now automatically opens it in Markr alongside the text editor — no click needed
-- **Search instant when warm, fast when cold**: `markr.searchFiles` now returns immediately from the cached file list (instant). If the cache isn't ready yet, it scans directly with a progress indicator so the picker is never empty or stuck
-
-### Fixed
-- **Faster workspace scan**: expanded the exclusion glob to skip `build/`, `coverage/`, `.turbo/`, `.cache/`, `tmp/`, `vendor/`, `public/`, and more — significantly reduces scan time in large monorepos and projects with build output directories
-
----
-
 ## [3.9.0] — 2026-06-03
 
 ### Added
-- **Agent Watch — real-time live preview**: Markr now watches the file directly on disk using `fs.watch`. When Claude Code, Codex, Cursor, or any AI agent edits your CLAUDE.md, .cursorrules, agent.md, or any `.md` file **without you saving**, the preview refreshes automatically (300ms debounce). No save required. No VS Code event needed.
-- **Live badge in toolbar**: a subtle `⬤ Live` indicator appears in the toolbar for every real file. When the agent edits the file, it pulses green and shows `⬤ Updated` for 3 seconds — a clear signal that Markr caught the change
-- **Token delta badge**: when the file grows or shrinks, a `+N tok` / `−N tok` badge appears next to the stats for 8 seconds — immediately tells you the context cost of the agent's edit
-- **Block-level diff highlighting**: new sections added by the agent flash green with a brief left-border animation before fading to normal. You can see exactly what the agent wrote
+- **Markr IS the editor for AI config files**: opening CLAUDE.md, .cursorrules, agent.md, skill.md, copilot-instructions.md, .windsurfrules, or any AI config file from anywhere in VS Code (Explorer, Ctrl+P, terminal, git checkout) now opens it **exclusively in Markr** — the text editor tab is automatically closed so Markr's split-edit view is the only editor for these files
+- **Agent Watch — real-time live preview**: Markr watches files directly on disk via `fs.watch`. When Claude Code, Codex, Cursor, or any AI agent edits a file **without saving**, the preview refreshes automatically (300ms debounce) — no save event needed
+- **Live badge**: a `⬤ Live` indicator in the toolbar pulses green and shows `⬤ Updated` for 3 seconds when an agent edit is detected
+- **Token delta badge**: `+N tok` / `−N tok` appears for 8 seconds after each agent edit — shows the exact context cost of what the agent wrote
+- **Block-level diff highlighting**: new sections added by an agent flash green with a fade animation so you can see exactly what changed
+- **Folder tree in Activity Bar panel**: the Workspace section shows files grouped in a collapsible nested folder tree instead of a flat list
+- **Search in Activity Bar**: 🔍 button in the panel title opens a fuzzy Quick Pick over all workspace files — instant from cache, scans directly if cold
+- **Extension icon regenerated**: `icon.png` regenerated from `icon.svg` for consistent branding
+
+### Fixed
+- **Search was stuck/empty**: `markr.searchFiles` now uses cached files instantly; if the cache is cold it scans directly with a progress indicator — never shows an empty picker
+- **Faster workspace scan**: exclusion list expanded to skip `build/`, `coverage/`, `.turbo/`, `.cache/`, `tmp/`, `vendor/`, `public/` and more — significantly faster on large repos
+- **Source button loop guard**: clicking "Source" in Markr to open the raw text editor works correctly — auto-close is suppressed for 2 seconds so the text editor stays open
 
 ---
 
