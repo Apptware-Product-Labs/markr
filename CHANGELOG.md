@@ -7,6 +7,19 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.9.3] — 2026-06-05
+
+### Fixed
+- **Critical: .md files no longer hijacked by Markr** — the auto-open behaviour that replaced VS Code's text editor with Markr is now **off by default**. Files open normally in VS Code. The text editor is always preserved.
+
+### Added
+- **`markr.autoOpenAiConfigs` setting** (default: `false`) — opt-in toggle in VS Code Settings. When enabled, opening CLAUDE.md, .cursorrules, agent.md, or any AI config file automatically opens Markr alongside the text editor (Beside column). Both editors stay open — the user controls their layout. Enable via: *Settings → Extensions → Markr → Auto Open AI Configs*
+
+### Changed
+- Auto-open no longer closes the text editor tab under any circumstance — both Markr and the text editor stay open when the feature is enabled
+
+---
+
 ## [3.9.2] — 2026-06-04
 
 ### Changed

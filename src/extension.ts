@@ -253,48 +253,37 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // ── Auto-open AI config files in Markr (Markr IS the editor) ─────────────
-  // When the user opens CLAUDE.md, .cursorrules, agent.md, or any recognised
-  // AI config file in VS Code (Explorer double-click, Ctrl+P, terminal, etc.),
-  // Markr opens in the SAME column — replacing the text editor tab — so Markr
-  // is the full editor for these files, not a companion preview.
+  // ── Optional: auto-open AI config files in Markr ─────────────────────────
+  // OFF by default — users opt in via markr.autoOpenAiConfigs setting.
+  // When ON: opening CLAUDE.md / .cursorrules / agent.md etc. automatically
+  // opens Markr alongside the text editor (Beside column).
+  // The text editor stays open — the user controls their own layout.
   const { AI_CONFIG_NAMES: AI_NAMES_AUTO } = await import('./markrExplorer');
   let _autoOpenTimer: ReturnType<typeof setTimeout> | undefined;
-  // Guard: when the user explicitly clicks "Source" in Markr we open the text
-  // editor on purpose — don't immediately close it again.
   let _suppressAutoClose = false;
 
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(async editor => {
-      if (_suppressAutoClose) return; // user explicitly opened text editor via Source button
+      if (_suppressAutoClose) return;
+      // Only run when the setting is explicitly enabled by the user
+      const cfg = vscode.workspace.getConfiguration('markr');
+      if (!cfg.get<boolean>('autoOpenAiConfigs', false)) return;
+
       if (!editor || editor.document.languageId !== 'markdown') return;
       const doc = editor.document;
-      if (doc.uri.scheme !== 'file') return; // skip untitled / virtual files
+      if (doc.uri.scheme !== 'file') return;
       const filename = path.basename(doc.uri.fsPath).toLowerCase();
       const isAiConfig = AI_NAMES_AUTO.has(filename) || /^claude(\.local)?\.md$/i.test(filename);
       if (!isAiConfig) return;
 
       clearTimeout(_autoOpenTimer);
-      _autoOpenTimer = setTimeout(async () => {
-        // Open Markr in the active column so it replaces the text editor slot
-        MarkdownPreviewPanel.createOrShow(doc, { column: vscode.ViewColumn.Active });
-
-        // Close the VS Code text editor tab for this file so only Markr remains
-        setTimeout(async () => {
-          try {
-            for (const group of vscode.window.tabGroups.all) {
-              for (const tab of group.tabs) {
-                if (
-                  tab.input instanceof vscode.TabInputText &&
-                  (tab.input as vscode.TabInputText).uri.toString() === doc.uri.toString()
-                ) {
-                  await vscode.window.tabGroups.close(tab, true /* preserve focus */);
-                }
-              }
-            }
-          } catch { /* tabGroups API unavailable in older VS Code — silently skip */ }
-        }, 400);
-      }, 200);
+      _autoOpenTimer = setTimeout(() => {
+        // Open Markr Beside the text editor — both stay open, user controls layout
+        const current = MarkdownPreviewPanel.currentPanel;
+        if (!current || current['_document']?.uri.toString() !== doc.uri.toString()) {
+          MarkdownPreviewPanel.createOrShow(doc); // uses Beside column — text editor stays
+        }
+      }, 250);
     })
   );
 
