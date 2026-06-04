@@ -36,8 +36,22 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 
 ## See it in action
 
-<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-04-activity-bar.gif" alt="Activity Bar panel — open AI configs without opening a file" width="100%" />
-<p align="center"><sub>✦ Click the Markr icon in the Activity Bar — browse and open CLAUDE.md, .cursorrules, or any .md file without opening a file first</sub></p>
+<!-- ── NEW in v3.9 ─────────────────────────────────────────────────────── -->
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-07-auto-open.gif" alt="AI config files open automatically in Markr — no text editor tab" width="100%" />
+<p align="center"><sub>✦ Double-click CLAUDE.md, .cursorrules, or any AI config — Markr opens automatically, text editor closes. Markr is the editor.</sub></p>
+
+<br/>
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-06-agent-watch.gif" alt="Agent Watch — preview refreshes live while Claude Code edits the file" width="100%" />
+<p align="center"><sub>✦ Agent Watch — Claude Code edits CLAUDE.md → preview updates instantly without saving → ⬤ Updated badge + token delta</sub></p>
+
+<br/>
+
+<!-- ── Existing features ───────────────────────────────────────────────── -->
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-04-activity-bar.gif" alt="Activity Bar panel — browse AI configs and workspace files" width="100%" />
+<p align="center"><sub>✦ Click the Markr icon in the Activity Bar — AI configs pinned at top, workspace files in a nested folder tree, instant search</sub></p>
 
 <br/>
 
@@ -57,7 +71,7 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 <br/>
 
 <img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-05-file-search.gif" alt="File search — type to filter workspace markdown files instantly" width="100%" />
-<p align="center"><sub>✦ Type in the Notebooks panel search box to filter all workspace .md files instantly</sub></p>
+<p align="center"><sub>✦ Type in the Notebooks panel to filter all workspace .md files instantly</sub></p>
 
 ---
 

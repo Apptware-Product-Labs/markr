@@ -7,6 +7,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.9.2] — 2026-06-04
+
+### Changed
+- **Display name updated**: `Markr – Markdown Preview` → `Markr – AI Config Editor & Markdown Preview` — reflects the primary use case
+- **Description updated**: leads with AI config editor + Agent Watch positioning for better marketplace search ranking
+- **Keywords expanded**: added `agent watch`, `live preview`, `real-time preview`, `agent config`, `agent editor`, `ai agent`, `claude md`, `cursor rules`, `copilot instructions`, `context window`, `token counter`, `mermaid diagram`
+- **README "See it in action" updated**: new gif-07 (auto-open) and gif-06 (agent watch) demos placed at the top — most differentiating features shown first
+- **Demo files refreshed**: `samples/demo-ai-workflow.md` restored to proper AI agent architecture content (Mermaid sequence + flowchart, tables, alerts) for GIF recording
+
+---
+
 ## [3.9.1] — 2026-06-03
 
 ### Fixed

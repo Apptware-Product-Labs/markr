@@ -1,111 +1,87 @@
-# CLAUDE.md — BenchMark Platform
+# AI Agent Architecture — Velmeni Health
 
-> You are working on **BenchMark**, an employee resource management platform built with Next.js 16, Supabase, and Tailwind CSS. Read this file completely before writing any code.
-
----
-
-## Project Context
-
-BenchMark manages employee allocation, leave, timesheets, reimbursements, and org-chart visualisation for Apptware Labs and its clients. It is a multi-tenant SaaS product — every query must be scoped to `tenant_id`.
-
-**Current sprint:** Phase 1 Foundation — hardening the engineering substrate before adding features.
+> **Project:** Velmeni · **Stack:** Next.js + Supabase · **Updated by Claude Code:** see Agent Watch in Markr toolbar
 
 ---
 
-## Architecture
+## Patient Report Delivery Flow
 
-| Layer | Technology | Notes |
-|-------|-----------|-------|
-| Frontend | Next.js 16 App Router + React 19 | Server components by default |
-| Database | Supabase (PostgreSQL) | 69 migrations, RLS enabled |
-| Auth | Supabase Auth | Service-role key is server-only |
-| Styling | Tailwind CSS 4 + shadcn/ui | Components in `src/components/ui/` |
-| State | Zustand (sparingly) + SWR | SWR for all data fetching |
-| Validation | React Hook Form + Zod | Every mutating route uses `safeParse` |
-| Email | Resend | Transactional only |
+```mermaid
+sequenceDiagram
+    participant Doctor as Doctor / Staff
+    participant Backend as Velmeni Backend
+    participant Email as Patient Email
+    participant Patient as Patient (Mobile)
+    participant Web as Report Portal
 
----
-
-## Critical Rules
-
-### Multi-tenancy — never skip this
-Every database query MUST include `tenant_id`:
-
-```sql
--- ✅ Correct
-SELECT * FROM employees WHERE tenant_id = current_tenant_id();
-
--- ❌ Wrong — leaks data across tenants
-SELECT * FROM employees;
-```
-
-Every new table must include:
-```sql
-tenant_id UUID NOT NULL REFERENCES tenants(id)
-```
-
-### API route conventions
-
-```typescript
-// Every mutating route pattern
-export async function POST(req: Request) {
-  const body = await req.json();
-  const parsed = MySchema.safeParse(body);
-  if (!parsed.success) return ApiErrors.badRequest(parsed.error);
-
-  // ... business logic
-
-  return NextResponse.json({ ok: true });
-}
-```
-
-### File structure
-```
-src/
-├── app/           # Next.js App Router pages + API routes
-├── components/    # Feature-based folders + ui/ for shadcn primitives
-├── lib/           # Utilities, Supabase client, helpers
-├── schemas/       # Zod schemas — one per domain
-├── types/         # TypeScript types
-└── services/      # Domain services (Phase 1 Sprint 4)
+    Doctor->>Backend: Generate report (scan / visit / CBCT)
+    Backend-->>Doctor: Report ready (report_id, PDF)
+    Doctor->>Backend: Send report to patient
+    Backend->>Email: Summary + QR code + secure link
+    Patient->>Web: Scan QR or open link
+    Web->>Backend: Validate access token
+    Backend->>Email: Send OTP to patient email
+    Patient->>Web: Enter OTP
+    Web->>Backend: Verify OTP + issue session
+    Backend-->>Web: Authorized — report + scan details
+    Web-->>Patient: View / download report
 ```
 
 ---
 
-## What NOT to do
+## Agent Responsibilities
 
-- Never import the service-role key in a `"use client"` file
-- Never use `any` (ESLint will error after Sprint 1 lands)
-- Never skip input validation on POST/PUT/PATCH/DELETE routes
-- Never query `hq_*` prefixed tables — those belong to BenchMark HQ
-
----
-
-## Current Sprint Tickets
-
-| ID | Title | Status |
-|----|-------|--------|
-| F1.1 | CI pipeline (ESLint + TypeScript + Playwright) | 🟡 In progress |
-| F1.2 | Self-host fonts (remove Google Fonts CDN call) | ⬜ Backlog |
-| F1.3 | TypeScript strict mode | ⬜ Backlog |
-| F1.5 | Regenerate database types via `supabase gen types` | ⬜ Backlog |
-| F1.6 | ESLint `no-any` rule | ⬜ Backlog |
-| T1.4 | Add `tenant_id` to all new tables | 🟡 In progress |
+| Agent | Role | Context limit | Triggers |
+|-------|------|--------------|----------|
+| `report-agent` | Generates structured report from scan data | 8k tokens | New scan uploaded |
+| `delivery-agent` | Sends report email + OTP flow | 4k tokens | Doctor approves report |
+| `qa-agent` | Validates report before delivery | 4k tokens | Pre-delivery hook |
+| `triage-agent` | Routes urgent findings to on-call doctor | 16k tokens | Critical marker detected |
+| `summary-agent` | Patient-facing plain-language summary | 8k tokens | Report finalized |
 
 ---
 
-## Useful Commands
+## Error Handling Flow
 
-```bash
-npm run dev          # Start dev server
-npm run build        # Production build
-npm run lint         # ESLint
-npm run typecheck    # TypeScript check
-supabase start       # Local Supabase
-supabase gen types typescript --local > src/types/database.ts
+```mermaid
+flowchart TD
+    A[Agent call] --> B{Response OK?}
+    B -- Yes --> C[Parse output]
+    B -- No --> D{Retry count < 3?}
+    D -- Yes --> E[Exponential backoff]
+    E --> A
+    D -- No --> F[Alert on-call + fallback to manual]
+    C --> G{Valid schema?}
+    G -- Yes --> H[Proceed]
+    G -- No --> I[Log + queue for review]
 ```
 
 ---
 
-> [!IMPORTANT]
-> The `public.tenants`, `public.audit_log`, and `provision_tenant()` RPC are consumed by BenchMark HQ. Renaming or changing their schema silently breaks the HQ admin app. Always file a paired HQ PR.
+## Deployment Checklist
+
+- [x] Report agent prompt reviewed by clinical team
+- [x] OTP delivery tested on staging
+- [x] QA agent false-positive rate under 2%
+- [ ] Load test with 1000 concurrent reports
+- [ ] HIPAA compliance audit
+- [ ] Patient portal mobile responsiveness
+
+---
+
+> [!WARNING]
+> The `triage-agent` must never cache responses. Each call must be fresh to avoid stale clinical data.
+
+> [!NOTE]
+> Token counts above are averages. During peak hours, `report-agent` has consumed up to 11k tokens on complex CBCT scans.
+
+---
+
+## Performance Benchmarks
+
+| Metric | Target | Current | Status |
+|--------|--------|---------|--------|
+| Report generation | < 8s | 5.2s | ✅ |
+| OTP delivery | < 3s | 1.8s | ✅ |
+| QA validation | < 2s | 3.1s | ⚠️ Needs work |
+| End-to-end (patient) | < 20s | 14s | ✅ |
