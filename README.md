@@ -13,8 +13,8 @@
 [![Version](https://img.shields.io/visual-studio-marketplace/v/Apptware-Product-Lab.markr?color=F97316&label=VS%20Code&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/Apptware-Product-Lab.markr?color=EF4444&label=installs&style=flat-square)](https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr)
 [![Open VSX](https://img.shields.io/open-vsx/dt/Apptware-Product-Lab/markr?color=F97316&label=Open%20VSX&style=flat-square)](https://open-vsx.org/extension/Apptware-Product-Lab/markr)
-[![License: MIT](https://img.shields.io/badge/license-MIT-orange.svg?style=flat-square)](LICENSE)
-[![Made by Apptware Labs](https://img.shields.io/badge/made%20by-Apptware%20Labs-F97316?style=flat-square)](https://apptware.com)
+[![License](https://img.shields.io/badge/license-All%20Rights%20Reserved-F97316?style=flat-square)](LICENSE)
+[![Made by Apptware Labs](https://img.shields.io/badge/made%20by-Apptware%20Labs%20Pvt%20Ltd-F97316?style=flat-square)](https://apptware.com)
 
 <br/>
 
@@ -388,7 +388,7 @@ For commercial licensing: [sumit.patil@apptware.com](mailto:sumit.patil@apptware
 
 Built with ❤️ by **[Apptware Labs Pvt Ltd](https://apptware.com)**
 
-*Apptware Labs is a product studio building developer tools and enterprise software — open source and commercial.*
+*Apptware Labs Pvt Ltd is a product studio building developer tools and enterprise software.*
 
 <br/>
 
