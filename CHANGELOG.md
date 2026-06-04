@@ -7,6 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.9.2] — 2026-06-03
+
+### Changed
+- **Markr is now the full editor for AI config files**: when CLAUDE.md, .cursorrules, agent.md, skill.md, copilot-instructions.md, or any AI config file is opened anywhere in VS Code, Markr opens in the **same column** (replacing the text editor slot) and the plain text editor tab is automatically closed. Markr's split-edit mode becomes the only editor for these files — no text editor tab cluttering the workspace
+- **Source button loop guard**: clicking "Source" in the Markr toolbar to open the raw text editor works correctly — the auto-close is suppressed for 2 seconds so the text editor stays open after the user explicitly requested it
+
+---
+
 ## [3.9.1] — 2026-06-03
 
 ### Added

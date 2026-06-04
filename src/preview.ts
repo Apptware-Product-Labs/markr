@@ -2878,6 +2878,8 @@ const ICON = {
 
 export class MarkdownPreviewPanel {
   public  static currentPanel: MarkdownPreviewPanel | undefined;
+  /** Set by extension.ts so "Source" button doesn't trigger the auto-close loop. */
+  public  static setSuppressAutoClose: (val: boolean) => void = () => {};
   private readonly _panel: vscode.WebviewPanel;
   private _document: vscode.TextDocument;
   private readonly _disposables: vscode.Disposable[] = [];
@@ -2892,8 +2894,12 @@ export class MarkdownPreviewPanel {
   private _prevMarkdown = '';
   private _lastFsChange = 0;
 
-  public static createOrShow(document: vscode.TextDocument): void {
-    const column = vscode.window.activeTextEditor ? vscode.ViewColumn.Beside : vscode.ViewColumn.One;
+  public static createOrShow(document: vscode.TextDocument, options?: { column?: vscode.ViewColumn }): void {
+    // When called from the auto-open (agent config), open in the ACTIVE column so
+    // Markr takes the same slot as the text editor (not beside it).
+    // For all other callers (toolbar, command palette), keep the Beside behaviour.
+    const column = options?.column
+      ?? (vscode.window.activeTextEditor ? vscode.ViewColumn.Beside : vscode.ViewColumn.One);
     if (MarkdownPreviewPanel.currentPanel) {
       MarkdownPreviewPanel.currentPanel._panel.reveal(column);
       MarkdownPreviewPanel.currentPanel._document = document;
@@ -3042,6 +3048,9 @@ export class MarkdownPreviewPanel {
         const uri = msg.uri ? vscode.Uri.parse(msg.uri) : this._document.uri;
         const doc = await vscode.workspace.openTextDocument(uri);
         this._document = doc;
+        // Suppress auto-close for 2s so the Source button doesn't immediately
+        // re-open Markr and close the text editor the user just asked for.
+        MarkdownPreviewPanel.setSuppressAutoClose(true);
         await vscode.window.showTextDocument(doc, {
           viewColumn: vscode.ViewColumn.One,
           preserveFocus: false,
