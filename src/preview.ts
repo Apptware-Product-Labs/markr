@@ -959,9 +959,54 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 #sidebar.hidden { width: 0; min-width: 0; opacity: 0; overflow: hidden; }
 .sb-section { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0; }
 .sb-section.flex-fill { flex: 1; overflow: hidden; }
-#sec-files { flex: 0 1 52%; min-height: 138px; overflow: hidden; }
-#sec-toc { flex: 1 1 48%; min-height: 150px; overflow: hidden; }
+#sec-files   { flex: 0 1 42%; min-height: 120px; overflow: hidden; }
+#sec-context { flex: 0 0 auto; overflow: hidden; }
+#sec-toc     { flex: 1 1 36%; min-height: 120px; overflow: hidden; }
 #sidebar.no-toc #sec-files { flex: 1 1 auto; }
+
+/* ── Context Composer sidebar section ────────────────────────────────────── */
+.ctx-bar-wrap { padding: 8px 12px 4px; flex-shrink: 0; }
+.ctx-bar-track { height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; margin-bottom: 5px; }
+.ctx-bar-fill {
+  height: 100%; border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent) 0%, #ef4444 100%);
+  transition: width .4s cubic-bezier(.4,0,.2,1);
+}
+.ctx-bar-fill.warn { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+.ctx-bar-fill.danger { background: #ef4444; }
+.ctx-total { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-faint); }
+.ctx-total strong { color: var(--accent); }
+
+.ctx-scope-label {
+  padding: 5px 12px 2px; font-size: 9px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint);
+  display: flex; align-items: center; gap: 4px;
+}
+.ctx-file {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px 4px 12px; cursor: pointer;
+  transition: background .08s;
+}
+.ctx-file:hover { background: var(--bg-hover); }
+.ctx-file input[type="checkbox"] {
+  accent-color: var(--accent); width: 12px; height: 12px;
+  flex-shrink: 0; cursor: pointer; margin: 0;
+}
+.ctx-file-name { flex: 1; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctx-file-bar { height: 3px; border-radius: 2px; background: var(--accent); opacity: .45; flex-shrink: 0; min-width: 2px; }
+.ctx-file-tok { font-size: 10px; color: var(--text-faint); flex-shrink: 0; font-family: ui-monospace, monospace; min-width: 40px; text-align: right; }
+.ctx-file-model { font-size: 9px; color: var(--accent); background: var(--accent-bg); border: 1px solid var(--accent-border); border-radius: 3px; padding: 1px 4px; flex-shrink: 0; }
+.ctx-empty { padding: 10px 12px; font-size: 11.5px; color: var(--text-faint); }
+
+.ctx-actions {
+  display: flex; gap: 6px; padding: 8px 10px 8px;
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.ctx-btn { flex: 1; padding: 5px 6px; border-radius: 5px; font-size: 11.5px; font-family: inherit; cursor: pointer; text-align: center; transition: background .1s, color .1s; }
+.ctx-btn-copy { background: var(--accent); color: #fff; border: none; font-weight: 600; }
+.ctx-btn-copy:hover { opacity: .88; }
+.ctx-btn-view { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
+.ctx-btn-view:hover { background: var(--bg-hover); color: var(--text); }
 .sb-header {
   display: flex; align-items: center; padding: 0 10px 0 12px; height: 32px;
   gap: 4px; flex-shrink: 0; cursor: pointer; user-select: none;
@@ -3129,6 +3174,139 @@ const SCRIPT = /* javascript */`
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CONTEXT COMPOSER — sidebar section
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  var ctxSelected = {};   // fullPath → boolean (selected state per file)
+  var ctxSummary  = null; // last received summary
+
+  function renderContextComposer(summary) {
+    ctxSummary = summary;
+    var body = qs('#ctx-body');
+    if (!body) return;
+
+    var files = (summary && summary.files) || [];
+    if (!files.length) {
+      body.innerHTML = '<div class="ctx-empty">No AI config files found in this workspace or parent directories.</div>';
+      return;
+    }
+
+    // Initialise selection from summary (default = all selected)
+    files.forEach(function(f) {
+      if (ctxSelected[f.fullPath] === undefined) ctxSelected[f.fullPath] = f.selected !== false;
+    });
+
+    var maxTok       = Math.max.apply(null, files.map(function(f) { return f.tokens; })) || 1;
+    var ctxWindow    = summary.contextWindow || 200000;
+    var windowLabel  = ctxWindow >= 1000000
+      ? (ctxWindow / 1000000).toFixed(0) + 'M'
+      : (ctxWindow / 1000) + 'K';
+
+    function getTotal() {
+      return files.reduce(function(s, f) { return s + (ctxSelected[f.fullPath] ? f.tokens : 0); }, 0);
+    }
+    function fmtTok(n, exact) {
+      var prefix = exact ? '' : '~';
+      return n >= 1000 ? prefix + (n / 1000).toFixed(1) + 'K' : prefix + n;
+    }
+
+    function updateBar() {
+      var total = getTotal();
+      var pct   = Math.min(100, (total / ctxWindow) * 100);
+      var fill  = qs('#ctx-bar-fill');
+      var lbl   = qs('#ctx-total-label');
+      if (fill) {
+        fill.style.width = pct + '%';
+        fill.className   = 'ctx-bar-fill' + (pct > 80 ? ' danger' : pct > 55 ? ' warn' : '');
+      }
+      if (lbl) {
+        lbl.innerHTML = '<strong>' + fmtTok(total, true) + '</strong> / ' + windowLabel + ' tok (' + Math.round(pct) + '%)';
+      }
+    }
+
+    function fileRow(f) {
+      var chk  = ctxSelected[f.fullPath] ? ' checked' : '';
+      var barW = Math.round((f.tokens / maxTok) * 32);
+      return '<div class="ctx-file" data-path="' + escHtml(f.fullPath) + '">'
+        + '<input type="checkbox" data-path="' + escHtml(f.fullPath) + '"' + chk + '>'
+        + '<span class="ctx-file-name" title="' + escHtml(f.relPath) + '">' + escHtml(f.filename) + '</span>'
+        + '<div class="ctx-file-bar" style="width:' + barW + 'px"></div>'
+        + '<span class="ctx-file-tok">' + fmtTok(f.tokens, f.exact) + '</span>'
+        + (f.modelLabel ? '<span class="ctx-file-model">' + escHtml(f.modelLabel) + '</span>' : '')
+        + '</div>';
+    }
+
+    // Build HTML
+    var html = '<div class="ctx-bar-wrap">'
+      + '<div class="ctx-bar-track"><div class="ctx-bar-fill" id="ctx-bar-fill" style="width:0%"></div></div>'
+      + '<div class="ctx-total"><span>Context window used</span><span id="ctx-total-label"></span></div>'
+      + '</div>';
+
+    var parents   = files.filter(function(f) { return f.scope === 'parent'; });
+    var workspace = files.filter(function(f) { return f.scope === 'workspace'; });
+
+    if (parents.length) {
+      html += '<div class="ctx-scope-label">↑ Parent dirs (read by Claude Code)</div>';
+      parents.forEach(function(f) { html += fileRow(f); });
+    }
+    if (workspace.length) {
+      if (parents.length) html += '<div class="ctx-scope-label">This workspace</div>';
+      workspace.forEach(function(f) { html += fileRow(f); });
+    }
+
+    html += '<div class="ctx-actions">'
+      + '<button class="ctx-btn ctx-btn-copy" id="btn-ctx-copy">Copy merged</button>'
+      + '<button class="ctx-btn ctx-btn-view" id="btn-ctx-view">View merged</button>'
+      + '</div>';
+
+    body.innerHTML = html;
+    updateBar();
+
+    // Checkbox events — update selection + bar
+    qsa('.ctx-file input[type="checkbox"]', body).forEach(function(cb) {
+      cb.addEventListener('change', function(e) {
+        e.stopPropagation();
+        ctxSelected[cb.getAttribute('data-path')] = cb.checked;
+        updateBar();
+      });
+    });
+
+    // Click row = toggle checkbox
+    qsa('.ctx-file', body).forEach(function(row) {
+      row.addEventListener('click', function(e) {
+        if (e.target.tagName === 'INPUT') return;
+        var cb = row.querySelector('input[type="checkbox"]');
+        if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }
+      });
+    });
+
+    // Copy merged
+    qs('#btn-ctx-copy')?.addEventListener('click', function() {
+      var btn   = qs('#btn-ctx-copy');
+      var paths = Object.keys(ctxSelected).filter(function(p) { return ctxSelected[p]; });
+      vsc.postMessage({ type: 'contextCopy', selectedPaths: paths });
+      if (btn) { btn.textContent = '✓ Copying…'; }
+    });
+
+    // View merged — opens merged content as clipboard preview
+    qs('#btn-ctx-view')?.addEventListener('click', function() {
+      var paths = Object.keys(ctxSelected).filter(function(p) { return ctxSelected[p]; });
+      vsc.postMessage({ type: 'contextView', selectedPaths: paths });
+    });
+  }
+
+  // Expand context section → trigger discovery
+  qs('#sec-context .sb-header')?.addEventListener('click', function() {
+    var sec = qs('#sec-context');
+    if (!sec) return;
+    sec.classList.toggle('collapsed');
+    if (!sec.classList.contains('collapsed') && (!ctxSummary || !ctxSummary.files.length)) {
+      qs('#ctx-body').innerHTML = '<div class="ctx-empty">Scanning…</div>';
+      vsc.postMessage({ type: 'contextRefresh' });
+    }
+  });
+
   // ── Theme picker ───────────────────────────────────────────────────────────
   function applyTheme(t) {
     document.documentElement.setAttribute('data-m', t);
@@ -3964,9 +4142,7 @@ export class MarkdownPreviewPanel {
       if (msg.type === 'contextCopy') {
         const { ContextComposer } = await import('./contextComposer');
         const composer = new ContextComposer();
-        // msg.files contains the selection state from the webview
         const summary  = await composer.discover(this._document.uri);
-        // Apply selection from msg
         if (msg.selectedPaths && Array.isArray(msg.selectedPaths)) {
           const sel = new Set<string>(msg.selectedPaths);
           summary.files.forEach(f => { f.selected = sel.has(f.fullPath); });
@@ -3974,8 +4150,21 @@ export class MarkdownPreviewPanel {
         const merged = composer.mergeContext(summary.files);
         await vscode.env.clipboard.writeText(merged);
         const count  = summary.files.filter(f => f.selected).length;
-        vscode.window.setStatusBarMessage(`$(check) Markr: context copied (${count} files)`, 3000);
+        vscode.window.setStatusBarMessage(`$(check) Markr: merged context copied (${count} files)`, 3000);
         this._panel.webview.postMessage({ type: 'contextCopied', count });
+      }
+      if (msg.type === 'contextView') {
+        // Show the merged context as a clipboard-style preview
+        const { ContextComposer } = await import('./contextComposer');
+        const { countTokens, detectModel, fmtTokens } = await import('./tokenEngine');
+        const composer = new ContextComposer();
+        const summary  = await composer.discover(this._document.uri);
+        if (msg.selectedPaths && Array.isArray(msg.selectedPaths)) {
+          const sel = new Set<string>(msg.selectedPaths);
+          summary.files.forEach(f => { f.selected = sel.has(f.fullPath); });
+        }
+        const merged = composer.mergeContext(summary.files);
+        this._sendClipboardPreview(merged);
       }
       if (msg.type === 'saveFile') {
         // Explicit save triggered by the user (⌘S or Save button).
@@ -4406,6 +4595,17 @@ export class MarkdownPreviewPanel {
       </div>
       <div class="sb-body" id="files-list"></div>
     </div>
+    <!-- ── Context Composer ──────────────────────────────────────────────── -->
+    <div class="sb-section collapsed" id="sec-context">
+      <div class="sb-header">
+        <span class="sb-title">Context</span>
+        <span class="sb-chevron">${ICON.chevron}</span>
+      </div>
+      <div class="sb-body" id="ctx-body" style="padding:0">
+        <div class="ctx-empty">Click ▸ to discover AI config files in scope</div>
+      </div>
+    </div>
+
     <div class="sb-section flex-fill ${showTOC ? '' : 'collapsed'}" id="sec-toc">
       <div class="sb-header">
         <span class="sb-title">On this page</span>

@@ -7,6 +7,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.10.1] — 2026-06-05
+
+### Added
+- **Context Composer sidebar panel**: a new collapsible "Context" section in the sidebar shows every AI config file in scope — current workspace files AND parent directory files (exactly how Claude Code reads them hierarchically). Each file shows a token count, proportional bar, and AI tool badge. A gradient progress bar shows how much of the model's context window is used. Click any row to toggle it. **Copy merged** copies all selected files as one formatted context block ready to paste. **View merged** opens it as a live Markr preview.
+
+---
+
 ## [3.10.0] — 2026-06-05
 
 ### Added
