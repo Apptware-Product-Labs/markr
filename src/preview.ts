@@ -94,9 +94,116 @@ function readingTime(words: number): string {
   return `${Math.max(1, Math.ceil(words / 200))} min`;
 }
 
+// ─── Model-aware token counting ──────────────────────────────────────────────
+
+type AiModel = 'claude' | 'gpt4' | 'gpt4o' | 'generic';
+
+/** Detect which AI model a file is for based on its filename. */
+function detectModel(filename: string, relPath = ''): AiModel {
+  const f = filename.toLowerCase();
+  const p = relPath.toLowerCase();
+  // Claude / Anthropic
+  if (/^claude(\.local)?\.md$/i.test(f)) return 'claude';
+  if (f === 'agent.md' || f === 'agents.md' || f === 'skill.md' || f === 'skills.md') return 'claude';
+  if (f === 'system-prompt.md' || f === 'prompt.md' || f === 'prompts.md') return 'claude';
+  if (f === 'memory.md' || f === 'context.md') return 'claude';
+  // Windsurf uses Claude by default
+  if (f === '.windsurfrules' || f === 'windsurf.md') return 'claude';
+  // Cursor uses GPT-4 (cl100k)
+  if (f === '.cursorrules' || f === 'cursor.md') return 'gpt4';
+  // Copilot uses GPT-4o (o200k)
+  if (p.includes('copilot') || f.includes('copilot')) return 'gpt4o';
+  // Aider, Codex, OpenAI
+  if (f === 'aider.md' || f === 'codex.md' || f === 'openai.md' || f === 'gpt.md') return 'gpt4o';
+  return 'generic';
+}
+
+/** Model display label for the toolbar. */
+function modelLabel(model: AiModel): string {
+  switch (model) {
+    case 'claude':  return 'Claude';
+    case 'gpt4':    return 'GPT-4';
+    case 'gpt4o':   return 'GPT-4o';
+    default:        return '';
+  }
+}
+
+/**
+ * Count tokens accurately per model.
+ * - Claude: content-aware heuristic (code ~3 chars/tok, prose ~3.5 chars/tok)
+ * - GPT-4 (cl100k): uses gpt-tokenizer for exact counts
+ * - GPT-4o (o200k): same library, o200k encoder
+ * - Generic: content-aware heuristic (average of above)
+ */
+function countTokens(text: string, model: AiModel): number {
+  if (!text) return 0;
+
+  if (model === 'gpt4' || model === 'gpt4o') {
+    try {
+      // gpt-tokenizer provides exact cl100k/o200k token counts
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { encode } = model === 'gpt4o'
+        ? require('gpt-tokenizer/model/gpt-4o')
+        : require('gpt-tokenizer');
+      return (encode(text) as number[]).length;
+    } catch {
+      // Fallback if tokenizer fails (e.g. very long text, unusual chars)
+    }
+  }
+
+  // Claude / generic: content-aware heuristic
+  // Extract code blocks (tokenise at ~3 chars/token — more symbols, shorter tokens)
+  let codeChars = 0;
+  const prose = text
+    .replace(/```[\s\S]*?```/g, m => { codeChars += m.length; return ''; })
+    .replace(/`[^`\n]+`/g,      m => { codeChars += m.length; return ''; });
+
+  const codeTokens  = Math.round(codeChars / 3);
+  // Prose: Claude ~3.5 chars/token, generic ~3.8
+  const charsPerTok = model === 'claude' ? 3.5 : 3.8;
+  const proseTokens = Math.round(prose.length / charsPerTok);
+
+  return codeTokens + proseTokens;
+}
+
+/** Per-heading section breakdown: [{heading, tokens}] */
+function sectionTokens(text: string, model: AiModel): Array<{ heading: string; tokens: number; level: number }> {
+  const lines   = text.split('\n');
+  const result: Array<{ heading: string; tokens: number; level: number }> = [];
+  let curHeading = '(preamble)';
+  let curLevel   = 0;
+  let curLines:   string[] = [];
+
+  const flush = () => {
+    if (curLines.length) {
+      result.push({ heading: curHeading, tokens: countTokens(curLines.join('\n'), model), level: curLevel });
+      curLines = [];
+    }
+  };
+
+  for (const line of lines) {
+    const m = line.match(/^(#{1,6})\s+(.*)/);
+    if (m) {
+      flush();
+      curHeading = m[2].trim();
+      curLevel   = m[1].length;
+      curLines   = [line];
+    } else {
+      curLines.push(line);
+    }
+  }
+  flush();
+  return result.filter(s => s.tokens > 0);
+}
+
+/** Format token count: 340 → "340 tok", 2400 → "2.4K tok" */
+function fmtTokens(n: number): string {
+  return n < 1000 ? `${n} tok` : `~${(n / 1000).toFixed(1)}K tok`;
+}
+
+/** Legacy compat: still used in a few places that don't have model context */
 function tokenEstimate(chars: number): string {
-  const t = Math.round(chars / 4);
-  return t < 1000 ? `${t} tok` : `~${(t / 1000).toFixed(1)}K tok`;
+  return fmtTokens(Math.round(chars / 3.8));
 }
 
 function docStats(text: string) {
@@ -448,6 +555,53 @@ body {
   font-size: 11px; color: var(--text-muted); white-space: nowrap; padding: 0 2px; cursor: default;
 }
 .stats-accent { color: var(--accent); }
+/* Token button — clickable, shows model label + section breakdown popup */
+.tok-btn {
+  background: transparent; border: none; padding: 0; cursor: pointer;
+  color: inherit; font-family: inherit; font-size: inherit; line-height: inherit;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.tok-btn:hover { color: var(--accent); }
+.tok-btn.stats-accent { color: var(--accent); }
+.tok-model {
+  font-size: 9px; padding: 1px 5px; border-radius: 8px; font-weight: 600;
+  background: var(--accent-bg); color: var(--accent);
+  border: 1px solid var(--accent-border); letter-spacing: 0.03em; line-height: 1.6;
+}
+/* Token section breakdown panel */
+#tok-panel {
+  position: fixed; z-index: 800;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.35);
+  min-width: 260px; max-width: 340px; overflow: hidden;
+  display: none;
+}
+#tok-panel.open { display: block; }
+.tok-panel-hdr {
+  padding: 8px 12px 6px; font-size: 10px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-faint);
+  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px;
+}
+.tok-panel-model { color: var(--accent); font-weight: 700; }
+.tok-panel-body { padding: 4px 0 6px; max-height: 280px; overflow-y: auto; }
+.tok-row {
+  display: flex; align-items: center; padding: 4px 12px; gap: 8px; cursor: pointer;
+  transition: background .08s;
+}
+.tok-row:hover { background: var(--bg-hover); }
+.tok-row-name { flex: 1; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tok-row-name.h1 { color: var(--text); font-weight: 600; }
+.tok-row-name.h2 { padding-left: 8px; }
+.tok-row-name.h3 { padding-left: 16px; font-size: 11.5px; }
+.tok-row-name.h4 { padding-left: 22px; font-size: 11px; }
+.tok-row-count { font-size: 11px; color: var(--text-faint); flex-shrink: 0; font-family: ui-monospace, monospace; min-width: 44px; text-align: right; }
+.tok-row-bar { height: 3px; border-radius: 2px; background: var(--accent); opacity: .5; min-width: 2px; flex-shrink: 0; transition: width .2s; }
+.tok-total {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px 4px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-muted);
+}
+.tok-total strong { color: var(--accent); font-size: 12.5px; }
 .save-status {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 11px; opacity: 0; transition: opacity 0.2s, color 0.2s;
@@ -1168,12 +1322,36 @@ const SCRIPT = /* javascript */`
     const words  = countWords(text);
     const chars  = text.length;
     const mins   = Math.max(1, Math.ceil(words / 200));
-    const tokens = Math.round(chars / 4);
-    const tokStr = tokens < 1000 ? tokens + ' tok' : '~' + (tokens/1000).toFixed(1) + 'K tok';
-    const wEl = qs('#stat-words'), tEl = qs('#stat-time'), cEl = qs('#stat-tok');
+    const wEl = qs('#stat-words'), tEl = qs('#stat-time');
     if (wEl) wEl.textContent = words.toLocaleString();
     if (tEl) tEl.textContent = mins;
-    if (cEl) { cEl.textContent = tokStr; cEl.title = chars.toLocaleString() + ' characters'; }
+  }
+
+  // ── Token display — accurate model-aware count from extension ─────────────
+  function setTokDisplay(tokStr, modelLbl, sections) {
+    const btn = qs('#stat-tok');
+    if (!btn) return;
+    // Update text + model badge
+    var modelSpan = btn.querySelector('.tok-model');
+    // Strip existing text nodes
+    [...btn.childNodes].forEach(function(n) { if (n.nodeType === 3) n.remove(); });
+    btn.insertAdjacentText('afterbegin', tokStr);
+    if (modelLbl) {
+      if (!modelSpan) {
+        modelSpan = document.createElement('span');
+        modelSpan.className = 'tok-model';
+        btn.appendChild(modelSpan);
+      }
+      modelSpan.textContent = modelLbl;
+      modelSpan.style.display = '';
+    } else if (modelSpan) {
+      modelSpan.style.display = 'none';
+    }
+    // Update sections for the breakdown panel
+    if (sections) {
+      tokSections = sections;
+      tokModel    = modelLbl || '';
+    }
   }
 
   // ── Save indicator ─────────────────────────────────────────────────────────
@@ -2350,6 +2528,62 @@ const SCRIPT = /* javascript */`
   qs('#btn-pdf')?.addEventListener('click',    () => vsc.postMessage({ type: 'exportPdf' }));
   qs('#btn-print')?.addEventListener('click',  () => vsc.postMessage({ type: 'print' }));
 
+  // ── Token section breakdown panel ─────────────────────────────────────────
+  var tokSections = (typeof __TOK_SECTIONS__ !== 'undefined') ? __TOK_SECTIONS__ : [];
+  var tokModel    = (typeof __TOK_MODEL__    !== 'undefined') ? __TOK_MODEL__    : '';
+
+  function renderTokPanel(sections, model) {
+    var body   = qs('#tok-panel-body');
+    var total  = qs('#tok-panel-total');
+    var mdl    = qs('#tok-panel-model');
+    if (!body) return;
+    if (mdl)   mdl.textContent = model || '';
+    var sum    = sections.reduce(function(a, s) { return a + s.tokens; }, 0);
+    var max    = Math.max.apply(null, sections.map(function(s) { return s.tokens; })) || 1;
+    body.innerHTML = sections.map(function(s) {
+      var barW = Math.round((s.tokens / max) * 60);
+      var cls  = s.level === 0 ? '' : 'h' + s.level;
+      return '<div class="tok-row" data-heading="' + escHtml(s.heading) + '">'
+        + '<span class="tok-row-name ' + cls + '">' + escHtml(s.heading) + '</span>'
+        + '<div class="tok-row-bar" style="width:' + barW + 'px"></div>'
+        + '<span class="tok-row-count">' + s.tokens.toLocaleString() + '</span>'
+        + '</div>';
+    }).join('');
+    if (total) total.textContent = sum.toLocaleString() + ' tok';
+    // Click row → scroll to that heading in preview
+    qsa('.tok-row', body).forEach(function(row) {
+      row.addEventListener('click', function() {
+        var h = row.getAttribute('data-heading') || '';
+        var id = h.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+        var el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        closeTokPanel();
+      });
+    });
+  }
+
+  function openTokPanel() {
+    renderTokPanel(tokSections, tokModel);
+    var panel = qs('#tok-panel');
+    var btn   = qs('#stat-tok');
+    if (!panel || !btn) return;
+    var r = btn.getBoundingClientRect();
+    panel.style.top  = (r.bottom + 6) + 'px';
+    panel.style.right = '8px';
+    panel.classList.add('open');
+  }
+  function closeTokPanel() {
+    qs('#tok-panel')?.classList.remove('open');
+  }
+
+  qs('#stat-tok')?.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (qs('#tok-panel')?.classList.contains('open')) { closeTokPanel(); } else { openTokPanel(); }
+  });
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#tok-panel') && !e.target.closest('#stat-tok')) closeTokPanel();
+  });
+
   // ── Theme picker ───────────────────────────────────────────────────────────
   function applyTheme(t) {
     document.documentElement.setAttribute('data-m', t);
@@ -2709,6 +2943,7 @@ const SCRIPT = /* javascript */`
         aiBadge.style.display = msg.isAiConfig ? '' : 'none';
       }
       updateStats(msg.markdown);
+      if (msg.tokStr) setTokDisplay(msg.tokStr, msg.modelLabel || '', msg.sections || null);
       // Reset undo/redo history and dirty state whenever a new file is loaded
       resetHistory();
       markClean();
@@ -2752,6 +2987,7 @@ const SCRIPT = /* javascript */`
       // Real-time update from fs.watch — file changed on disk (agent wrote it)
       currentMarkdown = msg.markdown;
       updateStats(msg.markdown);
+      if (msg.tokStr) setTokDisplay(msg.tokStr, msg.modelLabel || '', msg.sections || null);
 
       // ── Update the visible preview ─────────────────────────────────────────
       // In split-edit mode: update the right-hand split-preview pane
@@ -3449,8 +3685,13 @@ export class MarkdownPreviewPanel {
     const relPath    = vscode.workspace.asRelativePath(this._document.uri);
     const aiKind     = aiDocKind(filename, relPath);
     const autoEdit   = !!aiKind;
-    const tokStr     = tokenEstimate(stats.chars);
-    const statsTitle = `${stats.words.toLocaleString()} words · ${stats.headings} heading${stats.headings !== 1 ? 's' : ''} · ${stats.codeBlocks} code block${stats.codeBlocks !== 1 ? 's' : ''}`;
+    const model      = detectModel(filename, relPath);
+    const tokCount   = countTokens(text, model);
+    const tokStr     = fmtTokens(tokCount);
+    const modelLbl   = modelLabel(model);
+    const sections   = sectionTokens(text, model);
+    const sectionsJson = JSON.stringify(sections);
+    const statsTitle = `${stats.words.toLocaleString()} words · ${stats.headings} heading${stats.headings !== 1 ? 's' : ''} · ${stats.codeBlocks} code block${stats.codeBlocks !== 1 ? 's' : ''} · ${tokStr}${modelLbl ? ' (' + modelLbl + ')' : ''}`;
 
     return /* html */`<!DOCTYPE html>
 <html lang="en" data-m="${mode}">
@@ -3481,7 +3722,7 @@ export class MarkdownPreviewPanel {
     <span class="stats" title="${statsTitle}">
       <span id="stat-time">${readingTime(stats.words)}</span>m
       · <span id="stat-words">${stats.words.toLocaleString()}</span>w
-      · <span id="stat-tok" class="${autoEdit ? 'stats-accent' : ''}" title="${stats.chars.toLocaleString()} chars">${tokStr}</span>
+      · <button id="stat-tok" class="tok-btn${autoEdit ? ' stats-accent' : ''}" title="Click to see token breakdown by section">${tokStr}${modelLbl ? '<span class="tok-model">' + modelLbl + '</span>' : ''}</button>
     </span>
     <span id="save-status" class="save-status"></span>
     <span id="diff-chip"></span>
@@ -3610,6 +3851,18 @@ export class MarkdownPreviewPanel {
 <button id="top-btn" title="Back to top">${ICON.arrowUp}</button>
 <div id="rich-copy-toast">✓ Copied with formatting</div>
 
+<!-- Token section breakdown panel -->
+<div id="tok-panel">
+  <div class="tok-panel-hdr">
+    Token breakdown
+    <span class="tok-panel-model" id="tok-panel-model"></span>
+  </div>
+  <div class="tok-panel-body" id="tok-panel-body"></div>
+  <div class="tok-total">
+    Total context: <strong id="tok-panel-total"></strong>
+  </div>
+</div>
+
 <!-- Mermaid zoom modal -->
 <div class="mermaid-modal" id="mermaid-modal">
   <div class="mermaid-modal-backdrop" id="mermaid-modal-backdrop"></div>
@@ -3695,6 +3948,8 @@ export class MarkdownPreviewPanel {
   const __FILES_LOADING__ = ${filesLoadingJson};
   const __CURRENT_URI__ = ${currentUriJson};
   const __AUTOEDIT__ = ${autoEdit};
+  const __TOK_SECTIONS__ = ${sectionsJson};
+  const __TOK_MODEL__    = ${JSON.stringify(modelLbl)};
 </script>
 <script nonce="${nonce}">${SCRIPT}</script>
 </body>
@@ -3740,19 +3995,23 @@ export class MarkdownPreviewPanel {
       this._prevMarkdown = rawText;
 
       const { meta, body } = extractFrontmatter(rawText);
-      const rendered = applyGithubAlerts(marked.parse(body) as string);
-      const stats    = docStats(rawText);
-      const tokDelta = Math.round(stats.chars / 4) - Math.round(docStats(prevBlocks.join('\n\n')).chars / 4);
+      const rendered  = applyGithubAlerts(marked.parse(body) as string);
+      const stats     = docStats(rawText);
+      const filename  = this._document.uri.path.split('/').pop() ?? '';
+      const relPath   = vscode.workspace.asRelativePath(this._document.uri);
+      const model     = detectModel(filename, relPath);
+      const tokNow    = countTokens(rawText, model);
+      const tokPrev   = countTokens(prevBlocks.join('\n\n'), model);
+      const tokDelta  = tokNow - tokPrev;
+      const sections  = sectionTokens(rawText, model);
 
-      // agentUpdate handles both preview-only mode AND split-edit mode:
-      // — in preview mode: updates the scroller
-      // — in split-edit mode (editMode=true): updates textarea + right pane
-      //   This is intentional — the agent wrote to disk, so disk IS the truth.
       this._panel.webview.postMessage({
         type: 'agentUpdate',
         html: (meta ? renderFrontmatter(meta) : '') + rendered,
         markdown: rawText,
-        tokStr: tokenEstimate(stats.chars),
+        tokStr: fmtTokens(tokNow),
+        modelLabel: modelLabel(model),
+        sections,
         words: stats.words,
         tokDelta,
         prevBlocks,

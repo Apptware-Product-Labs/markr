@@ -7,6 +7,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.9.7] — 2026-06-05
+
+### Added
+- **Accurate model-aware token counting**: replaced `chars / 4` with real tokenization per AI tool — GPT-4 / Cursor use the exact `gpt-tokenizer` cl100k encoder; GPT-4o / Copilot use the o200k encoder; Claude / Windsurf use a content-aware heuristic (code blocks at ~3 chars/tok, prose at ~3.5 chars/tok). Each model gives a meaningfully different count for the same file.
+- **Model label on token counter**: the toolbar now shows which model is being counted — `2.3K tok Claude`, `2.1K tok GPT-4`, `2.0K tok GPT-4o`. Detected automatically from the filename (CLAUDE.md → Claude, .cursorrules → GPT-4, copilot-instructions.md → GPT-4o, etc.)
+- **Token section breakdown panel**: click the token count in the toolbar to see a popup showing how many tokens each heading section uses, with a proportional bar. Click any row to jump to that section. Helps identify which parts of your config to trim.
+
+---
+
 ## [3.9.6] — 2026-06-05
 
 ### Changed
