@@ -7,6 +7,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.9.6] — 2026-06-05
+
+### Changed
+- **Smoother live-edit reveal animation**: replaced the jarring green background flash with a clean two-phase animation — new blocks slide up from slightly below while fading in (0.35s), then a soft green left accent dissolves over 2.5s. No background colour blocks, no padding jumps. Matches how Notion and Linear show AI-written content.
+- **Manual typing also shows reveal**: when you type in the split-edit textarea, newly completed paragraphs and headings in the right pane now use the same smooth reveal animation — not just agent edits. Uses a shared `swapWithReveal` helper.
+- **Animation resets cleanly**: `agent-new` class is removed after the animation completes so it doesn't interfere with copy buttons, selections, or subsequent edits.
+
+---
+
 ## [3.9.5] — 2026-06-05
 
 ### Fixed

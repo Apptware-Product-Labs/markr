@@ -516,15 +516,24 @@ body:not(.edit-mode) #btn-save-file { display: none; }
 }
 .tok-delta.tok-pos { background: rgba(34,197,94,0.13); color: #16a34a; }
 .tok-delta.tok-neg { background: rgba(239,68,68,0.10); color: #dc2626; }
-/* New block added by agent — brief green flash fades to nothing */
-@keyframes agent-new-flash {
-  0%   { background: rgba(34,197,94,0.18); border-left-color: #22c55e; padding-left: 10px; }
-  70%  { background: rgba(34,197,94,0.08); border-left-color: rgba(34,197,94,0.4); }
-  100% { background: transparent; border-left-color: transparent; padding-left: 0; }
+/* ── New block reveal — clean two-phase like Notion/Linear AI edits ────────
+   Phase 1 (0.35s): content slides up + fades in from transparent
+   Phase 2 (2s):    soft green left accent dissolves away
+   No background blocks, no jarring jumps. ──────────────────────────────── */
+@keyframes agent-reveal {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes agent-accent {
+  0%   { border-left-color: rgba(34,197,94,0.7); }
+  60%  { border-left-color: rgba(34,197,94,0.25); }
+  100% { border-left-color: transparent; }
 }
 .markdown-body .agent-new {
-  border-left: 3px solid transparent;
-  animation: agent-new-flash 3s ease-out forwards;
+  border-left: 2px solid transparent;
+  animation: agent-reveal 0.35s ease-out,
+             agent-accent  2.5s ease-out 0.1s forwards;
+  will-change: opacity, transform;
 }
 .sep-v { width: 1px; height: 16px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
 .tb-btn {
@@ -1423,6 +1432,30 @@ const SCRIPT = /* javascript */`
   }
 
   // ── TOC ────────────────────────────────────────────────────────────────────
+  // ── swapWithReveal ────────────────────────────────────────────────────────
+  // Replaces innerHTML of a .markdown-body container, then animates any
+  // blocks that are new (not in the old set) with the agent-new reveal.
+  // Used by both agentUpdate (external agent) and updateSplitPreview (typing).
+  function swapWithReveal(container, newHtml) {
+    if (!container) return;
+    // Fingerprint current top-level blocks before the swap
+    var oldFp = new Set([].map.call(container.children, function(el) {
+      return (el.textContent || '').trim().slice(0, 80);
+    }));
+    container.innerHTML = newHtml;
+    // Animate new blocks with the reveal effect
+    [].forEach.call(container.children, function(el) {
+      var fp = (el.textContent || '').trim().slice(0, 80);
+      if (fp && !oldFp.has(fp)) {
+        el.classList.remove('agent-new'); // reset if already there
+        void el.offsetWidth;             // force reflow so animation restarts
+        el.classList.add('agent-new');
+        // Clean up class after animation completes so it doesn't interfere
+        setTimeout(function() { el.classList.remove('agent-new'); }, 2800);
+      }
+    });
+  }
+
   function buildTOC() {
     const hs = qsa('.markdown-body h1,h2,h3,h4,h5,h6');
     const body = qs('#toc-body');
@@ -2698,18 +2731,17 @@ const SCRIPT = /* javascript */`
       setTimeout(() => { el.style.background = ''; }, 1400);
     }
     if (msg.type === 'updateSplitPreview') {
-      // Preserve split-preview scroll position across the innerHTML swap so
-      // the preview doesn't jump to the top on every keystroke.
+      // Preserve scroll position so the pane doesn't jump on every keystroke
       const spEl = qs('#split-preview');
       const prevSpST = spEl ? spEl.scrollTop : 0;
+      // Use swapWithReveal so manual typing shows the same smooth reveal
+      // as agent edits — new paragraphs/headings fade in with a green accent
       const sp = qs('#split-preview .markdown-body');
-      if (sp) sp.innerHTML = msg.html;
+      swapWithReveal(sp, msg.html);
       if (spEl) spEl.scrollTop = prevSpST;
-      // Always set up helpers on the split-preview (visible in both edit and preview mode)
       addCopyButtons(); setupHeadingAnchors();
       if (qs('#split-preview .language-mermaid')) setupMermaid();
       if (!editMode) {
-        // Also update the main scroller when in pure preview mode
         const body = qs('#scroller .markdown-body');
         if (body) body.innerHTML = msg.html;
         buildTOC();
@@ -2729,40 +2761,26 @@ const SCRIPT = /* javascript */`
         : qs('#scroller .markdown-body');
       if (!targetBody) return;
 
-      // Fingerprint existing top-level elements so we can detect new ones after the swap
-      const prevSet = new Set(
-        [...targetBody.children].map(el => (el.textContent || '').trim().slice(0, 80))
-      );
-
-      targetBody.innerHTML = msg.html;
+      // Swap HTML with smooth reveal animation for new blocks
+      swapWithReveal(targetBody, msg.html);
 
       // ── In split-edit mode: also sync the textarea to disk content ─────────
-      // The agent wrote to disk — that IS the authoritative version.
-      // Syncing the textarea keeps the left pane in sync with what the agent wrote.
       if (editMode) {
         const ea = qs('#edit-area');
         if (ea && ea.value !== msg.markdown) {
           const ss = ea.selectionStart, se = ea.selectionEnd;
           ea.value = msg.markdown;
-          // Restore cursor if possible (cursor may shift if agent inserted before it)
           try { ea.setSelectionRange(ss, se); } catch {}
         }
-        resetHistory(); markClean(); // reset undo stack to the agent's version
+        resetHistory(); markClean();
       } else {
-        // Also keep split-preview in sync for non-edit-mode (defensive)
         const spBody = qs('#split-preview .markdown-body');
         if (spBody) spBody.innerHTML = msg.html;
       }
 
-      // Highlight blocks that are new (not present before the update)
-      [...targetBody.children].forEach(el => {
-        const fp = (el.textContent || '').trim().slice(0, 80);
-        if (fp && !prevSet.has(fp)) { el.classList.add('agent-new'); }
-      });
-
       // Re-run helpers on the new content
       addCopyButtons(); setupHeadingAnchors(); buildTOC();
-      if (qs('#scroller .language-mermaid')) setupMermaid();
+      if (qs('#scroller .language-mermaid') || qs('#split-preview .language-mermaid')) setupMermaid();
 
       // ── Live badge: pulse green briefly to signal the agent edited the file ──
       const badge = qs('#live-badge');
