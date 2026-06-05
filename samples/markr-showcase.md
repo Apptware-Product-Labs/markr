@@ -66,20 +66,11 @@ gantt
 
     section Validation
     Load and rollback tests    :test1, 2026-05-28, 2d
-    Release candidate          :milestone, rc, 2026-05-30, 0d
+    Release candidate          :crit, rc, 2026-05-30, 0d
 
     section Launch
     Gradual traffic shift      :launch1, 2026-05-31, 3d
     Production review          :review, after launch1, 1d
-
-    classDef discovery fill:#3b82f6,color:#fff,stroke:none
-    classDef build fill:#22c55e,color:#fff,stroke:none
-    classDef test fill:#f97316,color:#fff,stroke:none
-    classDef launch fill:#8b5cf6,color:#fff,stroke:none
-    class disc1,disc2 discovery
-    class build1,build2 build
-    class test1,rc test
-    class launch1,review launch
 ```
 
 ## GitHub Alerts

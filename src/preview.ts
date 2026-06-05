@@ -600,7 +600,9 @@ body.sb-resizing { cursor: col-resize !important; user-select: none; }
 .sb-section.flex-fill { flex: 1; overflow: hidden; }
 #sec-files { flex: 0 1 52%; min-height: 138px; overflow: hidden; }
 #sec-toc { flex: 1 1 48%; min-height: 150px; overflow: hidden; }
-#sidebar.no-toc #sec-files { flex: 1 1 auto; }
+/* When TOC is collapsed: remove its min-height so Notebooks fills ALL remaining space */
+#sidebar.no-toc #sec-toc  { flex: 0 0 auto; min-height: 0; }
+#sidebar.no-toc #sec-files { flex: 1 1 auto; min-height: 0; overflow: hidden; }
 .sb-header {
   display: flex; align-items: center; padding: 0 10px 0 12px; height: 32px;
   gap: 4px; flex-shrink: 0; cursor: pointer; user-select: none;
