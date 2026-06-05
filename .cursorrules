@@ -1,0 +1,55 @@
+# Cursor Rules — Markr Extension
+
+## Project: Markr VS Code Extension
+TypeScript + esbuild + VS Code Webview API
+
+---
+
+## Code Style
+
+- Use `const` by default, `let` only when reassignment is needed
+- Prefer early returns to reduce nesting
+- No `any` types — use proper TypeScript types
+- Function names: `camelCase`, class names: `PascalCase`
+- Keep functions under 40 lines — extract helpers if longer
+
+## VS Code Extension Rules
+
+- All webview JS lives inside the `SCRIPT` template literal in `preview.ts`
+- **Never use backtick strings inside SCRIPT** — use string concatenation
+- Extension host ↔ Webview: always use `postMessage`, never share state
+- API keys always go in `context.secrets` (SecretStorage) — never in settings
+
+## Token Counting
+
+- Import from `src/tokenEngine.ts` — never use `chars / 4` directly
+- `countTokens(text, model)` for exact counts
+- `detectModel(filename, relPath)` to auto-detect the model
+- `fmtTokens(n)` for display strings
+
+## Build & Test
+
+- Always run `npm run build` after changes
+- Check that the `.vsix` stays under 5 MB
+- Test the Prompt Runner with at least one API provider before releasing
+- Verify Mermaid diagrams still render after CSS/JS changes
+
+## File Structure
+
+```
+src/
+  extension.ts      — activation + commands
+  preview.ts        — all webview UI (HTML/CSS/JS as template literals)
+  tokenEngine.ts    — model-aware token counting
+  promptRunner.ts   — streaming API (Anthropic/OpenAI/Google)
+  contextComposer.ts — file discovery + merge
+  promptHistory.ts  — run storage via globalState
+  markrExplorer.ts  — Activity Bar tree
+```
+
+## Common Mistakes to Avoid
+
+- Forgetting to add new AI config filenames to BOTH `AI_CONFIG_NAMES` sets
+- Using `innerHTML` on user-controlled content (use `textContent`)
+- Calling `applyEdit()` when content hasn't changed (causes false dirty state)
+- Starting `fs.watch` without a cleanup in `dispose()`
