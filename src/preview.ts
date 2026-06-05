@@ -775,6 +775,57 @@ body.chat-mode:not(.edit-mode) #edit-area { display: none; }
 }
 #btn-chat-new:hover { background: var(--bg-hover); color: var(--text); }
 
+/* History button */
+#btn-chat-history {
+  padding: 3px 8px; font-size: 11px; border-radius: 5px; cursor: pointer;
+  background: transparent; border: 1px solid var(--border-faint);
+  color: var(--text-faint); font-family: inherit; display: flex; align-items: center; gap: 4px;
+  transition: background .1s, color .1s;
+}
+#btn-chat-history:hover  { background: var(--bg-hover); color: var(--text); }
+#btn-chat-history.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-border); }
+.history-badge {
+  font-size: 9px; background: var(--accent); color: #fff;
+  border-radius: 8px; padding: 1px 5px; font-weight: 700; line-height: 1.4;
+}
+
+/* History panel */
+#chat-history-panel {
+  display: none; flex: 1; flex-direction: column; overflow: hidden;
+}
+body.chat-history #chat-history-panel { display: flex; }
+body.chat-history #chat-messages,
+body.chat-history #chat-empty,
+body.chat-history #chat-setup { display: none !important; }
+body.chat-history #chat-input-wrap { display: none; }
+
+.history-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+.history-section-label {
+  padding: 8px 12px 4px; font-size: 9.5px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint);
+}
+.history-item {
+  padding: 8px 14px; cursor: pointer; border-left: 2px solid transparent;
+  transition: background .08s; display: flex; flex-direction: column; gap: 3px;
+}
+.history-item:hover { background: var(--bg-hover); border-left-color: var(--border); }
+.history-item.active { background: var(--accent-bg); border-left-color: var(--accent); }
+.hi-row1 { display: flex; align-items: center; gap: 6px; }
+.hi-file { font-size: 12px; font-weight: 600; color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hi-model { font-size: 9px; color: var(--accent); background: var(--accent-bg); border: 1px solid var(--accent-border); border-radius: 3px; padding: 1px 4px; }
+.hi-date { font-size: 10px; color: var(--text-faint); flex-shrink: 0; }
+.hi-preview { font-size: 11.5px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.history-empty { padding: 24px 16px; text-align: center; color: var(--text-faint); font-size: 12px; }
+.history-footer {
+  padding: 6px 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between;
+  align-items: center; font-size: 11px; color: var(--text-faint);
+}
+.history-clear-btn {
+  font-size: 11px; color: #ef4444; background: transparent; border: none;
+  cursor: pointer; padding: 2px 6px; border-radius: 3px; font-family: inherit;
+}
+.history-clear-btn:hover { background: rgba(239,68,68,.1); }
+
 /* ── Messages area ────────────────────────────────────────────────────────── */
 #chat-messages {
   flex: 1; overflow-y: auto; overflow-x: hidden;
@@ -3412,6 +3463,113 @@ const SCRIPT = /* javascript */`
     }
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROMPT HISTORY UI
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function toggleHistory() {
+    var inHistory = document.body.classList.toggle('chat-history');
+    var btn = qs('#btn-chat-history');
+    if (btn) btn.classList.toggle('active', inHistory);
+    if (inHistory) {
+      vsc.postMessage({ type: 'getHistory', fileOnly: false });
+    }
+  }
+
+  qs('#btn-chat-history')?.addEventListener('click', function() {
+    toggleHistory();
+  });
+
+  qs('#btn-history-clear')?.addEventListener('click', function() {
+    vsc.postMessage({ type: 'clearHistory' });
+  });
+
+  function renderHistory(runs) {
+    var list  = qs('#history-list');
+    var count = qs('#history-count');
+    var foot  = qs('#history-footer-count');
+    if (!list) return;
+    if (count) count.textContent = String(runs.length);
+    if (foot)  foot.textContent  = runs.length + ' run' + (runs.length !== 1 ? 's' : '');
+    if (!runs.length) {
+      list.innerHTML = '<div class="history-empty">No runs yet — send a message to start.</div>';
+      return;
+    }
+    // Group by date
+    var groups = {};
+    runs.forEach(function(r) {
+      var d = new Date(r.timestamp);
+      var today = new Date();
+      var label;
+      if (d.toDateString() === today.toDateString()) {
+        label = 'Today';
+      } else {
+        var yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        label = d.toDateString() === yesterday.toDateString()
+          ? 'Yesterday'
+          : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      }
+      if (!groups[label]) groups[label] = [];
+      groups[label].push(r);
+    });
+    var html = '';
+    Object.keys(groups).forEach(function(label) {
+      html += '<div class="history-section-label">' + escHtml(label) + '</div>';
+      groups[label].forEach(function(r) {
+        var firstUser = r.messages.find(function(m) { return m.role === 'user'; });
+        var preview   = firstUser ? firstUser.content.slice(0, 80) : '(no messages)';
+        var time      = new Date(r.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        html += '<div class="history-item" data-run-id="' + escHtml(r.id) + '">'
+          + '<div class="hi-row1">'
+          + '<span class="hi-file">' + escHtml(r.file) + '</span>'
+          + '<span class="hi-model">' + escHtml(r.modelLabel) + '</span>'
+          + '<span class="hi-date">' + time + '</span>'
+          + '</div>'
+          + '<div class="hi-preview">' + escHtml(preview) + (firstUser && firstUser.content.length > 80 ? '…' : '') + '</div>'
+          + '</div>';
+      });
+    });
+    list.innerHTML = html;
+
+    // Click a history item → restore that conversation in the chat
+    qsa('.history-item', list).forEach(function(item) {
+      item.addEventListener('click', function() {
+        var id  = item.getAttribute('data-run-id');
+        var run = runs.find(function(r) { return r.id === id; });
+        if (!run) return;
+        // Restore the conversation
+        chatState.messages = run.messages.filter(function(m) { return m.role === 'user' || m.role === 'assistant'; });
+        var msgs = qs('#chat-messages');
+        if (msgs) {
+          msgs.innerHTML = '';
+          chatState.messages.forEach(function(m) { appendMessage(m.role, m.content, false); });
+        }
+        // Exit history mode
+        document.body.classList.remove('chat-history');
+        var btn = qs('#btn-chat-history');
+        if (btn) btn.classList.remove('active');
+        updateChatVisibility();
+        qs('#chat-input')?.focus();
+      });
+    });
+  }
+
+  // Handle history messages from extension
+  window.addEventListener('message', function(ev) {
+    var msg = ev.data;
+    if (msg.type === 'historyData') {
+      renderHistory(msg.runs || []);
+    }
+    if (msg.type === 'historyCount') {
+      var badge = qs('#history-count');
+      if (badge) badge.textContent = String(msg.count || 0);
+    }
+  });
+
+  // Initialise history count on load
+  vsc.postMessage({ type: 'getHistory', fileOnly: false });
+
   // ── Theme picker ───────────────────────────────────────────────────────────
   function applyTheme(t) {
     document.documentElement.setAttribute('data-m', t);
@@ -4010,6 +4168,8 @@ export class MarkdownPreviewPanel {
   public  static onPromptRun: ((msg: unknown) => void) | undefined;
   /** Called by extension.ts when webview requests available models. */
   public  static onGetModels: (() => void) | undefined;
+  /** Called by extension.ts when webview requests prompt history. */
+  public  static onGetHistory: ((relPath?: string) => void) | undefined;
   private readonly _panel: vscode.WebviewPanel;
   private _document: vscode.TextDocument;
   private readonly _disposables: vscode.Disposable[] = [];
@@ -4236,6 +4396,13 @@ export class MarkdownPreviewPanel {
       }
       if (msg.type === 'getModels') {
         MarkdownPreviewPanel.onGetModels?.();
+      }
+      if (msg.type === 'getHistory') {
+        const relPath = vscode.workspace.asRelativePath(this._document.uri);
+        MarkdownPreviewPanel.onGetHistory?.(msg.fileOnly ? relPath : undefined);
+      }
+      if (msg.type === 'clearHistory') {
+        vscode.commands.executeCommand('markr.clearPromptHistory');
       }
       if (msg.type === 'contextRefresh') {
         // Webview requests a fresh context discovery
@@ -4745,6 +4912,9 @@ export class MarkdownPreviewPanel {
             <strong>System:</strong> ${filename}
           </span>
           <button id="btn-chat-new" title="Start a new conversation">New chat</button>
+          <button id="btn-chat-history" title="Browse prompt history">
+            History <span class="history-badge" id="history-count">0</span>
+          </button>
           <div class="chat-model-wrap">
             <button id="btn-chat-model">
               <span class="provider-dot"></span>
@@ -4789,6 +4959,17 @@ export class MarkdownPreviewPanel {
         <div id="chat-messages" style="display:none"></div>
 
         <!-- Input -->
+        <!-- History panel — shown when History button is active -->
+        <div id="chat-history-panel">
+          <div class="history-list" id="history-list">
+            <div class="history-empty">No runs yet — send a message to start building history.</div>
+          </div>
+          <div class="history-footer">
+            <span id="history-footer-count">0 runs</span>
+            <button class="history-clear-btn" id="btn-history-clear">Clear history</button>
+          </div>
+        </div>
+
         <div id="chat-input-wrap">
           <textarea id="chat-input" rows="1" placeholder="Ask anything about this file… (Enter to send, Shift+Enter for newline)"></textarea>
           <button id="btn-chat-send" title="Send (Enter)">

@@ -4,12 +4,17 @@ import { MarkdownPreviewPanel } from './preview';
 import { MarkrExplorerProvider, AI_CONFIG_TEMPLATES } from './markrExplorer';
 import { ContextComposer } from './contextComposer';
 import { PromptRunner, MODELS } from './promptRunner';
+import { PromptHistoryManager } from './promptHistory';
+import { TokenDecorationProvider } from './tokenDecorations';
 
 export async function activate(context: vscode.ExtensionContext) {
 
   // ── Core modules ───────────────────────────────────────────────────────────
-  const contextComposer = new ContextComposer();
-  const promptRunner    = new PromptRunner(context.secrets);
+  const contextComposer  = new ContextComposer();
+  const promptRunner     = new PromptRunner(context.secrets);
+  const promptHistory    = new PromptHistoryManager(context);
+  const tokenDecorations = new TokenDecorationProvider();
+  context.subscriptions.push(tokenDecorations);
 
   // ── Activity Bar Explorer ──────────────────────────────────────────────────
   const explorerProvider = new MarkrExplorerProvider();
@@ -377,15 +382,39 @@ export async function activate(context: vscode.ExtensionContext) {
 
     panel.postMessage({ type: 'promptStart' });
 
-    // 🔴 Fix: panel may be disposed (user closed it) while the stream is in flight.
-    // Wrap every postMessage in a try/catch — disposing throws "webview is disposed".
     const safePost = (msg2: object) => { try { panel.postMessage(msg2); } catch { /* panel disposed */ } };
+    const modelObj = MODELS.find(m => m.id === msg.model);
+    const runId    = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const startMs  = Date.now();
+
+    // Accumulate full assistant response for history storage
+    let fullResponse = '';
 
     await promptRunner.streamRun(
       { provider: msg.provider, model: msg.model, systemPrompt: msg.systemPrompt, messages: msg.messages },
-      (text) => safePost({ type: 'promptChunk', text }),
-      ()     => safePost({ type: 'promptDone' }),
-      (err)  => safePost({ type: 'promptError', error: err }),
+      (text) => { fullResponse += text; safePost({ type: 'promptChunk', text }); },
+      async () => {
+        safePost({ type: 'promptDone' });
+        // Save the completed run to history (non-blocking)
+        const p = MarkdownPreviewPanel.currentPanel;
+        const docUri  = p?.['_document']?.uri;
+        const relPath = docUri ? vscode.workspace.asRelativePath(docUri) : '';
+        await promptHistory.save({
+          id:           runId,
+          timestamp:    startMs,
+          file:         docUri?.path.split('/').pop() ?? '',
+          relPath,
+          model:        msg.model,
+          modelLabel:   modelObj?.label ?? msg.model,
+          provider:     msg.provider,
+          systemPrompt: msg.systemPrompt,
+          messages:     [...msg.messages, { role: 'assistant', content: fullResponse }],
+          durationMs:   Date.now() - startMs,
+        });
+        // Refresh history count in webview
+        safePost({ type: 'historyCount', count: promptHistory.getAll().length });
+      },
+      (err) => safePost({ type: 'promptError', error: err }),
     );
   };
 
@@ -394,6 +423,26 @@ export async function activate(context: vscode.ExtensionContext) {
     const configured = await promptRunner.configuredProviders();
     MarkdownPreviewPanel.currentPanel?.postMessage({ type: 'modelsList', models: MODELS, configured });
   };
+
+  // History: get all runs for the current file
+  MarkdownPreviewPanel.onGetHistory = async (relPath?: string) => {
+    const runs = relPath ? promptHistory.getForFile(relPath) : promptHistory.getAll();
+    MarkdownPreviewPanel.currentPanel?.postMessage({ type: 'historyData', runs });
+  };
+
+  // Clear history
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markr.clearPromptHistory', async () => {
+      const confirm = await vscode.window.showWarningMessage(
+        'Clear all Markr prompt history for this workspace?', 'Clear', 'Cancel'
+      );
+      if (confirm === 'Clear') {
+        await promptHistory.clear();
+        MarkdownPreviewPanel.currentPanel?.postMessage({ type: 'historyCount', count: 0 });
+        vscode.window.showInformationMessage('Prompt history cleared.');
+      }
+    })
+  );
 
   // ── Document listeners ─────────────────────────────────────────────────────
   context.subscriptions.push(

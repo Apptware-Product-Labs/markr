@@ -7,6 +7,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.11.0] — 2026-06-05
+
+### Added
+- **Prompt history**: every Prompt Runner conversation is automatically saved. Click the **History** button in the chat panel header to browse all past runs grouped by date. Click any entry to restore the conversation. Limit: last 200 runs per workspace. Use "Clear history" to reset.
+- **Inline token decorations**: a subtle `~N tok` annotation appears at the end of every heading line in Markdown files in the VS Code editor — like GitLens blame but for token cost. Sections using more than 25% of the file's total tokens are highlighted in warning colour. Toggle off via `markr.showTokenDecorations: false` in Settings.
+- **`markr.showTokenDecorations` setting** (default: `true`)
+- **`markr.clearPromptHistory` command** in the Command Palette
+
+---
+
 ## [3.10.3] — 2026-06-05
 
 ### Security
