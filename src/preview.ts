@@ -3178,6 +3178,10 @@ export class MarkdownPreviewPanel {
   public  static currentPanel: MarkdownPreviewPanel | undefined;
   /** Set by extension.ts so "Source" button doesn't trigger the auto-close loop. */
   public  static setSuppressAutoClose: (val: boolean) => void = () => {};
+  /** Called by extension.ts when webview requests a prompt run. */
+  public  static onPromptRun: ((msg: unknown) => void) | undefined;
+  /** Called by extension.ts when webview requests available models. */
+  public  static onGetModels: (() => void) | undefined;
   private readonly _panel: vscode.WebviewPanel;
   private _document: vscode.TextDocument;
   private readonly _disposables: vscode.Disposable[] = [];
@@ -3253,6 +3257,11 @@ export class MarkdownPreviewPanel {
   }
 
   /** Send clipboard preview to the webview as a temporary overlay (no tab mutation). */
+  /** Post any message to the webview from outside the class. */
+  public postMessage(msg: object): void {
+    this._panel.webview.postMessage(msg);
+  }
+
   public _sendClipboardPreview(text: string): void {
     this._clipboardMode = true;
     const rawText = text;
@@ -3390,6 +3399,36 @@ export class MarkdownPreviewPanel {
       }
       if (msg.type === 'dismissClipboard') {
         this._clipboardMode = false;
+      }
+      // ── Context Composer & Prompt Runner ──────────────────────────────────
+      if (msg.type === 'promptRun') {
+        MarkdownPreviewPanel.onPromptRun?.(msg);
+      }
+      if (msg.type === 'getModels') {
+        MarkdownPreviewPanel.onGetModels?.();
+      }
+      if (msg.type === 'contextRefresh') {
+        // Webview requests a fresh context discovery
+        const { ContextComposer } = await import('./contextComposer');
+        const composer = new ContextComposer();
+        const summary  = await composer.discover(this._document.uri);
+        this._panel.webview.postMessage({ type: 'contextSummary', summary });
+      }
+      if (msg.type === 'contextCopy') {
+        const { ContextComposer } = await import('./contextComposer');
+        const composer = new ContextComposer();
+        // msg.files contains the selection state from the webview
+        const summary  = await composer.discover(this._document.uri);
+        // Apply selection from msg
+        if (msg.selectedPaths && Array.isArray(msg.selectedPaths)) {
+          const sel = new Set<string>(msg.selectedPaths);
+          summary.files.forEach(f => { f.selected = sel.has(f.fullPath); });
+        }
+        const merged = composer.mergeContext(summary.files);
+        await vscode.env.clipboard.writeText(merged);
+        const count  = summary.files.filter(f => f.selected).length;
+        vscode.window.setStatusBarMessage(`$(check) Markr: context copied (${count} files)`, 3000);
+        this._panel.webview.postMessage({ type: 'contextCopied', count });
       }
       if (msg.type === 'saveFile') {
         // Explicit save triggered by the user (⌘S or Save button).
