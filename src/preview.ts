@@ -1032,9 +1032,7 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 body.resizing-sidebar #sidebar-resizer { background: var(--accent-bg); }
 body.resizing-sidebar #sidebar-resizer::after { border-left-color: var(--accent); }
 body.resizing-sidebar { cursor: col-resize !important; user-select: none; }
-/* Prevent text selection flash during resize */
-body.resizing-sidebar * { pointer-events: none !important; }
-body.resizing-sidebar #sidebar-resizer { pointer-events: all !important; }
+/* NOTE: do NOT add pointer-events: none here — it breaks all clicks */
 
 .sb-section { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0; }
 .sb-section.flex-fill { flex: 1; overflow: hidden; }
@@ -1937,13 +1935,8 @@ const SCRIPT = /* javascript */`
     return Object.keys(node.dirs).sort().map(name => {
       const child = node.dirs[name];
       const collapsed = collapsedFolders.has(child.path);
-      // Folder icon (open when expanded, closed when collapsed)
-      var folderIcon = collapsed
-        ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-faint);flex-shrink:0"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'
-        : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);opacity:.6;flex-shrink:0"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
       let html = '<button class="file-dir' + (collapsed ? ' collapsed' : '') + '" data-dir="' + escHtml(child.path) + '" style="--depth:' + depth + '">'
         + '<span class="folder-chevron">▾</span>'
-        + folderIcon
         + '<span class="folder-name">' + escHtml(child.name) + '</span>'
         + '<span class="folder-count">' + treeCount(child) + '</span></button>';
       if (!collapsed) {
@@ -3702,6 +3695,8 @@ const SCRIPT = /* javascript */`
 
     var startX = 0, startW = 0;
 
+    // Use var expressions (not declarations) inside the callback — safer across environments
+    var sbMoveHandler = null, sbUpHandler = null;
     sidebarRes.addEventListener('mousedown', function(e) {
       if (e.button !== 0) return;
       e.preventDefault();
@@ -3709,21 +3704,21 @@ const SCRIPT = /* javascript */`
       startW = sidebar.getBoundingClientRect().width;
       document.body.classList.add('resizing-sidebar');
 
-      function onMove(e) {
-        var newW = Math.max(180, Math.min(420, startW + (e.clientX - startX)));
+      sbMoveHandler = function(ev) {
+        var newW = Math.max(180, Math.min(420, startW + (ev.clientX - startX)));
         document.documentElement.style.setProperty('--sidebar-width', newW + 'px');
-      }
-      function onUp() {
+      };
+      sbUpHandler = function() {
         document.body.classList.remove('resizing-sidebar');
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
+        document.removeEventListener('mousemove', sbMoveHandler);
+        document.removeEventListener('mouseup', sbUpHandler);
         try {
           var w = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width'));
           localStorage.setItem('markr-sidebar-width', String(Math.round(w)));
         } catch {}
-      }
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
+      };
+      document.addEventListener('mousemove', sbMoveHandler);
+      document.addEventListener('mouseup', sbUpHandler);
     });
 
     // Double-click resets to default width
