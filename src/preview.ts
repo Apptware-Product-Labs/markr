@@ -580,11 +580,22 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 
 /* === Sidebar ===============================================================*/
 #sidebar {
-  width: 240px; min-width: 240px; display: flex; flex-direction: column;
+  width: var(--sidebar-width, 240px);
+  min-width: 0; display: flex; flex-direction: column;
   background: var(--bg-panel); border-right: 1px solid var(--border);
-  overflow: hidden; transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease; flex-shrink: 0;
+  overflow: hidden; flex-shrink: 0;
+  transition: opacity 0.2s ease;
 }
-#sidebar.hidden { width: 0; min-width: 0; opacity: 0; overflow: hidden; }
+#sidebar.hidden { width: 0 !important; opacity: 0; overflow: hidden; }
+
+/* Sidebar drag handle — safe, NO pointer-events manipulation */
+#sidebar-resizer {
+  width: 5px; flex-shrink: 0; cursor: col-resize;
+  background: transparent; border-right: 1px solid var(--border);
+  transition: background 0.15s, border-color 0.15s;
+}
+#sidebar-resizer:hover { background: var(--accent-bg); border-right-color: var(--accent); }
+body.sb-resizing { cursor: col-resize !important; user-select: none; }
 .sb-section { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0; }
 .sb-section.flex-fill { flex: 1; overflow: hidden; }
 #sec-files { flex: 0 1 52%; min-height: 138px; overflow: hidden; }
@@ -2401,10 +2412,66 @@ const SCRIPT = /* javascript */`
     sec.querySelector('.sb-header')?.addEventListener('click', e => {
       if (e.target.closest('.sb-action')) return;
       sec.classList.toggle('collapsed');
+      // When TOC collapses, Notebooks fills all remaining sidebar height.
+      // When TOC expands, the split is restored. Matches VS Code GitLens behaviour.
+      if (sec.id === 'sec-toc') {
+        qs('#sidebar')?.classList.toggle('no-toc', sec.classList.contains('collapsed'));
+      }
     });
   });
 
+  // Sync no-toc on initial load (TOC may start collapsed from settings)
+  if (qs('#sec-toc')?.classList.contains('collapsed')) {
+    qs('#sidebar')?.classList.add('no-toc');
+  }
+
   qs('#btn-new-file')?.addEventListener('click', e => { e.stopPropagation(); vsc.postMessage({ type: 'newFile' }); });
+
+  // ── Sidebar resize ─────────────────────────────────────────────────────────
+  (function() {
+    var res = qs('#sidebar-resizer');
+    var sb  = qs('#sidebar');
+    if (!res || !sb) return;
+
+    // Restore saved width from last session
+    try {
+      var saved = localStorage.getItem('markr-sb-w');
+      if (saved) document.documentElement.style.setProperty('--sidebar-width', saved + 'px');
+    } catch {}
+
+    var x0 = 0, w0 = 0;
+    var moveH = null, upH = null; // use null-initialised vars, not function declarations
+
+    res.addEventListener('mousedown', function(e) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      x0 = e.clientX;
+      w0 = sb.getBoundingClientRect().width;
+      document.body.classList.add('sb-resizing');
+
+      moveH = function(ev) {
+        var nw = Math.max(160, Math.min(480, w0 + ev.clientX - x0));
+        document.documentElement.style.setProperty('--sidebar-width', nw + 'px');
+      };
+      upH = function() {
+        document.body.classList.remove('sb-resizing');
+        document.removeEventListener('mousemove', moveH);
+        document.removeEventListener('mouseup', upH);
+        try {
+          var w = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width'));
+          localStorage.setItem('markr-sb-w', String(Math.round(w)));
+        } catch {}
+      };
+      document.addEventListener('mousemove', moveH);
+      document.addEventListener('mouseup', upH);
+    });
+
+    // Double-click resets to default
+    res.addEventListener('dblclick', function() {
+      document.documentElement.style.removeProperty('--sidebar-width');
+      try { localStorage.removeItem('markr-sb-w'); } catch {}
+    });
+  })();
 
   // ── Notebook file search / filter ─────────────────────────────────────────
   let filterDebounce;
@@ -3590,6 +3657,7 @@ export class MarkdownPreviewPanel {
       <div class="sb-body" id="toc-body"></div>
     </div>
   </div>
+  <div id="sidebar-resizer" title="Drag to resize · Double-click to reset"></div>
   <div id="main-col">
     <!-- Clipboard preview banner — shown when content comes from clipboard -->
     <div id="clipboard-banner">
