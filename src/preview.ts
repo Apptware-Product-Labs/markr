@@ -608,11 +608,12 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 .sb-section.collapsed .sb-body { display: none; }
 .sb-section.collapsed #file-search-wrap { display: none; }
 .sb-ai-label {
-  padding: 8px 10px 2px; font-size: 10px; font-weight: 700;
-  letter-spacing: 0.07em; text-transform: uppercase;
-  color: var(--text-faint); font-family: inherit;
+  padding: 7px 10px 2px; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted); /* was text-faint — too invisible in dark theme */
+  font-family: inherit;
 }
-.sb-ai-label.accent { color: var(--accent); opacity: 0.8; }
+.sb-ai-label.accent { color: var(--accent); font-weight: 700; opacity: 1; }
 
 /* File search input */
 #file-search-wrap {
@@ -668,38 +669,41 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
    Matches VS Code's SCM panel aesthetic. ===================================*/
 .file-dir {
   width: 100%; display: flex; align-items: center; gap: 4px;
-  padding: 3px 8px 3px calc(8px + (var(--depth, 0) * 12px));
+  padding: 4px 8px 3px calc(8px + (var(--depth, 0) * 12px));
   border: none; background: transparent; cursor: pointer; text-align: left;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--text-faint); white-space: nowrap; margin-top: 4px;
+  font-size: 12px; font-weight: 600; /* was 10px uppercase — too small to read */
+  color: var(--text-muted); white-space: nowrap;
 }
-.file-dir:hover { background: var(--bg-hover); color: var(--text-muted); }
+.file-dir:hover { background: var(--bg-hover); color: var(--text); }
 .file-dir .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-.file-dir .folder-count { font-size: 9px; color: var(--text-faint); margin-left: 3px; }
-.folder-chevron { width: 9px; height: 9px; transition: transform 0.12s; flex-shrink: 0; }
+.file-dir .folder-count {
+  font-size: 10px; color: var(--text-muted);
+  background: var(--bg-hover); border-radius: 8px; padding: 0 5px;
+}
+.folder-chevron { width: 9px; height: 9px; transition: transform 0.12s; flex-shrink: 0; opacity: 0.6; }
 .file-dir.collapsed .folder-chevron { transform: rotate(-90deg); }
 .file-item {
   display: flex; align-items: center;
-  padding: 3px 8px 3px calc(10px + (var(--depth, 0) * 12px));
+  padding: 4px 8px 4px calc(10px + (var(--depth, 0) * 12px));
   gap: 5px; font-size: 12.5px; font-family: inherit;
-  color: var(--text-muted); cursor: pointer;
-  border-left: 2px solid transparent;
-  transition: background 0.08s, color 0.08s, border-color 0.08s;
+  color: var(--text); /* was text-muted — filenames must be fully readable */
+  cursor: pointer; border-left: 2px solid transparent;
+  transition: background 0.08s, border-color 0.08s;
   user-select: none; min-width: 0;
 }
-.file-item:hover { background: var(--bg-hover); color: var(--text); }
-.file-item:hover .file-path { opacity: 0.7; }
+.file-item:hover { background: var(--bg-hover); }
 .file-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-bg); }
 .file-item svg { flex-shrink: 0; opacity: 0.4; }
 .file-item.active svg, .file-item.ai svg { opacity: 0.9; }
 .file-item.ai svg { color: var(--accent); }
 .file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-/* Right-side metadata — path or AI kind badge, dim and right-aligned like SCM */
+/* Path label — use text-muted NOT text-faint (text-faint = #48443e in dark = invisible) */
 .file-path {
-  font-size: 10.5px; color: var(--text-faint); flex-shrink: 0;
+  font-size: 11px; color: var(--text-muted); flex-shrink: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  max-width: 90px; opacity: 0.5; transition: opacity 0.1s;
+  max-width: 100px; opacity: 0.65; transition: opacity 0.1s;
 }
+.file-item:hover .file-path { opacity: 1; }
 .file-ai-kind {
   flex-shrink: 0; font-size: 9px; line-height: 1; color: var(--accent);
   background: var(--accent-bg); border: 1px solid var(--accent-border);
