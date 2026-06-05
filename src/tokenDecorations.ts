@@ -16,27 +16,41 @@
 import * as vscode from 'vscode';
 import { countTokens, detectModel, type AiModel } from './tokenEngine';
 
-// ─── Decoration type ──────────────────────────────────────────────────────────
+// ─── Decoration types (created lazily inside the class, not at module level) ──
+// IMPORTANT: vscode.window.createTextEditorDecorationType() must NOT be called
+// at module level — it runs before VS Code context is ready and silently crashes
+// extension activation, breaking the entire extension.
+let normalDeco: vscode.TextEditorDecorationType | undefined;
+let heavyDeco:  vscode.TextEditorDecorationType | undefined;
 
-// Two levels: normal sections and heavy sections (>20% of total)
-const normalDeco = vscode.window.createTextEditorDecorationType({
-  after: {
-    margin: '0 0 0 12px',
-    color: new vscode.ThemeColor('editorLineNumber.foreground'),
-    fontStyle:  'normal',
-    fontWeight: 'normal',
-  },
-  rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-});
+function getNormalDeco(): vscode.TextEditorDecorationType {
+  if (!normalDeco) {
+    normalDeco = vscode.window.createTextEditorDecorationType({
+      after: {
+        margin: '0 0 0 12px',
+        color: new vscode.ThemeColor('editorLineNumber.foreground'),
+        fontStyle:  'normal',
+        fontWeight: 'normal',
+      },
+      rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
+    });
+  }
+  return normalDeco;
+}
 
-const heavyDeco = vscode.window.createTextEditorDecorationType({
-  after: {
-    margin: '0 0 0 12px',
-    color: new vscode.ThemeColor('editorWarning.foreground'),
-    fontStyle: 'italic',
-  },
-  rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
-});
+function getHeavyDeco(): vscode.TextEditorDecorationType {
+  if (!heavyDeco) {
+    heavyDeco = vscode.window.createTextEditorDecorationType({
+      after: {
+        margin: '0 0 0 12px',
+        color: new vscode.ThemeColor('editorWarning.foreground'),
+        fontStyle: 'italic',
+      },
+      rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed,
+    });
+  }
+  return heavyDeco;
+}
 
 // ─── TokenDecorationProvider ──────────────────────────────────────────────────
 
@@ -78,16 +92,16 @@ export class TokenDecorationProvider implements vscode.Disposable {
 
     // Only decorate markdown files
     if (doc.languageId !== 'markdown') {
-      editor.setDecorations(normalDeco, []);
-      editor.setDecorations(heavyDeco, []);
+      editor.setDecorations(getNormalDeco(), []);
+      editor.setDecorations(getHeavyDeco(), []);
       return;
     }
 
     // Check the user's setting (default: on)
     const cfg = vscode.workspace.getConfiguration('markr');
     if (!cfg.get<boolean>('showTokenDecorations', true)) {
-      editor.setDecorations(normalDeco, []);
-      editor.setDecorations(heavyDeco, []);
+      editor.setDecorations(getNormalDeco(), []);
+      editor.setDecorations(getHeavyDeco(), []);
       return;
     }
 
@@ -99,8 +113,8 @@ export class TokenDecorationProvider implements vscode.Disposable {
     // Parse sections and count tokens per section
     const sections = this._parseSections(text, model);
     if (!sections.length) {
-      editor.setDecorations(normalDeco, []);
-      editor.setDecorations(heavyDeco, []);
+      editor.setDecorations(getNormalDeco(), []);
+      editor.setDecorations(getHeavyDeco(), []);
       return;
     }
 
@@ -128,8 +142,8 @@ export class TokenDecorationProvider implements vscode.Disposable {
       if (pct > 25) { heavyRanges.push(opts); } else { normalRanges.push(opts); }
     }
 
-    editor.setDecorations(normalDeco, normalRanges);
-    editor.setDecorations(heavyDeco,  heavyRanges);
+    editor.setDecorations(getNormalDeco(), normalRanges);
+    editor.setDecorations(getHeavyDeco(),  heavyRanges);
   }
 
   /** Parse markdown headings and measure the token cost of each section's content. */
@@ -161,8 +175,8 @@ export class TokenDecorationProvider implements vscode.Disposable {
 
   dispose(): void {
     clearTimeout(this._debounceTimer);
-    normalDeco.dispose();
-    heavyDeco.dispose();
+    normalDeco?.dispose();
+    heavyDeco?.dispose();
     this._disposables.forEach(d => d.dispose());
   }
 }
