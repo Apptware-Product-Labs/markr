@@ -4,12 +4,9 @@ import * as nodePath from 'path';
 // ─── AI Config detection (mirrors preview.ts — kept separate to avoid circular deps) ──
 
 export const AI_CONFIG_NAMES = new Set([
-  'claude.md', 'claude.local.md', 'codex.md',
-  'agent.md', 'agents.md',                         // 🟢 Fix: agent.md was missing
-  'skill.md', 'skills.md',
-  'gemini.md', 'system-prompt.md', 'systemprompt.md',
-  'copilot-instructions.md', '.cursorrules', 'cursor.md',
-  '.windsurfrules', 'windsurf.md',                  // 🟢 Fix: windsurfrules was missing
+  'claude.md', 'claude.local.md', 'codex.md', 'agents.md', 'gemini.md',
+  'skills.md', 'skill.md', 'system-prompt.md', 'systemprompt.md',
+  'copilot-instructions.md', '.cursorrules', 'cursor.md', 'windsurf.md',
   'aider.md', 'gpt.md', 'openai.md', 'anthropic.md', 'context.md',
   'instructions.md', 'memory.md', 'rules.md', 'prompt.md', 'prompts.md',
 ]);
