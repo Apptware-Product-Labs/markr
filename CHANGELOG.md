@@ -7,6 +7,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.10.0] — 2026-06-05
+
+### Added
+- **Prompt Runner — full chat UI inside VS Code**: click `▶ Run` in the toolbar to open a chat panel. The current file becomes the system prompt. Left pane = editable file, right pane = streaming chat. Edit your prompt and test immediately without leaving the editor.
+  - Beautiful message bubbles (user right, assistant left) with markdown rendering, code blocks, inline code
+  - Model selector grouped by provider — Anthropic (Claude 4 Sonnet/Opus, Claude 3.5), OpenAI (GPT-4o, o3-mini), Google (Gemini 2.0 Flash, 1.5 Pro)
+  - Streaming responses with animated cursor
+  - Copy button on every message
+  - New chat button
+  - Smooth setup screen when no API key configured — explains SecretStorage, one click per provider
+  - API keys stored in VS Code's encrypted SecretStorage — never plain text, never in git
+- **Architecture refactor**: extracted `tokenEngine.ts`, `contextComposer.ts`, `promptRunner.ts` as clean separate modules. Adding a new model = one entry. Adding a new feature = one file.
+
+---
+
 ## [3.9.7] — 2026-06-05
 
 ### Added

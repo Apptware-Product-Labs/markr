@@ -690,6 +690,224 @@ body:not(.edit-mode) #btn-save-file { display: none; }
   will-change: opacity, transform;
 }
 .sep-v { width: 1px; height: 16px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROMPT RUNNER — Chat UI
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Chat panel — slides in to replace #scroller when chat mode is active */
+#chat-panel {
+  display: none; flex-direction: column; flex: 1; min-width: 0; overflow: hidden;
+  background: var(--bg);
+}
+body.chat-mode #chat-panel    { display: flex; }
+body.chat-mode #scroller      { display: none; }
+body.chat-mode #split-preview { display: none; }
+body.chat-mode #split-resizer { display: none; }
+
+/* In chat mode the edit area stays (left), chat panel takes right */
+body.chat-mode.edit-mode #main { gap: 0; }
+body.chat-mode.edit-mode #edit-area { flex: 0 0 42%; border-right: 1px solid var(--border); }
+body.chat-mode.edit-mode #chat-panel { flex: 1; }
+body.chat-mode:not(.edit-mode) #edit-area { display: none; }
+
+/* ── Chat header ──────────────────────────────────────────────────────────── */
+#chat-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px 6px; border-bottom: 1px solid var(--border);
+  background: var(--bg-panel); flex-shrink: 0; gap: 8px;
+}
+.chat-sys-info {
+  font-size: 11px; color: var(--text-faint); flex: 1; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.chat-sys-info strong { color: var(--text-muted); }
+
+/* ── Model selector ───────────────────────────────────────────────────────── */
+.chat-model-wrap { position: relative; flex-shrink: 0; }
+#btn-chat-model {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 9px; border-radius: 6px; font-size: 12px; font-family: inherit;
+  cursor: pointer; font-weight: 600;
+  background: var(--accent-bg); color: var(--accent);
+  border: 1px solid var(--accent-border);
+  transition: background .1s;
+}
+#btn-chat-model:hover { background: var(--accent); color: #fff; }
+#btn-chat-model .provider-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0;
+}
+#chat-model-menu {
+  display: none; position: absolute; top: calc(100% + 4px); right: 0;
+  min-width: 240px; background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.3);
+  z-index: 900; overflow: hidden;
+}
+#chat-model-menu.open { display: block; }
+.model-group-label {
+  padding: 8px 12px 4px; font-size: 9.5px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint);
+}
+.model-group-sep { height: 1px; background: var(--border); margin: 4px 0; }
+.model-opt {
+  display: flex; align-items: center; gap: 8px; padding: 7px 12px;
+  cursor: pointer; font-size: 12.5px; color: var(--text-muted);
+  transition: background .08s;
+}
+.model-opt:hover { background: var(--bg-hover); color: var(--text); }
+.model-opt.active { color: var(--accent); background: var(--accent-bg); }
+.model-opt-label { flex: 1; font-weight: 500; }
+.model-opt-ctx { font-size: 10px; color: var(--text-faint); font-family: ui-monospace, monospace; }
+.model-provider-icon { font-size: 13px; width: 16px; text-align: center; flex-shrink: 0; }
+.model-menu-footer {
+  padding: 6px 12px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--accent); cursor: pointer;
+  display: flex; align-items: center; gap: 5px;
+}
+.model-menu-footer:hover { background: var(--accent-bg); }
+
+/* ── New chat button ──────────────────────────────────────────────────────── */
+#btn-chat-new {
+  padding: 3px 8px; font-size: 11px; border-radius: 5px; cursor: pointer;
+  background: transparent; border: 1px solid var(--border-faint);
+  color: var(--text-faint); font-family: inherit;
+  transition: background .1s, color .1s;
+}
+#btn-chat-new:hover { background: var(--bg-hover); color: var(--text); }
+
+/* ── Messages area ────────────────────────────────────────────────────────── */
+#chat-messages {
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: 16px 0 8px; display: flex; flex-direction: column; gap: 2px;
+}
+#chat-messages::-webkit-scrollbar { width: 4px; }
+#chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Message bubbles ──────────────────────────────────────────────────────── */
+.chat-msg {
+  display: flex; flex-direction: column; padding: 0 14px;
+  animation: msg-in .2s ease-out;
+}
+@keyframes msg-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.chat-msg.user { align-items: flex-end; }
+.chat-msg.assistant { align-items: flex-start; }
+.chat-msg-meta {
+  font-size: 10px; color: var(--text-faint); margin-bottom: 4px;
+  display: flex; align-items: center; gap: 5px;
+}
+.chat-msg.user .chat-msg-meta { flex-direction: row-reverse; }
+.chat-bubble {
+  max-width: 88%; padding: 10px 14px; border-radius: 12px;
+  font-size: 13.5px; line-height: 1.65; word-break: break-word;
+}
+.chat-msg.user .chat-bubble {
+  background: var(--accent); color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.chat-msg.assistant .chat-bubble {
+  background: var(--bg-panel); color: var(--text);
+  border: 1px solid var(--border); border-bottom-left-radius: 4px;
+}
+/* Markdown inside assistant bubbles */
+.chat-bubble p { margin: 0 0 10px; }
+.chat-bubble p:last-child { margin-bottom: 0; }
+.chat-bubble h1,.chat-bubble h2,.chat-bubble h3 { font-weight: 700; margin: 14px 0 6px; font-size: 14px; }
+.chat-bubble ul,.chat-bubble ol { padding-left: 18px; margin: 6px 0 10px; }
+.chat-bubble li { margin-bottom: 3px; }
+.chat-bubble code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
+  background: rgba(127,127,127,.12); padding: 1px 4px; border-radius: 3px;
+}
+.chat-bubble pre {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px 12px; overflow-x: auto; margin: 8px 0;
+}
+.chat-bubble pre code { background: none; padding: 0; font-size: 12px; }
+.chat-bubble strong { font-weight: 700; }
+.chat-bubble em { font-style: italic; }
+.chat-bubble blockquote {
+  border-left: 3px solid var(--accent); padding: 4px 10px;
+  margin: 8px 0; color: var(--text-muted);
+}
+/* Streaming cursor */
+.chat-cursor {
+  display: inline-block; width: 2px; height: 14px; background: var(--accent);
+  vertical-align: middle; animation: cur-blink .9s step-end infinite;
+}
+@keyframes cur-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+/* Copy message button */
+.chat-msg-copy {
+  opacity: 0; font-size: 10px; color: var(--text-faint); background: transparent;
+  border: none; cursor: pointer; padding: 2px 5px; border-radius: 3px;
+  transition: opacity .1s; flex-shrink: 0;
+}
+.chat-msg:hover .chat-msg-copy { opacity: 1; }
+.chat-msg-copy:hover { color: var(--accent); background: var(--accent-bg); }
+
+/* ── Empty / setup states ─────────────────────────────────────────────────── */
+#chat-empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 24px; text-align: center; gap: 8px; color: var(--text-faint);
+}
+#chat-empty .ce-icon { font-size: 32px; margin-bottom: 4px; }
+#chat-empty .ce-title { font-size: 14px; font-weight: 600; color: var(--text-muted); }
+#chat-empty .ce-sub { font-size: 12px; line-height: 1.5; max-width: 220px; }
+
+#chat-setup {
+  flex: 1; display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 24px; gap: 12px;
+}
+#chat-setup.show { display: flex; }
+.cs-title { font-size: 15px; font-weight: 700; color: var(--text); text-align: center; }
+.cs-sub { font-size: 12px; color: var(--text-faint); text-align: center; line-height: 1.5; max-width: 240px; }
+.cs-provider-btn {
+  width: 100%; max-width: 240px; padding: 10px 16px; border-radius: 8px;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  cursor: pointer; font-size: 13px; font-family: inherit; color: var(--text-muted);
+  text-align: left; transition: background .1s, border-color .1s, color .1s;
+}
+.cs-provider-btn:hover { background: var(--bg-hover); border-color: var(--accent-border); color: var(--text); }
+.cs-provider-icon { font-size: 18px; flex-shrink: 0; }
+.cs-lock { font-size: 10px; color: var(--text-faint); margin-top: 6px; text-align: center; }
+
+/* ── Chat input ───────────────────────────────────────────────────────────── */
+#chat-input-wrap {
+  display: flex; align-items: flex-end; gap: 8px;
+  padding: 10px 12px; border-top: 1px solid var(--border);
+  background: var(--bg-panel); flex-shrink: 0;
+}
+#chat-input {
+  flex: 1; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; font-size: 13px;
+  font-family: inherit; color: var(--text); outline: none; resize: none;
+  max-height: 120px; min-height: 36px; line-height: 1.5;
+  transition: border-color .15s;
+}
+#chat-input:focus { border-color: var(--accent); }
+#chat-input::placeholder { color: var(--text-faint); }
+#btn-chat-send {
+  width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
+  background: var(--accent); color: #fff; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; transition: background .1s, transform .1s;
+}
+#btn-chat-send:hover:not(:disabled) { background: var(--accent-dim); }
+#btn-chat-send:active:not(:disabled) { transform: scale(.92); }
+#btn-chat-send:disabled { background: var(--border); color: var(--text-faint); cursor: not-allowed; }
+.chat-stop {
+  background: #ef4444 !important;
+}
+
+/* Run button in main toolbar */
+#btn-run {
+  background: var(--accent); color: #fff; font-weight: 600; border-color: var(--accent);
+}
+#btn-run:hover { background: var(--accent-dim) !important; border-color: var(--accent-dim); }
+#btn-run.active { background: #ef4444 !important; border-color: #ef4444; }
+body.chat-mode #btn-run { background: rgba(239,68,68,.15); color: #ef4444; border-color: rgba(239,68,68,.3); }
 .tb-btn {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px;
   border: 1px solid var(--border-faint); border-radius: 4px; font-size: 11.5px; font-family: inherit;
@@ -2584,6 +2802,333 @@ const SCRIPT = /* javascript */`
     if (!e.target.closest('#tok-panel') && !e.target.closest('#stat-tok')) closeTokPanel();
   });
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROMPT RUNNER — Chat UI
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  var chatState = {
+    messages: [],          // { role, content, el }
+    model: 'claude-sonnet-4-5',
+    provider: 'anthropic',
+    streaming: false,
+    streamEl: null,        // the DOM element receiving streaming text
+    streamText: '',        // accumulated stream text
+    hasKeys: [],           // providers that have keys configured
+    models: [],            // available models from extension
+    open: false,
+  };
+
+  // ── Open / close chat panel ────────────────────────────────────────────────
+  function openChat() {
+    if (chatState.open) return;
+    chatState.open = true;
+    document.body.classList.add('chat-mode');
+    if (!editMode) enterEditMode();           // show left pane with current file
+    qs('#btn-run')?.classList.add('active');
+    vsc.postMessage({ type: 'getModels' });   // request available models + keys
+    updateChatVisibility();
+    qs('#chat-input')?.focus();
+  }
+
+  function closeChat() {
+    chatState.open = false;
+    document.body.classList.remove('chat-mode');
+    qs('#btn-run')?.classList.remove('active');
+    if (!isClipboardMode) {
+      var active = tabs.find(function(t) { return t.uri === activeTabUri; });
+      if (active && !active.isAiConfig) exitEditMode(false, false, false);
+    }
+  }
+
+  qs('#btn-run')?.addEventListener('click', function() {
+    if (chatState.open) { closeChat(); } else { openChat(); }
+  });
+
+  // ── Visibility logic ───────────────────────────────────────────────────────
+  function updateChatVisibility() {
+    var setup    = qs('#chat-setup');
+    var empty    = qs('#chat-empty');
+    var messages = qs('#chat-messages');
+    if (!setup || !empty || !messages) return;
+
+    var hasAnyKey = chatState.hasKeys.length > 0;
+    if (!hasAnyKey) {
+      setup.classList.add('show');
+      empty.style.display = 'none';
+      messages.style.display = 'none';
+    } else if (chatState.messages.length === 0) {
+      setup.classList.remove('show');
+      empty.style.display = '';
+      messages.style.display = 'none';
+    } else {
+      setup.classList.remove('show');
+      empty.style.display = 'none';
+      messages.style.display = 'flex';
+    }
+  }
+
+  // ── Model menu ─────────────────────────────────────────────────────────────
+  function buildModelMenu(models, configured) {
+    chatState.models = models || [];
+    chatState.hasKeys = configured || [];
+
+    var menu = qs('#chat-model-menu');
+    if (!menu) return;
+
+    // Group by provider
+    var groups = { anthropic: [], openai: [], google: [] };
+    chatState.models.forEach(function(m) {
+      if (groups[m.provider]) groups[m.provider].push(m);
+    });
+
+    var icons = { anthropic: '✦', openai: '◎', google: '◇' };
+    var names = { anthropic: 'Anthropic', openai: 'OpenAI', google: 'Google' };
+    var providerColors = { anthropic: '#f97316', openai: '#22c55e', google: '#3b82f6' };
+
+    var html = '';
+    ['anthropic', 'openai', 'google'].forEach(function(prov) {
+      var list = groups[prov];
+      if (!list.length) return;
+      html += '<div class="model-group-label">' + names[prov] + '</div>';
+      list.forEach(function(m) {
+        var ctx = m.context >= 1000000
+          ? (m.context / 1000000).toFixed(0) + 'M'
+          : (m.context / 1000) + 'K';
+        var active = m.id === chatState.model ? ' active' : '';
+        html += '<div class="model-opt' + active + '" data-model="' + m.id + '" data-provider="' + m.provider + '">'
+          + '<span class="model-provider-icon">' + icons[prov] + '</span>'
+          + '<span class="model-opt-label">' + m.label + '</span>'
+          + '<span class="model-opt-ctx">' + ctx + '</span>'
+          + '</div>';
+      });
+      html += '<div class="model-group-sep"></div>';
+    });
+    html += '<div class="model-menu-footer">⚙ Manage API keys</div>';
+    menu.innerHTML = html;
+
+    qsa('.model-opt', menu).forEach(function(opt) {
+      opt.addEventListener('click', function() {
+        chatState.model    = opt.getAttribute('data-model') || chatState.model;
+        chatState.provider = opt.getAttribute('data-provider') || chatState.provider;
+        var label = qs('#chat-model-label');
+        if (label) label.textContent = opt.querySelector('.model-opt-label')?.textContent || '';
+        // Update provider dot colour
+        var dot = qs('#btn-chat-model .provider-dot');
+        if (dot) dot.style.background = providerColors[chatState.provider] || 'var(--accent)';
+        menu.classList.remove('open');
+        updateChatVisibility();
+      });
+    });
+
+    // "Manage API keys" footer
+    var footer = menu.querySelector('.model-menu-footer');
+    if (footer) footer.addEventListener('click', function() {
+      vsc.postMessage({ type: 'openSettings' });
+      menu.classList.remove('open');
+    });
+
+    // Set initial model to first configured provider's first model
+    if (chatState.hasKeys.length > 0 && chatState.models.length > 0) {
+      var firstProv = chatState.hasKeys[0];
+      var firstModel = chatState.models.find(function(m) { return m.provider === firstProv; });
+      if (firstModel) {
+        chatState.model    = firstModel.id;
+        chatState.provider = firstModel.provider;
+        var label = qs('#chat-model-label');
+        if (label) label.textContent = firstModel.label;
+        var dot = qs('#btn-chat-model .provider-dot');
+        if (dot) dot.style.background = providerColors[firstProv] || 'var(--accent)';
+      }
+    }
+    updateChatVisibility();
+  }
+
+  qs('#btn-chat-model')?.addEventListener('click', function(e) {
+    e.stopPropagation();
+    qs('#chat-model-menu')?.classList.toggle('open');
+  });
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.chat-model-wrap')) qs('#chat-model-menu')?.classList.remove('open');
+  });
+
+  // ── Setup screen provider buttons ──────────────────────────────────────────
+  qsa('.cs-provider-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var provider = btn.getAttribute('data-provider');
+      vsc.postMessage({ type: 'setApiKey', provider });
+    });
+  });
+
+  // ── New chat ───────────────────────────────────────────────────────────────
+  qs('#btn-chat-new')?.addEventListener('click', function() {
+    chatState.messages = [];
+    chatState.streaming = false;
+    var msgs = qs('#chat-messages');
+    if (msgs) msgs.innerHTML = '';
+    updateChatVisibility();
+    qs('#chat-input')?.focus();
+  });
+
+  // ── Render a message bubble ────────────────────────────────────────────────
+  function appendMessage(role, content, streaming) {
+    var msgs = qs('#chat-messages');
+    if (!msgs) return null;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'chat-msg ' + role;
+
+    var meta = document.createElement('div');
+    meta.className = 'chat-msg-meta';
+
+    var modelName = chatState.models.find(function(m) { return m.id === chatState.model; });
+    var senderName = role === 'user' ? 'You' : (modelName ? modelName.label : 'Assistant');
+
+    var copyBtn = document.createElement('button');
+    copyBtn.className = 'chat-msg-copy';
+    copyBtn.textContent = 'Copy';
+    copyBtn.addEventListener('click', function() {
+      navigator.clipboard.writeText(wrap.querySelector('.chat-bubble')?.textContent || '');
+      copyBtn.textContent = '✓';
+      setTimeout(function() { copyBtn.textContent = 'Copy'; }, 1500);
+    });
+
+    if (role === 'user') {
+      meta.innerHTML = '<span>' + senderName + '</span>';
+      meta.appendChild(copyBtn);
+    } else {
+      meta.appendChild(copyBtn);
+      meta.innerHTML += '<span>' + senderName + '</span>';
+    }
+
+    var bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+
+    if (streaming) {
+      bubble.innerHTML = '<span class="chat-cursor"></span>';
+    } else {
+      bubble.innerHTML = renderChatMarkdown(content);
+    }
+
+    wrap.appendChild(meta);
+    wrap.appendChild(bubble);
+    msgs.appendChild(wrap);
+    msgs.scrollTop = msgs.scrollHeight;
+    updateChatVisibility();
+    return bubble;
+  }
+
+  // ── Markdown rendering inside chat ────────────────────────────────────────
+  // marked.js is already bundled in this webview — use it for full GitHub-
+  // accurate rendering so code blocks, lists, and inline code all look right.
+  function renderChatMarkdown(text) {
+    try { return marked.parse(text || ''); } catch { return escHtml(text || ''); }
+  }
+
+  // ── Send a message ─────────────────────────────────────────────────────────
+  function sendChatMessage() {
+    if (chatState.streaming) return;
+    var input = qs('#chat-input');
+    var text  = input ? input.value.trim() : '';
+    if (!text) return;
+
+    // Add user message
+    chatState.messages.push({ role: 'user', content: text });
+    appendMessage('user', text, false);
+    input.value = '';
+    input.style.height = 'auto'; // reset textarea height
+
+    // Show send button as stop
+    var sendBtn = qs('#btn-chat-send');
+    if (sendBtn) sendBtn.classList.add('chat-stop');
+    chatState.streaming = true;
+
+    // Create assistant bubble (streaming placeholder)
+    chatState.streamText = '';
+    chatState.streamEl   = appendMessage('assistant', '', true);
+
+    // Send to extension
+    vsc.postMessage({
+      type:         'promptRun',
+      provider:     chatState.provider,
+      model:        chatState.model,
+      systemPrompt: currentMarkdown,
+      messages:     chatState.messages.map(function(m) { return { role: m.role, content: m.content }; }),
+    });
+  }
+
+  qs('#btn-chat-send')?.addEventListener('click', function() {
+    if (chatState.streaming) {
+      // Stop: just reset state (we can't cancel fetch easily, but UI resets)
+      chatState.streaming = false;
+      var sendBtn = qs('#btn-chat-send');
+      if (sendBtn) sendBtn.classList.remove('chat-stop');
+      finaliseStream();
+    } else {
+      sendChatMessage();
+    }
+  });
+
+  qs('#chat-input')?.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  });
+
+  // Auto-resize textarea as user types
+  qs('#chat-input')?.addEventListener('input', function() {
+    var ta = qs('#chat-input');
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+  });
+
+  // ── Handle streaming chunks from extension ─────────────────────────────────
+  function handlePromptChunk(text) {
+    if (!chatState.streamEl) return;
+    chatState.streamText += text;
+    // Render markdown with streaming cursor appended
+    chatState.streamEl.innerHTML = renderChatMarkdown(chatState.streamText) + '<span class="chat-cursor"></span>';
+    var msgs = qs('#chat-messages');
+    if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function finaliseStream() {
+    if (chatState.streamEl) {
+      chatState.streamEl.innerHTML = renderChatMarkdown(chatState.streamText);
+      chatState.messages.push({ role: 'assistant', content: chatState.streamText });
+    }
+    chatState.streamEl  = null;
+    chatState.streamText = '';
+    chatState.streaming  = false;
+    var sendBtn = qs('#btn-chat-send');
+    if (sendBtn) sendBtn.classList.remove('chat-stop');
+  }
+
+  function handlePromptError(err) {
+    if (chatState.streamEl) {
+      chatState.streamEl.innerHTML = '<span style="color:#ef4444">⚠ ' + escHtml(err) + '</span>';
+    }
+    finaliseStream();
+  }
+
+  // ── Handle messages from extension ────────────────────────────────────────
+  // (these are added to the existing window.addEventListener('message') handler below)
+  // Registering additional handlers here via a simple dispatcher
+  window.addEventListener('message', function(ev) {
+    var msg = ev.data;
+    if (msg.type === 'modelsList')    { buildModelMenu(msg.models, msg.configured); }
+    if (msg.type === 'promptStart')   { /* already showing streaming bubble */ }
+    if (msg.type === 'promptChunk')   { handlePromptChunk(msg.text); }
+    if (msg.type === 'promptDone')    { finaliseStream(); }
+    if (msg.type === 'promptError')   { handlePromptError(msg.error); }
+    if (msg.type === 'contextSummary') { renderContextComposer(msg.summary); }
+    if (msg.type === 'contextCopied') {
+      var btn = qs('#btn-ctx-copy');
+      if (btn) { btn.textContent = '✓ Copied!'; setTimeout(function() { btn.textContent = 'Copy merged'; }, 2000); }
+    }
+  });
+
   // ── Theme picker ───────────────────────────────────────────────────────────
   function applyTheme(t) {
     document.documentElement.setAttribute('data-m', t);
@@ -3292,6 +3837,8 @@ export class MarkdownPreviewPanel {
 
     this._panel.webview.onDidReceiveMessage(async msg => {
       if (msg.type === 'openLink') { vscode.env.openExternal(vscode.Uri.parse(msg.href)); }
+      if (msg.type === 'setApiKey')    { vscode.commands.executeCommand('markr.setApiKey', msg.provider); }
+      if (msg.type === 'openSettings') { vscode.commands.executeCommand('workbench.action.openSettings', 'markr'); }
       if (msg.type === 'copyMarkdown') {
         vscode.env.clipboard.writeText(this._document.getText()).then(() =>
           vscode.window.setStatusBarMessage('$(check) Markr: Markdown copied', 3000)
@@ -3770,6 +4317,7 @@ export class MarkdownPreviewPanel {
     <div class="sep-v"></div>
     <button id="btn-edit" class="tb-btn${autoEdit ? ' accent' : ''}" title="Split edit mode">${autoEdit ? '⚡ Edit' : 'Edit'}</button>
     <button id="btn-save-file" class="tb-btn" title="Save (⌘S / Ctrl+S)">Save</button>
+    <button id="btn-run" class="tb-btn" title="Open Prompt Runner — test this file as a system prompt">▶ Run</button>
     <button id="btn-source" class="tb-btn" title="Open Markdown source in VS Code editor">${ICON.source} Source</button>
     <div class="sep-v"></div>
     <button id="btn-paste-preview" class="tb-btn" title="Preview Clipboard — instantly render Markdown you copied from Claude, ChatGPT, Notion, or anywhere. No file needed.">${ICON.paste} Preview Clipboard</button>
@@ -3883,6 +4431,65 @@ export class MarkdownPreviewPanel {
       <textarea id="edit-area" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Start writing Markdown…"></textarea>
       <div id="split-resizer" title="Drag to resize editor and preview"></div>
       <div id="split-preview"><article class="markdown-body">${body}</article></div>
+
+      <!-- ── Prompt Runner chat panel ─────────────────────────────────── -->
+      <div id="chat-panel">
+        <!-- Header: system prompt info + model picker + new chat -->
+        <div id="chat-header">
+          <span class="chat-sys-info" id="chat-sys-info">
+            <strong>System:</strong> ${filename}
+          </span>
+          <button id="btn-chat-new" title="Start a new conversation">New chat</button>
+          <div class="chat-model-wrap">
+            <button id="btn-chat-model">
+              <span class="provider-dot"></span>
+              <span id="chat-model-label">Claude 4 Sonnet</span>
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div id="chat-model-menu">
+              <!-- populated by JS from MODELS list -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Setup screen — shown when no API key is configured -->
+        <div id="chat-setup">
+          <div class="ce-icon">⚡</div>
+          <div class="cs-title">Set up Prompt Runner</div>
+          <div class="cs-sub">Test your AI config files against real models — without leaving VS Code.</div>
+          <button class="cs-provider-btn" data-provider="anthropic">
+            <span class="cs-provider-icon">✦</span>
+            <div><div style="font-weight:600">Anthropic</div><div style="font-size:11px;opacity:.6">Claude 4, 3.5 Sonnet</div></div>
+          </button>
+          <button class="cs-provider-btn" data-provider="openai">
+            <span class="cs-provider-icon">◎</span>
+            <div><div style="font-weight:600">OpenAI</div><div style="font-size:11px;opacity:.6">GPT-4o, o3-mini</div></div>
+          </button>
+          <button class="cs-provider-btn" data-provider="google">
+            <span class="cs-provider-icon">◇</span>
+            <div><div style="font-weight:600">Google</div><div style="font-size:11px;opacity:.6">Gemini 2.0 Flash</div></div>
+          </button>
+          <div class="cs-lock">🔒 Keys stored in VS Code's encrypted secret storage — never in plain text or git</div>
+        </div>
+
+        <!-- Empty state — shown before first message -->
+        <div id="chat-empty">
+          <div class="ce-icon">💬</div>
+          <div class="ce-title">Test your prompt</div>
+          <div class="ce-sub">The current file is your system prompt. Ask anything to test how the model responds.</div>
+        </div>
+
+        <!-- Messages -->
+        <div id="chat-messages" style="display:none"></div>
+
+        <!-- Input -->
+        <div id="chat-input-wrap">
+          <textarea id="chat-input" rows="1" placeholder="Ask anything about this file… (Enter to send, Shift+Enter for newline)"></textarea>
+          <button id="btn-chat-send" title="Send (Enter)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>

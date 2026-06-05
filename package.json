@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr – AI Config Editor & Markdown Preview",
   "description": "The AI config editor & Markdown preview for VS Code — auto-opens CLAUDE.md / .cursorrules / agent.md in split-edit mode, real-time Agent Watch (live preview while Claude edits), copy diagrams as PNG, rich copy to Slack, Mermaid, TOC, themes, PDF export",
-  "version": "3.9.7",
+  "version": "3.10.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
