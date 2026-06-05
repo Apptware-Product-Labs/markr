@@ -344,6 +344,8 @@ export async function activate(context: vscode.ExtensionContext) {
       if (!key) return;
       await promptRunner.setKey(chosen as 'anthropic' | 'openai' | 'google', key);
       vscode.window.showInformationMessage(`✓ ${chosen} API key saved securely`);
+      // Refresh models list in any open Markr panel so the setup screen clears
+      if (MarkdownPreviewPanel.onGetModels) MarkdownPreviewPanel.onGetModels();
     })
   );
 

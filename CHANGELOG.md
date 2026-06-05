@@ -7,6 +7,24 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.10.2] — 2026-06-05
+
+### Fixed
+- **Prompt Runner DOM bug**: `appendMessage` was mixing `innerHTML +=` with `appendChild` which destroyed the copy button node — rebuilt using pure DOM methods
+- **Auto-scroll during streaming**: always scrolls to bottom during streaming; respects user scroll position once streaming is done
+- **After adding API key, chat panel refreshes immediately** — setup screen disappears and model picker activates without needing to reopen
+- **Streaming text display**: shows escaped plain text while streaming (fast), renders full markdown only when done (avoids layout thrash on every chunk)
+- **Error messages** styled with icon instead of raw red text
+- **`markr.setApiKey` added to command palette** so users can update keys anytime via `Ctrl+Shift+P`
+
+### Added
+- **Suggestion chips in empty state** — 3 context-aware starter prompts based on the file type (CLAUDE.md shows different suggestions than .cursorrules). Click to fill the input.
+- **Escape to close** chat panel
+- **System prompt info badge** shows filename + token count at top of chat panel
+- **Send button properly disables/enables** during streaming
+
+---
+
 ## [3.10.1] — 2026-06-05
 
 ### Added

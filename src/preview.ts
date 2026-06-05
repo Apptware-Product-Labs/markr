@@ -852,7 +852,14 @@ body.chat-mode:not(.edit-mode) #edit-area { display: none; }
 }
 #chat-empty .ce-icon { font-size: 32px; margin-bottom: 4px; }
 #chat-empty .ce-title { font-size: 14px; font-weight: 600; color: var(--text-muted); }
-#chat-empty .ce-sub { font-size: 12px; line-height: 1.5; max-width: 220px; }
+#chat-empty .ce-sub { font-size: 12px; line-height: 1.5; max-width: 260px; }
+#chat-suggestions { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 280px; margin-top: 4px; }
+.chat-suggestion {
+  padding: 7px 12px; border-radius: 8px; font-size: 12px; text-align: left;
+  background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-muted);
+  cursor: pointer; transition: background .1s, border-color .1s, color .1s; font-family: inherit;
+}
+.chat-suggestion:hover { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
 
 #chat-setup {
   flex: 1; display: none; flex-direction: column;
@@ -2868,9 +2875,11 @@ const SCRIPT = /* javascript */`
     if (chatState.open) return;
     chatState.open = true;
     document.body.classList.add('chat-mode');
-    if (!editMode) enterEditMode();           // show left pane with current file
+    if (!editMode) enterEditMode();  // show file on the left while chatting on the right
     qs('#btn-run')?.classList.add('active');
-    vsc.postMessage({ type: 'getModels' });   // request available models + keys
+    updateChatSysInfo();
+    populateSuggestions();
+    vsc.postMessage({ type: 'getModels' }); // get available models + check which keys exist
     updateChatVisibility();
     qs('#chat-input')?.focus();
   }
@@ -2885,9 +2894,62 @@ const SCRIPT = /* javascript */`
     }
   }
 
+  // Update the system-prompt info badge at top of chat panel
+  function updateChatSysInfo() {
+    var info = qs('#chat-sys-info');
+    if (!info) return;
+    var fname = qs('.fname')?.textContent || 'current file';
+    var tok   = qs('#stat-tok')?.textContent || '';
+    info.innerHTML = '<strong>System:</strong> ' + escHtml(fname)
+      + (tok ? '<span style="margin-left:6px;color:var(--text-faint)">' + escHtml(tok) + '</span>' : '');
+  }
+
+  // Escape closes chat if open
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && chatState.open && !chatState.streaming) {
+      closeChat();
+    }
+  }, true);
+
   qs('#btn-run')?.addEventListener('click', function() {
     if (chatState.open) { closeChat(); } else { openChat(); }
   });
+
+  // Populate suggestion chips based on filename context
+  function populateSuggestions() {
+    var sugDiv = qs('#chat-suggestions');
+    if (!sugDiv) return;
+    var fname = (qs('.fname')?.textContent || '').toLowerCase();
+    var prompts = fname.includes('claude') || fname.includes('agent') || fname.includes('skill')
+      ? [
+          'What are the main rules in this config?',
+          'Summarise what this agent is supposed to do',
+          'What would you never do based on these instructions?',
+          'How many tokens does this use? Am I wasting any?',
+        ]
+      : fname.includes('cursor') || fname.includes('rules')
+      ? [
+          'What coding patterns does this enforce?',
+          'What are the most important constraints here?',
+          'Summarise these rules in one paragraph',
+        ]
+      : [
+          'Summarise this document in 3 bullet points',
+          'What are the key decisions documented here?',
+          'What is missing or unclear in this document?',
+        ];
+    sugDiv.innerHTML = '';
+    prompts.slice(0, 3).forEach(function(p) {
+      var btn = document.createElement('button');
+      btn.className = 'chat-suggestion';
+      btn.textContent = p;
+      btn.addEventListener('click', function() {
+        var inp = qs('#chat-input');
+        if (inp) { inp.value = p; inp.focus(); }
+      });
+      sugDiv.appendChild(btn);
+    });
+  }
 
   // ── Visibility logic ───────────────────────────────────────────────────────
   function updateChatVisibility() {
@@ -3019,45 +3081,54 @@ const SCRIPT = /* javascript */`
     var msgs = qs('#chat-messages');
     if (!msgs) return null;
 
-    var wrap = document.createElement('div');
-    wrap.className = 'chat-msg ' + role;
+    var modelObj  = chatState.models.find(function(m) { return m.id === chatState.model; });
+    var senderName = role === 'user' ? 'You' : (modelObj ? modelObj.label : 'Assistant');
 
+    // Build meta row purely via DOM (never mix innerHTML + appendChild — it destroys nodes)
     var meta = document.createElement('div');
     meta.className = 'chat-msg-meta';
 
-    var modelName = chatState.models.find(function(m) { return m.id === chatState.model; });
-    var senderName = role === 'user' ? 'You' : (modelName ? modelName.label : 'Assistant');
+    var nameSpan = document.createElement('span');
+    nameSpan.textContent = senderName;
 
     var copyBtn = document.createElement('button');
     copyBtn.className = 'chat-msg-copy';
     copyBtn.textContent = 'Copy';
-    copyBtn.addEventListener('click', function() {
-      navigator.clipboard.writeText(wrap.querySelector('.chat-bubble')?.textContent || '');
-      copyBtn.textContent = '✓';
-      setTimeout(function() { copyBtn.textContent = 'Copy'; }, 1500);
-    });
 
     if (role === 'user') {
-      meta.innerHTML = '<span>' + senderName + '</span>';
+      meta.appendChild(nameSpan);
       meta.appendChild(copyBtn);
     } else {
       meta.appendChild(copyBtn);
-      meta.innerHTML += '<span>' + senderName + '</span>';
+      meta.appendChild(nameSpan);
     }
 
     var bubble = document.createElement('div');
     bubble.className = 'chat-bubble';
+    bubble.innerHTML = streaming
+      ? '<span class="chat-cursor"></span>'
+      : renderChatMarkdown(content);
 
-    if (streaming) {
-      bubble.innerHTML = '<span class="chat-cursor"></span>';
-    } else {
-      bubble.innerHTML = renderChatMarkdown(content);
-    }
+    // Copy button: copies the bubble's text content
+    copyBtn.addEventListener('click', function() {
+      var text = bubble.textContent || '';
+      navigator.clipboard.writeText(text);
+      copyBtn.textContent = '✓ Copied';
+      setTimeout(function() { copyBtn.textContent = 'Copy'; }, 1600);
+    });
 
+    var wrap = document.createElement('div');
+    wrap.className = 'chat-msg ' + role;
     wrap.appendChild(meta);
     wrap.appendChild(bubble);
+
     msgs.appendChild(wrap);
-    msgs.scrollTop = msgs.scrollHeight;
+
+    // Only auto-scroll if user is already near the bottom (don't hijack manual scrolling)
+    var threshold = 80;
+    var nearBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < threshold;
+    if (nearBottom || streaming) msgs.scrollTop = msgs.scrollHeight;
+
     updateChatVisibility();
     return bubble;
   }
@@ -3132,27 +3203,34 @@ const SCRIPT = /* javascript */`
   function handlePromptChunk(text) {
     if (!chatState.streamEl) return;
     chatState.streamText += text;
-    // Render markdown with streaming cursor appended
-    chatState.streamEl.innerHTML = renderChatMarkdown(chatState.streamText) + '<span class="chat-cursor"></span>';
+    // Show plain text while streaming (fast), render markdown fully on done
+    var preview = chatState.streamText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+      .replace(/\n/g,'<br>');
+    chatState.streamEl.innerHTML = preview + '<span class="chat-cursor"></span>';
     var msgs = qs('#chat-messages');
-    if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    if (msgs) msgs.scrollTop = msgs.scrollHeight; // always scroll during streaming
   }
 
   function finaliseStream() {
     if (chatState.streamEl) {
+      // Now render full markdown (code blocks, lists etc.) after stream completes
       chatState.streamEl.innerHTML = renderChatMarkdown(chatState.streamText);
       chatState.messages.push({ role: 'assistant', content: chatState.streamText });
     }
-    chatState.streamEl  = null;
+    chatState.streamEl   = null;
     chatState.streamText = '';
     chatState.streaming  = false;
     var sendBtn = qs('#btn-chat-send');
-    if (sendBtn) sendBtn.classList.remove('chat-stop');
+    if (sendBtn) { sendBtn.classList.remove('chat-stop'); sendBtn.disabled = false; }
   }
 
   function handlePromptError(err) {
     if (chatState.streamEl) {
-      chatState.streamEl.innerHTML = '<span style="color:#ef4444">⚠ ' + escHtml(err) + '</span>';
+      chatState.streamEl.innerHTML =
+        '<div style="color:#ef4444;display:flex;align-items:center;gap:6px">'
+        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+        + escHtml(err) + '</div>';
     }
     finaliseStream();
   }
@@ -4676,7 +4754,8 @@ export class MarkdownPreviewPanel {
         <div id="chat-empty">
           <div class="ce-icon">💬</div>
           <div class="ce-title">Test your prompt</div>
-          <div class="ce-sub">The current file is your system prompt. Ask anything to test how the model responds.</div>
+          <div class="ce-sub">Your file is the system prompt. Try one of these:</div>
+          <div id="chat-suggestions"></div>
         </div>
 
         <!-- Messages -->
