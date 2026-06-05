@@ -1106,11 +1106,12 @@ body.resizing-sidebar { cursor: col-resize !important; user-select: none; }
 .sb-section.collapsed .sb-body { display: none; }
 .sb-section.collapsed #file-search-wrap { display: none; }
 .sb-ai-label {
-  padding: 7px 10px 2px; font-size: 10.5px; font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--text-muted); font-family: inherit;   /* readable, not faint */
+  padding: 7px 10px 2px; font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-2, var(--text)); font-family: inherit;
+  opacity: 0.8;
 }
-.sb-ai-label.accent { color: var(--accent); font-weight: 700; opacity: 1; }
+.sb-ai-label.accent { color: var(--accent); opacity: 1; }
 
 /* File search input */
 #file-search-wrap {
@@ -1165,31 +1166,32 @@ body.resizing-sidebar { cursor: col-resize !important; user-select: none; }
    Clean, readable rows: filename clearly visible, path secondary but legible.
    Folder headers look like VS Code Explorer sections, not tiny uppercase.  */
 
-/* Folder group header — clear and readable, not invisible uppercase text */
+/* Folder group header */
 .file-dir {
   width: 100%; display: flex; align-items: center; gap: 5px;
   padding: 5px 8px 3px calc(6px + (var(--depth, 0) * 12px));
   border: none; background: transparent; cursor: pointer; text-align: left;
-  font-size: 12px; font-weight: 600;
-  color: var(--text-muted); white-space: nowrap;
+  font-size: 12.5px; font-weight: 600;
+  color: var(--text-2, var(--text)); /* uses --text-2 if available, else full --text */
+  white-space: nowrap;
 }
 .file-dir:hover { background: var(--bg-hover); color: var(--text); }
 .file-dir .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .file-dir .folder-count {
-  font-size: 10px; color: var(--text-faint);
+  font-size: 10px; color: var(--text-muted);
   background: var(--bg-hover); border-radius: 8px; padding: 0 5px;
 }
-.folder-chevron { width: 9px; height: 9px; transition: transform 0.12s; flex-shrink: 0; color: var(--text-faint); }
+.folder-chevron { width: 9px; height: 9px; transition: transform 0.12s; flex-shrink: 0; opacity: 0.6; }
 .file-dir.collapsed .folder-chevron { transform: rotate(-90deg); }
 .folder-svg-closed { opacity: 0.5; flex-shrink: 0; }
-.folder-svg-open { opacity: 0.7; color: var(--accent); flex-shrink: 0; }
+.folder-svg-open { opacity: 0.7; flex-shrink: 0; }
 
-/* File rows — filename is fully readable, path is clearly secondary */
+/* File rows */
 .file-item {
   display: flex; align-items: center;
   padding: 4px 8px 4px calc(10px + (var(--depth, 0) * 12px));
   gap: 6px; font-size: 12.5px; font-family: inherit;
-  color: var(--text);   /* ← filename readable at full contrast */
+  color: var(--text); /* full contrast always */
   cursor: pointer; border-left: 2px solid transparent;
   transition: background 0.08s, border-color 0.08s;
   user-select: none; min-width: 0;
@@ -1199,24 +1201,25 @@ body.resizing-sidebar { cursor: col-resize !important; user-select: none; }
   color: var(--accent); border-left-color: var(--accent);
   background: var(--accent-bg);
 }
-.file-item svg { flex-shrink: 0; opacity: 0.45; }
-.file-item.active svg, .file-item.ai svg { opacity: 0.9; }
+.file-item svg { flex-shrink: 0; opacity: 0.5; }
+.file-item.active svg, .file-item.ai svg { opacity: 1; }
 .file-item.ai svg { color: var(--accent); }
 
-/* Filename — always at full text contrast */
+/* Filename — always full contrast */
 .file-name {
   flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   min-width: 0; color: var(--text);
 }
 .file-item.active .file-name { color: var(--accent); }
 
-/* Path label — clearly secondary but actually readable (no opacity hack) */
+/* Path label — visible but secondary; use text-muted not text-faint */
+/* text-faint is near-invisible in dark theme (#48443e on dark bg) */
 .file-path {
-  font-size: 11px; color: var(--text-faint); flex-shrink: 0;
+  font-size: 10.5px; color: var(--text-muted); flex-shrink: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  max-width: 100px;
-  /* opacity is NOT used here — var(--text-faint) is already dim enough */
+  max-width: 100px; opacity: 0.75;
 }
+.file-item:hover .file-path { opacity: 1; }
 
 /* AI kind badge */
 .file-ai-kind {
