@@ -153,8 +153,22 @@ export class PromptRunner {
           'Content-Length':    Buffer.byteLength(body),
         },
       }, res => {
+        // 🔴 Fix: check HTTP status before attempting to parse SSE
+        if (res.statusCode && res.statusCode >= 400) {
+          let errBody = '';
+          res.on('data', c => errBody += c);
+          res.on('end', () => {
+            try { const j = JSON.parse(errBody); onError(`Anthropic ${res.statusCode}: ${j.error?.message ?? errBody.slice(0, 120)}`); }
+            catch  { onError(`Anthropic HTTP ${res.statusCode}: ${errBody.slice(0, 120)}`); }
+            resolve();
+          });
+          return;
+        }
         res.setEncoding('utf-8');
         let buf = '';
+        // 🔴 Fix: guard against double onDone (message_stop fires, then res.on('end') also fires)
+        let finished = false;
+        const finish = (err?: string) => { if (finished) return; finished = true; err ? onError(err) : onDone(); resolve(); };
         res.on('data', chunk => {
           buf += chunk;
           const lines = buf.split('\n');
@@ -168,15 +182,17 @@ export class PromptRunner {
               if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
                 onChunk(ev.delta.text);
               }
-              if (ev.type === 'message_stop') { onDone(); resolve(); }
-              if (ev.type === 'error') { onError(ev.error?.message ?? 'Anthropic error'); resolve(); }
+              if (ev.type === 'message_stop') { finish(); }
+              if (ev.type === 'error') { finish(ev.error?.message ?? 'Anthropic error'); }
             } catch { /* partial JSON — wait for next chunk */ }
           }
         });
-        res.on('end', () => { onDone(); resolve(); });
-        res.on('error', e => { onError(e.message); reject(e); });
+        res.on('end', () => finish());
+        res.on('error', e => { finish(e.message); });
       });
       req.on('error', e => { onError(e.message); reject(e); });
+      // 🟡 Fix: add socket timeout so streams don't hang indefinitely
+      req.setTimeout(60_000, () => { req.destroy(); onError('Request timed out after 60s'); });
       req.write(body);
       req.end();
     });
@@ -202,8 +218,20 @@ export class PromptRunner {
           'Content-Length': Buffer.byteLength(body),
         },
       }, res => {
+        if (res.statusCode && res.statusCode >= 400) {
+          let errBody = '';
+          res.on('data', c => errBody += c);
+          res.on('end', () => {
+            try { const j = JSON.parse(errBody); onError(`OpenAI ${res.statusCode}: ${j.error?.message ?? errBody.slice(0, 120)}`); }
+            catch  { onError(`OpenAI HTTP ${res.statusCode}: ${errBody.slice(0, 120)}`); }
+            resolve();
+          });
+          return;
+        }
         res.setEncoding('utf-8');
         let buf = '';
+        let finished = false;
+        const finish = (err?: string) => { if (finished) return; finished = true; err ? onError(err) : onDone(); resolve(); };
         res.on('data', chunk => {
           buf += chunk;
           const lines = buf.split('\n');
@@ -211,7 +239,7 @@ export class PromptRunner {
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
             const data = line.slice(6).trim();
-            if (data === '[DONE]') { onDone(); resolve(); return; }
+            if (data === '[DONE]') { finish(); return; }
             try {
               const ev = JSON.parse(data);
               const text = ev.choices?.[0]?.delta?.content;
@@ -219,10 +247,11 @@ export class PromptRunner {
             } catch { /* partial */ }
           }
         });
-        res.on('end', () => { onDone(); resolve(); });
-        res.on('error', e => { onError(e.message); reject(e); });
+        res.on('end', () => finish());
+        res.on('error', e => finish(e.message));
       });
       req.on('error', e => { onError(e.message); reject(e); });
+      req.setTimeout(60_000, () => { req.destroy(); onError('Request timed out after 60s'); });
       req.write(body);
       req.end();
     });
@@ -242,18 +271,32 @@ export class PromptRunner {
         contents,
         generationConfig: { maxOutputTokens: 4096 },
       });
-      const path = `/v1beta/models/${opts.model}:streamGenerateContent?alt=sse&key=${key}`;
+      // 🔴 Fix: API key moved from URL query string to header (was visible in logs/proxies)
+      const gPath = `/v1beta/models/${opts.model}:streamGenerateContent?alt=sse`;
       const req = https.request({
         hostname: 'generativelanguage.googleapis.com',
-        path,
+        path:     gPath,
         method:   'POST',
         headers:  {
-          'Content-Type':  'application/json',
-          'Content-Length': Buffer.byteLength(body),
+          'Content-Type':    'application/json',
+          'X-Goog-Api-Key':  key,  // secure header, not URL query param
+          'Content-Length':  Buffer.byteLength(body),
         },
       }, res => {
+        if (res.statusCode && res.statusCode >= 400) {
+          let errBody = '';
+          res.on('data', c => errBody += c);
+          res.on('end', () => {
+            try { const j = JSON.parse(errBody); onError(`Google ${res.statusCode}: ${j.error?.message ?? errBody.slice(0, 120)}`); }
+            catch  { onError(`Google HTTP ${res.statusCode}: ${errBody.slice(0, 120)}`); }
+            resolve();
+          });
+          return;
+        }
         res.setEncoding('utf-8');
         let buf = '';
+        let finished = false;
+        const finish = (err?: string) => { if (finished) return; finished = true; err ? onError(err) : onDone(); resolve(); };
         res.on('data', chunk => {
           buf += chunk;
           const lines = buf.split('\n');
@@ -267,10 +310,11 @@ export class PromptRunner {
             } catch { /* partial */ }
           }
         });
-        res.on('end', () => { onDone(); resolve(); });
-        res.on('error', e => { onError(e.message); reject(e); });
+        res.on('end', () => finish());
+        res.on('error', e => finish(e.message));
       });
       req.on('error', e => { onError(e.message); reject(e); });
+      req.setTimeout(60_000, () => { req.destroy(); onError('Request timed out after 60s'); });
       req.write(body);
       req.end();
     });

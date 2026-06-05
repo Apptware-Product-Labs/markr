@@ -154,6 +154,10 @@ export class ContextComposer {
     selected: boolean,
   ): ContextFile | null {
     try {
+      // Note: readFileSync is intentional here for the directory-walk phase
+      // (called synchronously within the directory listing loop).
+      // The async findFiles path in step 2 is non-blocking.
+      // TODO: migrate to fs.promises for large workspaces (tracked in CLAUDE.md).
       const content  = fs.readFileSync(fullPath, 'utf-8');
       const filename = nodePath.basename(fullPath);
       const relPath  = wsRoot && fullPath.startsWith(wsRoot)

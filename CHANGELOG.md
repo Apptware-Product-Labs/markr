@@ -7,6 +7,24 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.10.3] — 2026-06-05
+
+### Security
+- **XSS fix in chat**: user messages now render as plain text (`textContent`) — previously `renderChatMarkdown` called `marked.parse()` + `innerHTML` on user input, allowing HTML injection in the VS Code webview context
+- **Google API key moved from URL to header**: was visible in HTTP logs and proxies; now sent as `X-Goog-Api-Key` header (same pattern as Anthropic and OpenAI)
+
+### Fixed
+- **Double `onDone` call**: Anthropic and OpenAI streaming called `onDone()` twice — once on the final SSE event and again on TCP close — resulting in a blank duplicate assistant message being appended to conversation history; fixed with a `finished` guard flag
+- **Panel disposal crash**: closing Markr while a stream was in flight caused `panel.postMessage()` to throw "webview is disposed"; all post-stream `postMessage` calls are now wrapped in `try/catch`
+- **HTTP error codes silently ignored**: 401, 429, 500 responses from all three providers now surface a readable error message instead of a silent empty bubble
+- **Model picker disabled during streaming**: changing the model while a response was arriving corrupted conversation history sent to subsequent turns
+- **Stale streaming state on panel reopen**: re-opening Markr after closing mid-stream left the send button permanently in "stop" mode; now reset on `openChat()`
+- **Empty response shows helpful message** instead of a blank bubble
+- **Request timeout added (60s)**: streams no longer hang indefinitely on network issues
+- **`agent.md` and `.windsurfrules` added to AI_CONFIG_NAMES** in markrExplorer.ts — these files were not getting the star icon or being sorted to the top of the file list
+
+---
+
 ## [3.10.2] — 2026-06-05
 
 ### Fixed

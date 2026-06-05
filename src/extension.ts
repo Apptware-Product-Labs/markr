@@ -377,11 +377,15 @@ export async function activate(context: vscode.ExtensionContext) {
 
     panel.postMessage({ type: 'promptStart' });
 
+    // 🔴 Fix: panel may be disposed (user closed it) while the stream is in flight.
+    // Wrap every postMessage in a try/catch — disposing throws "webview is disposed".
+    const safePost = (msg2: object) => { try { panel.postMessage(msg2); } catch { /* panel disposed */ } };
+
     await promptRunner.streamRun(
       { provider: msg.provider, model: msg.model, systemPrompt: msg.systemPrompt, messages: msg.messages },
-      (text) => panel.postMessage({ type: 'promptChunk', text }),
-      ()     => panel.postMessage({ type: 'promptDone' }),
-      (err)  => panel.postMessage({ type: 'promptError', error: err }),
+      (text) => safePost({ type: 'promptChunk', text }),
+      ()     => safePost({ type: 'promptDone' }),
+      (err)  => safePost({ type: 'promptError', error: err }),
     );
   };
 

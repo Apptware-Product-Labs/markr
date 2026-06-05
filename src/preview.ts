@@ -2877,6 +2877,14 @@ const SCRIPT = /* javascript */`
     document.body.classList.add('chat-mode');
     if (!editMode) enterEditMode();  // show file on the left while chatting on the right
     qs('#btn-run')?.classList.add('active');
+    // 🟡 Fix: reset stale streaming state in case panel was closed mid-stream
+    if (chatState.streaming) {
+      chatState.streaming = false;
+      chatState.streamEl  = null;
+      chatState.streamText = '';
+      var sendBtn = qs('#btn-chat-send');
+      if (sendBtn) { sendBtn.classList.remove('chat-stop'); sendBtn.disabled = false; }
+    }
     updateChatSysInfo();
     populateSuggestions();
     vsc.postMessage({ type: 'getModels' }); // get available models + check which keys exist
@@ -3105,9 +3113,16 @@ const SCRIPT = /* javascript */`
 
     var bubble = document.createElement('div');
     bubble.className = 'chat-bubble';
-    bubble.innerHTML = streaming
-      ? '<span class="chat-cursor"></span>'
-      : renderChatMarkdown(content);
+    if (streaming) {
+      bubble.innerHTML = '<span class="chat-cursor"></span>';
+    } else if (role === 'user') {
+      // 🔴 Security fix: user input rendered as plain text only — never as HTML.
+      // renderChatMarkdown calls marked.parse() + innerHTML which would allow XSS.
+      bubble.textContent = content;
+    } else {
+      // Assistant content comes from the LLM — render as markdown for readability
+      bubble.innerHTML = renderChatMarkdown(content);
+    }
 
     // Copy button: copies the bubble's text content
     copyBtn.addEventListener('click', function() {
@@ -3153,9 +3168,11 @@ const SCRIPT = /* javascript */`
     input.value = '';
     input.style.height = 'auto'; // reset textarea height
 
-    // Show send button as stop
+    // Show send button as stop, disable model picker (changing model mid-stream corrupts history)
     var sendBtn = qs('#btn-chat-send');
     if (sendBtn) sendBtn.classList.add('chat-stop');
+    var modelBtn = qs('#btn-chat-model');
+    if (modelBtn) modelBtn.disabled = true;
     chatState.streaming = true;
 
     // Create assistant bubble (streaming placeholder)
@@ -3214,15 +3231,25 @@ const SCRIPT = /* javascript */`
 
   function finaliseStream() {
     if (chatState.streamEl) {
-      // Now render full markdown (code blocks, lists etc.) after stream completes
-      chatState.streamEl.innerHTML = renderChatMarkdown(chatState.streamText);
-      chatState.messages.push({ role: 'assistant', content: chatState.streamText });
+      var content = chatState.streamText;
+      // 🟡 Fix: show a clear message if the model returned an empty response
+      if (!content.trim()) {
+        chatState.streamEl.innerHTML =
+          '<em style="color:var(--text-faint)">(The model returned an empty response. Try rephrasing your question.)</em>';
+      } else {
+        // Render full markdown now that streaming is complete
+        chatState.streamEl.innerHTML = renderChatMarkdown(content);
+      }
+      chatState.messages.push({ role: 'assistant', content: content });
     }
     chatState.streamEl   = null;
     chatState.streamText = '';
     chatState.streaming  = false;
     var sendBtn = qs('#btn-chat-send');
     if (sendBtn) { sendBtn.classList.remove('chat-stop'); sendBtn.disabled = false; }
+    // 🟠 Fix: re-enable model picker after streaming ends
+    var modelBtn = qs('#btn-chat-model');
+    if (modelBtn) modelBtn.disabled = false;
   }
 
   function handlePromptError(err) {
