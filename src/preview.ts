@@ -94,98 +94,9 @@ function readingTime(words: number): string {
   return `${Math.max(1, Math.ceil(words / 200))} min`;
 }
 
-// ─── Model-aware token counting ──────────────────────────────────────────────
-
-type AiModel = 'claude' | 'gpt4' | 'gpt4o' | 'generic';
-
-/** Detect which AI model a file is for based on its filename. */
-function detectModel(filename: string, relPath = ''): AiModel {
-  const f = filename.toLowerCase();
-  const p = relPath.toLowerCase();
-  // Claude / Anthropic
-  if (/^claude(\.local)?\.md$/i.test(f)) return 'claude';
-  if (f === 'agent.md' || f === 'agents.md' || f === 'skill.md' || f === 'skills.md') return 'claude';
-  if (f === 'system-prompt.md' || f === 'prompt.md' || f === 'prompts.md') return 'claude';
-  if (f === 'memory.md' || f === 'context.md') return 'claude';
-  // Windsurf uses Claude by default
-  if (f === '.windsurfrules' || f === 'windsurf.md') return 'claude';
-  // Cursor uses GPT-4 (cl100k)
-  if (f === '.cursorrules' || f === 'cursor.md') return 'gpt4';
-  // Copilot uses GPT-4o (o200k)
-  if (p.includes('copilot') || f.includes('copilot')) return 'gpt4o';
-  // Aider, Codex, OpenAI
-  if (f === 'aider.md' || f === 'codex.md' || f === 'openai.md' || f === 'gpt.md') return 'gpt4o';
-  return 'generic';
-}
-
-/** Model display label for the toolbar. */
-function modelLabel(model: AiModel): string {
-  switch (model) {
-    case 'claude':  return 'Claude';
-    case 'gpt4':    return 'GPT-4';
-    case 'gpt4o':   return 'GPT-4o';
-    default:        return '';
-  }
-}
-
-/**
- * Count tokens per model — content-aware heuristic (no external tokenizer library).
- * Separates code blocks (~3 chars/tok) from prose for better accuracy.
- */
-function countTokens(text: string, model: AiModel): number {
-  if (!text) return 0;
-
-  let codeChars = 0;
-  const prose = text
-    .replace(/```[\s\S]*?```/g, (m: string) => { codeChars += m.length; return ''; })
-    .replace(/`[^`\n]+`/g,      (m: string) => { codeChars += m.length; return ''; });
-
-  const codeTokens  = Math.round(codeChars / 3);
-  const ratioMap: Record<AiModel, number> = {
-    claude: 3.5, gpt4: 4.0, gpt4o: 3.8, llama3: 4.0, gemini: 3.3, mistral: 3.6, generic: 3.8,
-  };
-  const proseTokens = Math.round(prose.length / (ratioMap[model] ?? 3.8));
-  return codeTokens + proseTokens;
-}
-
-/** Per-heading section breakdown: [{heading, tokens}] */
-function sectionTokens(text: string, model: AiModel): Array<{ heading: string; tokens: number; level: number }> {
-  const lines   = text.split('\n');
-  const result: Array<{ heading: string; tokens: number; level: number }> = [];
-  let curHeading = '(preamble)';
-  let curLevel   = 0;
-  let curLines:   string[] = [];
-
-  const flush = () => {
-    if (curLines.length) {
-      result.push({ heading: curHeading, tokens: countTokens(curLines.join('\n'), model), level: curLevel });
-      curLines = [];
-    }
-  };
-
-  for (const line of lines) {
-    const m = line.match(/^(#{1,6})\s+(.*)/);
-    if (m) {
-      flush();
-      curHeading = m[2].trim();
-      curLevel   = m[1].length;
-      curLines   = [line];
-    } else {
-      curLines.push(line);
-    }
-  }
-  flush();
-  return result.filter(s => s.tokens > 0);
-}
-
-/** Format token count: 340 → "340 tok", 2400 → "2.4K tok" */
-function fmtTokens(n: number): string {
-  return n < 1000 ? `${n} tok` : `~${(n / 1000).toFixed(1)}K tok`;
-}
-
-/** Legacy compat: still used in a few places that don't have model context */
 function tokenEstimate(chars: number): string {
-  return fmtTokens(Math.round(chars / 3.8));
+  const t = Math.round(chars / 4);
+  return t < 1000 ? `${t} tok` : `~${(t / 1000).toFixed(1)}K tok`;
 }
 
 function docStats(text: string) {
@@ -537,53 +448,6 @@ body {
   font-size: 11px; color: var(--text-muted); white-space: nowrap; padding: 0 2px; cursor: default;
 }
 .stats-accent { color: var(--accent); }
-/* Token button — clickable, shows model label + section breakdown popup */
-.tok-btn {
-  background: transparent; border: none; padding: 0; cursor: pointer;
-  color: inherit; font-family: inherit; font-size: inherit; line-height: inherit;
-  display: inline-flex; align-items: center; gap: 4px;
-}
-.tok-btn:hover { color: var(--accent); }
-.tok-btn.stats-accent { color: var(--accent); }
-.tok-model {
-  font-size: 9px; padding: 1px 5px; border-radius: 8px; font-weight: 600;
-  background: var(--accent-bg); color: var(--accent);
-  border: 1px solid var(--accent-border); letter-spacing: 0.03em; line-height: 1.6;
-}
-/* Token section breakdown panel */
-#tok-panel {
-  position: fixed; z-index: 800;
-  background: var(--bg-panel); border: 1px solid var(--border);
-  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.35);
-  min-width: 260px; max-width: 340px; overflow: hidden;
-  display: none;
-}
-#tok-panel.open { display: block; }
-.tok-panel-hdr {
-  padding: 8px 12px 6px; font-size: 10px; font-weight: 700; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--text-faint);
-  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px;
-}
-.tok-panel-model { color: var(--accent); font-weight: 700; }
-.tok-panel-body { padding: 4px 0 6px; max-height: 280px; overflow-y: auto; }
-.tok-row {
-  display: flex; align-items: center; padding: 4px 12px; gap: 8px; cursor: pointer;
-  transition: background .08s;
-}
-.tok-row:hover { background: var(--bg-hover); }
-.tok-row-name { flex: 1; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tok-row-name.h1 { color: var(--text); font-weight: 600; }
-.tok-row-name.h2 { padding-left: 8px; }
-.tok-row-name.h3 { padding-left: 16px; font-size: 11.5px; }
-.tok-row-name.h4 { padding-left: 22px; font-size: 11px; }
-.tok-row-count { font-size: 11px; color: var(--text-faint); flex-shrink: 0; font-family: ui-monospace, monospace; min-width: 44px; text-align: right; }
-.tok-row-bar { height: 3px; border-radius: 2px; background: var(--accent); opacity: .5; min-width: 2px; flex-shrink: 0; transition: width .2s; }
-.tok-total {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 12px 4px; border-top: 1px solid var(--border);
-  font-size: 11px; color: var(--text-muted);
-}
-.tok-total strong { color: var(--accent); font-size: 12.5px; }
 .save-status {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 11px; opacity: 0; transition: opacity 0.2s, color 0.2s;
@@ -672,282 +536,6 @@ body:not(.edit-mode) #btn-save-file { display: none; }
   will-change: opacity, transform;
 }
 .sep-v { width: 1px; height: 16px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
-
-/* ═══════════════════════════════════════════════════════════════════════════
-   PROMPT RUNNER — Chat UI
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* Chat panel — slides in to replace #scroller when chat mode is active */
-#chat-panel {
-  display: none; flex-direction: column; flex: 1; min-width: 0; overflow: hidden;
-  background: var(--bg);
-}
-body.chat-mode #chat-panel    { display: flex; }
-body.chat-mode #scroller      { display: none; }
-body.chat-mode #split-preview { display: none; }
-body.chat-mode #split-resizer { display: none; }
-
-/* In chat mode the edit area stays (left), chat panel takes right */
-body.chat-mode.edit-mode #main { gap: 0; }
-body.chat-mode.edit-mode #edit-area { flex: 0 0 42%; border-right: 1px solid var(--border); }
-body.chat-mode.edit-mode #chat-panel { flex: 1; }
-body.chat-mode:not(.edit-mode) #edit-area { display: none; }
-
-/* ── Chat header ──────────────────────────────────────────────────────────── */
-#chat-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 12px 6px; border-bottom: 1px solid var(--border);
-  background: var(--bg-panel); flex-shrink: 0; gap: 8px;
-}
-.chat-sys-info {
-  font-size: 11px; color: var(--text-faint); flex: 1; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap;
-}
-.chat-sys-info strong { color: var(--text-muted); }
-
-/* ── Model selector ───────────────────────────────────────────────────────── */
-.chat-model-wrap { position: relative; flex-shrink: 0; }
-#btn-chat-model {
-  display: inline-flex; align-items: center; gap: 5px;
-  padding: 4px 9px; border-radius: 6px; font-size: 12px; font-family: inherit;
-  cursor: pointer; font-weight: 600;
-  background: var(--accent-bg); color: var(--accent);
-  border: 1px solid var(--accent-border);
-  transition: background .1s;
-}
-#btn-chat-model:hover { background: var(--accent); color: #fff; }
-#btn-chat-model .provider-dot {
-  width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0;
-}
-#chat-model-menu {
-  display: none; position: absolute; top: calc(100% + 4px); right: 0;
-  min-width: 240px; background: var(--bg-panel); border: 1px solid var(--border);
-  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.3);
-  z-index: 900; overflow: hidden;
-}
-#chat-model-menu.open { display: block; }
-.model-group-label {
-  padding: 8px 12px 4px; font-size: 9.5px; font-weight: 700;
-  letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint);
-}
-.model-group-sep { height: 1px; background: var(--border); margin: 4px 0; }
-.model-opt {
-  display: flex; align-items: center; gap: 8px; padding: 7px 12px;
-  cursor: pointer; font-size: 12.5px; color: var(--text-muted);
-  transition: background .08s;
-}
-.model-opt:hover { background: var(--bg-hover); color: var(--text); }
-.model-opt.active { color: var(--accent); background: var(--accent-bg); }
-.model-opt-label { flex: 1; font-weight: 500; }
-.model-opt-ctx { font-size: 10px; color: var(--text-faint); font-family: ui-monospace, monospace; }
-.model-provider-icon { font-size: 13px; width: 16px; text-align: center; flex-shrink: 0; }
-.model-menu-footer {
-  padding: 6px 12px; border-top: 1px solid var(--border);
-  font-size: 11px; color: var(--accent); cursor: pointer;
-  display: flex; align-items: center; gap: 5px;
-}
-.model-menu-footer:hover { background: var(--accent-bg); }
-
-/* ── New chat button ──────────────────────────────────────────────────────── */
-#btn-chat-new {
-  padding: 3px 8px; font-size: 11px; border-radius: 5px; cursor: pointer;
-  background: transparent; border: 1px solid var(--border-faint);
-  color: var(--text-faint); font-family: inherit;
-  transition: background .1s, color .1s;
-}
-#btn-chat-new:hover { background: var(--bg-hover); color: var(--text); }
-
-/* History button */
-#btn-chat-history {
-  padding: 3px 8px; font-size: 11px; border-radius: 5px; cursor: pointer;
-  background: transparent; border: 1px solid var(--border-faint);
-  color: var(--text-faint); font-family: inherit; display: flex; align-items: center; gap: 4px;
-  transition: background .1s, color .1s;
-}
-#btn-chat-history:hover  { background: var(--bg-hover); color: var(--text); }
-#btn-chat-history.active { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-border); }
-.history-badge {
-  font-size: 9px; background: var(--accent); color: #fff;
-  border-radius: 8px; padding: 1px 5px; font-weight: 700; line-height: 1.4;
-}
-
-/* History panel */
-#chat-history-panel {
-  display: none; flex: 1; flex-direction: column; overflow: hidden;
-}
-body.chat-history #chat-history-panel { display: flex; }
-body.chat-history #chat-messages,
-body.chat-history #chat-empty,
-body.chat-history #chat-setup { display: none !important; }
-body.chat-history #chat-input-wrap { display: none; }
-
-.history-list { flex: 1; overflow-y: auto; padding: 6px 0; }
-.history-section-label {
-  padding: 8px 12px 4px; font-size: 9.5px; font-weight: 700;
-  letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint);
-}
-.history-item {
-  padding: 8px 14px; cursor: pointer; border-left: 2px solid transparent;
-  transition: background .08s; display: flex; flex-direction: column; gap: 3px;
-}
-.history-item:hover { background: var(--bg-hover); border-left-color: var(--border); }
-.history-item.active { background: var(--accent-bg); border-left-color: var(--accent); }
-.hi-row1 { display: flex; align-items: center; gap: 6px; }
-.hi-file { font-size: 12px; font-weight: 600; color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hi-model { font-size: 9px; color: var(--accent); background: var(--accent-bg); border: 1px solid var(--accent-border); border-radius: 3px; padding: 1px 4px; }
-.hi-date { font-size: 10px; color: var(--text-faint); flex-shrink: 0; }
-.hi-preview { font-size: 11.5px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.history-empty { padding: 24px 16px; text-align: center; color: var(--text-faint); font-size: 12px; }
-.history-footer {
-  padding: 6px 12px; border-top: 1px solid var(--border); display: flex; justify-content: space-between;
-  align-items: center; font-size: 11px; color: var(--text-faint);
-}
-.history-clear-btn {
-  font-size: 11px; color: #ef4444; background: transparent; border: none;
-  cursor: pointer; padding: 2px 6px; border-radius: 3px; font-family: inherit;
-}
-.history-clear-btn:hover { background: rgba(239,68,68,.1); }
-
-/* ── Messages area ────────────────────────────────────────────────────────── */
-#chat-messages {
-  flex: 1; overflow-y: auto; overflow-x: hidden;
-  padding: 16px 0 8px; display: flex; flex-direction: column; gap: 2px;
-}
-#chat-messages::-webkit-scrollbar { width: 4px; }
-#chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-/* ── Message bubbles ──────────────────────────────────────────────────────── */
-.chat-msg {
-  display: flex; flex-direction: column; padding: 0 14px;
-  animation: msg-in .2s ease-out;
-}
-@keyframes msg-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-.chat-msg.user { align-items: flex-end; }
-.chat-msg.assistant { align-items: flex-start; }
-.chat-msg-meta {
-  font-size: 10px; color: var(--text-faint); margin-bottom: 4px;
-  display: flex; align-items: center; gap: 5px;
-}
-.chat-msg.user .chat-msg-meta { flex-direction: row-reverse; }
-.chat-bubble {
-  max-width: 88%; padding: 10px 14px; border-radius: 12px;
-  font-size: 13.5px; line-height: 1.65; word-break: break-word;
-}
-.chat-msg.user .chat-bubble {
-  background: var(--accent); color: #fff;
-  border-bottom-right-radius: 4px;
-}
-.chat-msg.assistant .chat-bubble {
-  background: var(--bg-panel); color: var(--text);
-  border: 1px solid var(--border); border-bottom-left-radius: 4px;
-}
-/* Markdown inside assistant bubbles */
-.chat-bubble p { margin: 0 0 10px; }
-.chat-bubble p:last-child { margin-bottom: 0; }
-.chat-bubble h1,.chat-bubble h2,.chat-bubble h3 { font-weight: 700; margin: 14px 0 6px; font-size: 14px; }
-.chat-bubble ul,.chat-bubble ol { padding-left: 18px; margin: 6px 0 10px; }
-.chat-bubble li { margin-bottom: 3px; }
-.chat-bubble code {
-  font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px;
-  background: rgba(127,127,127,.12); padding: 1px 4px; border-radius: 3px;
-}
-.chat-bubble pre {
-  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-  padding: 10px 12px; overflow-x: auto; margin: 8px 0;
-}
-.chat-bubble pre code { background: none; padding: 0; font-size: 12px; }
-.chat-bubble strong { font-weight: 700; }
-.chat-bubble em { font-style: italic; }
-.chat-bubble blockquote {
-  border-left: 3px solid var(--accent); padding: 4px 10px;
-  margin: 8px 0; color: var(--text-muted);
-}
-/* Streaming cursor */
-.chat-cursor {
-  display: inline-block; width: 2px; height: 14px; background: var(--accent);
-  vertical-align: middle; animation: cur-blink .9s step-end infinite;
-}
-@keyframes cur-blink { 0%,100%{opacity:1} 50%{opacity:0} }
-/* Copy message button */
-.chat-msg-copy {
-  opacity: 0; font-size: 10px; color: var(--text-faint); background: transparent;
-  border: none; cursor: pointer; padding: 2px 5px; border-radius: 3px;
-  transition: opacity .1s; flex-shrink: 0;
-}
-.chat-msg:hover .chat-msg-copy { opacity: 1; }
-.chat-msg-copy:hover { color: var(--accent); background: var(--accent-bg); }
-
-/* ── Empty / setup states ─────────────────────────────────────────────────── */
-#chat-empty {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 24px; text-align: center; gap: 8px; color: var(--text-faint);
-}
-#chat-empty .ce-icon { font-size: 32px; margin-bottom: 4px; }
-#chat-empty .ce-title { font-size: 14px; font-weight: 600; color: var(--text-muted); }
-#chat-empty .ce-sub { font-size: 12px; line-height: 1.5; max-width: 260px; }
-#chat-suggestions { display: flex; flex-direction: column; gap: 6px; width: 100%; max-width: 280px; margin-top: 4px; }
-.chat-suggestion {
-  padding: 7px 12px; border-radius: 8px; font-size: 12px; text-align: left;
-  background: var(--bg-panel); border: 1px solid var(--border); color: var(--text-muted);
-  cursor: pointer; transition: background .1s, border-color .1s, color .1s; font-family: inherit;
-}
-.chat-suggestion:hover { background: var(--accent-bg); border-color: var(--accent-border); color: var(--accent); }
-
-#chat-setup {
-  flex: 1; display: none; flex-direction: column;
-  align-items: center; justify-content: center;
-  padding: 24px; gap: 12px;
-}
-#chat-setup.show { display: flex; }
-.cs-title { font-size: 15px; font-weight: 700; color: var(--text); text-align: center; }
-.cs-sub { font-size: 12px; color: var(--text-faint); text-align: center; line-height: 1.5; max-width: 240px; }
-.cs-provider-btn {
-  width: 100%; max-width: 240px; padding: 10px 16px; border-radius: 8px;
-  display: flex; align-items: center; gap: 10px;
-  background: var(--bg-panel); border: 1px solid var(--border);
-  cursor: pointer; font-size: 13px; font-family: inherit; color: var(--text-muted);
-  text-align: left; transition: background .1s, border-color .1s, color .1s;
-}
-.cs-provider-btn:hover { background: var(--bg-hover); border-color: var(--accent-border); color: var(--text); }
-.cs-provider-icon { font-size: 18px; flex-shrink: 0; }
-.cs-lock { font-size: 10px; color: var(--text-faint); margin-top: 6px; text-align: center; }
-
-/* ── Chat input ───────────────────────────────────────────────────────────── */
-#chat-input-wrap {
-  display: flex; align-items: flex-end; gap: 8px;
-  padding: 10px 12px; border-top: 1px solid var(--border);
-  background: var(--bg-panel); flex-shrink: 0;
-}
-#chat-input {
-  flex: 1; background: var(--bg); border: 1px solid var(--border);
-  border-radius: 8px; padding: 8px 12px; font-size: 13px;
-  font-family: inherit; color: var(--text); outline: none; resize: none;
-  max-height: 120px; min-height: 36px; line-height: 1.5;
-  transition: border-color .15s;
-}
-#chat-input:focus { border-color: var(--accent); }
-#chat-input::placeholder { color: var(--text-faint); }
-#btn-chat-send {
-  width: 34px; height: 34px; border-radius: 8px; flex-shrink: 0;
-  background: var(--accent); color: #fff; border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 16px; transition: background .1s, transform .1s;
-}
-#btn-chat-send:hover:not(:disabled) { background: var(--accent-dim); }
-#btn-chat-send:active:not(:disabled) { transform: scale(.92); }
-#btn-chat-send:disabled { background: var(--border); color: var(--text-faint); cursor: not-allowed; }
-.chat-stop {
-  background: #ef4444 !important;
-}
-
-/* Run button in main toolbar */
-#btn-run {
-  background: var(--accent); color: #fff; font-weight: 600; border-color: var(--accent);
-}
-#btn-run:hover { background: var(--accent-dim) !important; border-color: var(--accent-dim); }
-#btn-run.active { background: #ef4444 !important; border-color: #ef4444; }
-body.chat-mode #btn-run { background: rgba(239,68,68,.15); color: #ef4444; border-color: rgba(239,68,68,.3); }
 .tb-btn {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px;
   border: 1px solid var(--border-faint); border-radius: 4px; font-size: 11.5px; font-family: inherit;
@@ -992,84 +580,16 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 
 /* === Sidebar ===============================================================*/
 #sidebar {
-  width: var(--sidebar-width, 240px);
-  min-width: 0; display: flex; flex-direction: column;
+  width: 240px; min-width: 240px; display: flex; flex-direction: column;
   background: var(--bg-panel); border-right: 1px solid var(--border);
-  overflow: hidden; flex-shrink: 0;
-  transition: opacity 0.2s ease; /* only transition opacity, not width — avoids lag during resize */
+  overflow: hidden; transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease; flex-shrink: 0;
 }
-#sidebar.hidden { width: 0 !important; opacity: 0; overflow: hidden; }
-
-/* ── Sidebar resize handle ───────────────────────────────────────────────── */
-#sidebar-resizer {
-  width: 5px; flex-shrink: 0; cursor: col-resize; position: relative;
-  background: transparent;
-  transition: background 0.15s;
-}
-#sidebar-resizer::after {
-  content: ''; position: absolute; inset: 0 0 0 2px;
-  border-left: 1px solid var(--border);
-}
-#sidebar-resizer:hover,
-body.resizing-sidebar #sidebar-resizer { background: var(--accent-bg); }
-body.resizing-sidebar #sidebar-resizer::after { border-left-color: var(--accent); }
-body.resizing-sidebar { cursor: col-resize !important; user-select: none; }
-/* NO pointer-events rules — they break all clicks */
-
+#sidebar.hidden { width: 0; min-width: 0; opacity: 0; overflow: hidden; }
 .sb-section { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0; }
 .sb-section.flex-fill { flex: 1; overflow: hidden; }
-#sec-files   { flex: 0 1 42%; min-height: 120px; overflow: hidden; }
-#sec-context { flex: 0 0 auto; overflow: hidden; }
-#sec-toc     { flex: 1 1 36%; min-height: 120px; overflow: hidden; }
-
-/* When TOC is collapsed, Notebooks expands to fill remaining sidebar height */
-#sidebar.no-toc #sec-files { flex: 1 1 auto; min-height: 0; }
-/* When both TOC and Context are collapsed, Notebooks takes everything */
-#sidebar.no-toc #sec-context { flex: 0 0 auto; }
-
-/* ── Context Composer sidebar section ────────────────────────────────────── */
-.ctx-bar-wrap { padding: 8px 12px 4px; flex-shrink: 0; }
-.ctx-bar-track { height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; margin-bottom: 5px; }
-.ctx-bar-fill {
-  height: 100%; border-radius: 3px;
-  background: linear-gradient(90deg, var(--accent) 0%, #ef4444 100%);
-  transition: width .4s cubic-bezier(.4,0,.2,1);
-}
-.ctx-bar-fill.warn { background: linear-gradient(90deg, #f59e0b, #ef4444); }
-.ctx-bar-fill.danger { background: #ef4444; }
-.ctx-total { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-faint); }
-.ctx-total strong { color: var(--accent); }
-
-.ctx-scope-label {
-  padding: 5px 12px 2px; font-size: 9px; font-weight: 700;
-  letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint);
-  display: flex; align-items: center; gap: 4px;
-}
-.ctx-file {
-  display: flex; align-items: center; gap: 6px;
-  padding: 4px 10px 4px 12px; cursor: pointer;
-  transition: background .08s;
-}
-.ctx-file:hover { background: var(--bg-hover); }
-.ctx-file input[type="checkbox"] {
-  accent-color: var(--accent); width: 12px; height: 12px;
-  flex-shrink: 0; cursor: pointer; margin: 0;
-}
-.ctx-file-name { flex: 1; font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ctx-file-bar { height: 3px; border-radius: 2px; background: var(--accent); opacity: .45; flex-shrink: 0; min-width: 2px; }
-.ctx-file-tok { font-size: 10px; color: var(--text-faint); flex-shrink: 0; font-family: ui-monospace, monospace; min-width: 40px; text-align: right; }
-.ctx-file-model { font-size: 9px; color: var(--accent); background: var(--accent-bg); border: 1px solid var(--accent-border); border-radius: 3px; padding: 1px 4px; flex-shrink: 0; }
-.ctx-empty { padding: 10px 12px; font-size: 11.5px; color: var(--text-faint); }
-
-.ctx-actions {
-  display: flex; gap: 6px; padding: 8px 10px 8px;
-  border-top: 1px solid var(--border); flex-shrink: 0;
-}
-.ctx-btn { flex: 1; padding: 5px 6px; border-radius: 5px; font-size: 11.5px; font-family: inherit; cursor: pointer; text-align: center; transition: background .1s, color .1s; }
-.ctx-btn-copy { background: var(--accent); color: #fff; border: none; font-weight: 600; }
-.ctx-btn-copy:hover { opacity: .88; }
-.ctx-btn-view { background: transparent; color: var(--text-muted); border: 1px solid var(--border); }
-.ctx-btn-view:hover { background: var(--bg-hover); color: var(--text); }
+#sec-files { flex: 0 1 52%; min-height: 138px; overflow: hidden; }
+#sec-toc { flex: 1 1 48%; min-height: 150px; overflow: hidden; }
+#sidebar.no-toc #sec-files { flex: 1 1 auto; }
 .sb-header {
   display: flex; align-items: center; padding: 0 10px 0 12px; height: 32px;
   gap: 4px; flex-shrink: 0; cursor: pointer; user-select: none;
@@ -1088,12 +608,11 @@ body.resizing-sidebar { cursor: col-resize !important; user-select: none; }
 .sb-section.collapsed .sb-body { display: none; }
 .sb-section.collapsed #file-search-wrap { display: none; }
 .sb-ai-label {
-  padding: 7px 10px 2px; font-size: 10.5px; font-weight: 700;
-  letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--text-2, var(--text)); font-family: inherit;
-  opacity: 0.8;
+  padding: 8px 10px 2px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--text-faint); font-family: inherit;
 }
-.sb-ai-label.accent { color: var(--accent); opacity: 1; }
+.sb-ai-label.accent { color: var(--accent); opacity: 0.8; }
 
 /* File search input */
 #file-search-wrap {
@@ -1144,66 +663,43 @@ body.resizing-sidebar { cursor: col-resize !important; user-select: none; }
   border: 1.5px solid var(--border); border-top-color: var(--accent);
   animation: spin 0.8s linear infinite;
 }
-/* === File list ===============================================================
-   Clean, readable rows: filename clearly visible, path secondary but legible.
-   Folder headers look like VS Code Explorer sections, not tiny uppercase.  */
-
-/* Folder group header */
+/* === File list — Source Control style ======================================
+   Compact rows: icon + filename left, path/badge right (dim).
+   Matches VS Code's SCM panel aesthetic. ===================================*/
 .file-dir {
-  width: 100%; display: flex; align-items: center; gap: 5px;
-  padding: 5px 8px 3px calc(6px + (var(--depth, 0) * 12px));
+  width: 100%; display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px 3px calc(8px + (var(--depth, 0) * 12px));
   border: none; background: transparent; cursor: pointer; text-align: left;
-  font-size: 12.5px; font-weight: 600;
-  color: var(--text-2, var(--text)); /* uses --text-2 if available, else full --text */
-  white-space: nowrap;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-faint); white-space: nowrap; margin-top: 4px;
 }
-.file-dir:hover { background: var(--bg-hover); color: var(--text); }
+.file-dir:hover { background: var(--bg-hover); color: var(--text-muted); }
 .file-dir .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-.file-dir .folder-count {
-  font-size: 10px; color: var(--text-muted);
-  background: var(--bg-hover); border-radius: 8px; padding: 0 5px;
-}
-.folder-chevron { width: 9px; height: 9px; transition: transform 0.12s; flex-shrink: 0; opacity: 0.6; }
+.file-dir .folder-count { font-size: 9px; color: var(--text-faint); margin-left: 3px; }
+.folder-chevron { width: 9px; height: 9px; transition: transform 0.12s; flex-shrink: 0; }
 .file-dir.collapsed .folder-chevron { transform: rotate(-90deg); }
-.folder-svg-closed { opacity: 0.5; flex-shrink: 0; }
-.folder-svg-open { opacity: 0.7; flex-shrink: 0; }
-
-/* File rows */
 .file-item {
   display: flex; align-items: center;
-  padding: 4px 8px 4px calc(10px + (var(--depth, 0) * 12px));
-  gap: 6px; font-size: 12.5px; font-family: inherit;
-  color: var(--text); /* full contrast always */
-  cursor: pointer; border-left: 2px solid transparent;
-  transition: background 0.08s, border-color 0.08s;
+  padding: 3px 8px 3px calc(10px + (var(--depth, 0) * 12px));
+  gap: 5px; font-size: 12.5px; font-family: inherit;
+  color: var(--text-muted); cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background 0.08s, color 0.08s, border-color 0.08s;
   user-select: none; min-width: 0;
 }
-.file-item:hover { background: var(--bg-hover); }
-.file-item.active {
-  color: var(--accent); border-left-color: var(--accent);
-  background: var(--accent-bg);
-}
-.file-item svg { flex-shrink: 0; opacity: 0.5; }
-.file-item.active svg, .file-item.ai svg { opacity: 1; }
+.file-item:hover { background: var(--bg-hover); color: var(--text); }
+.file-item:hover .file-path { opacity: 0.7; }
+.file-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-bg); }
+.file-item svg { flex-shrink: 0; opacity: 0.4; }
+.file-item.active svg, .file-item.ai svg { opacity: 0.9; }
 .file-item.ai svg { color: var(--accent); }
-
-/* Filename — always full contrast */
-.file-name {
-  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  min-width: 0; color: var(--text);
-}
-.file-item.active .file-name { color: var(--accent); }
-
-/* Path label — visible but secondary; use text-muted not text-faint */
-/* text-faint is near-invisible in dark theme (#48443e on dark bg) */
+.file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* Right-side metadata — path or AI kind badge, dim and right-aligned like SCM */
 .file-path {
-  font-size: 10.5px; color: var(--text-muted); flex-shrink: 0;
+  font-size: 10.5px; color: var(--text-faint); flex-shrink: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  max-width: 100px; opacity: 0.75;
+  max-width: 90px; opacity: 0.5; transition: opacity 0.1s;
 }
-.file-item:hover .file-path { opacity: 1; }
-
-/* AI kind badge */
 .file-ai-kind {
   flex-shrink: 0; font-size: 9px; line-height: 1; color: var(--accent);
   background: var(--accent-bg); border: 1px solid var(--accent-border);
@@ -1612,11 +1108,6 @@ body.has-tabs #fmt-toolbar { top: 78px; }
   .markdown-body { padding: 20px 16px 60px; }
   .fname { max-width: 100px; }
 }
-.text-faint { color: var(--text-faint); }
-.sb-ai-label-other { margin-top: 4px; color: var(--text-faint); }
-.chat-sys-tok { margin-left: 6px; color: var(--text-faint); }
-.tb-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; flex-shrink: 0; }
-.sp-hint { font-size: 11px; color: var(--text-faint); }
 `;
 
 // ─── Webview Script ──────────────────────────────────────────────────────────
@@ -1677,36 +1168,12 @@ const SCRIPT = /* javascript */`
     const words  = countWords(text);
     const chars  = text.length;
     const mins   = Math.max(1, Math.ceil(words / 200));
-    const wEl = qs('#stat-words'), tEl = qs('#stat-time');
+    const tokens = Math.round(chars / 4);
+    const tokStr = tokens < 1000 ? tokens + ' tok' : '~' + (tokens/1000).toFixed(1) + 'K tok';
+    const wEl = qs('#stat-words'), tEl = qs('#stat-time'), cEl = qs('#stat-tok');
     if (wEl) wEl.textContent = words.toLocaleString();
     if (tEl) tEl.textContent = mins;
-  }
-
-  // ── Token display — accurate model-aware count from extension ─────────────
-  function setTokDisplay(tokStr, modelLbl, sections) {
-    const btn = qs('#stat-tok');
-    if (!btn) return;
-    // Update text + model badge
-    var modelSpan = btn.querySelector('.tok-model');
-    // Strip existing text nodes
-    [...btn.childNodes].forEach(function(n) { if (n.nodeType === 3) n.remove(); });
-    btn.insertAdjacentText('afterbegin', tokStr);
-    if (modelLbl) {
-      if (!modelSpan) {
-        modelSpan = document.createElement('span');
-        modelSpan.className = 'tok-model';
-        btn.appendChild(modelSpan);
-      }
-      modelSpan.textContent = modelLbl;
-      modelSpan.style.display = '';
-    } else if (modelSpan) {
-      modelSpan.style.display = 'none';
-    }
-    // Update sections for the breakdown panel
-    if (sections) {
-      tokSections = sections;
-      tokModel    = modelLbl || '';
-    }
+    if (cEl) { cEl.textContent = tokStr; cEl.title = chars.toLocaleString() + ' characters'; }
   }
 
   // ── Save indicator ─────────────────────────────────────────────────────────
@@ -1871,14 +1338,14 @@ const SCRIPT = /* javascript */`
     if (fileFilter) {
       // Flat list when filtering — skip folder tree grouping
       if (otherFiles.length) {
-        if (aiFiles.length) html += '<div class="sb-ai-label sb-ai-label-other">Other</div>';
+        if (aiFiles.length) html += '<div class="sb-ai-label" style="margin-top:4px;color:var(--text-faint)">Other</div>';
         otherFiles.forEach(f => { html += fileItemHtml(f, 0); });
       }
     } else {
       // Normal grouped folder-tree view
       const tree = buildFileTree(otherFiles);
       if (tree.files.length) {
-        if (aiFiles.length) html += '<div class="sb-ai-label sb-ai-label-other">Other</div>';
+        if (aiFiles.length) html += '<div class="sb-ai-label" style="margin-top:4px;color:var(--text-faint)">Other</div>';
         tree.files.forEach(f => { html += fileItemHtml(f, 0); });
       }
       html += renderTree(tree, 0);
@@ -1927,14 +1394,8 @@ const SCRIPT = /* javascript */`
     return Object.keys(node.dirs).sort().map(name => {
       const child = node.dirs[name];
       const collapsed = collapsedFolders.has(child.path);
-      // Folder icon (open when expanded, closed when collapsed)
-      var folderIcon = collapsed
-        ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="folder-svg-closed"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'
-        : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="folder-svg-open"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
       let html = '<button class="file-dir' + (collapsed ? ' collapsed' : '') + '" data-dir="' + escHtml(child.path) + '" style="--depth:' + depth + '">'
-        + '<span class="folder-chevron">▾</span>'
-        + folderIcon
-        + '<span class="folder-name">' + escHtml(child.name) + '</span>'
+        + '<span class="folder-chevron">▾</span><span class="folder-name">' + escHtml(child.name) + '</span>'
         + '<span class="folder-count">' + treeCount(child) + '</span></button>';
       if (!collapsed) {
         child.files.sort((a, b) => a.label.localeCompare(b.label)).forEach(f => { html += fileItemHtml(f, depth + 1); });
@@ -1952,32 +1413,18 @@ const SCRIPT = /* javascript */`
   }
 
   function fileItemHtml(f, depth = 0) {
+    // SCM-style: compact icon + filename left, path or AI-kind badge right (dim)
     const icon = f.isAiConfig
       ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>'
       : '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h8l4 4v8H2V2z" opacity=".35"/><path d="M10 2v4h4"/></svg>';
-
-    // Right-side: AI kind badge OR readable path
+    // Right-side: AI kind badge OR parent directory (last segment only)
     var right = '';
     if (f.aiKind) {
       right = '<span class="file-ai-kind">' + escHtml(f.aiKind) + '</span>';
     } else if (f.dir) {
-      // Show full path but cap at 2 segments so it's readable, not truncated
-      // e.g. "docs/development/contributing.md" → "docs / development"
-      var parts = f.dir.split('/').filter(Boolean);
-      var pathLabel;
-      if (parts.length === 0) {
-        pathLabel = '';
-      } else if (parts.length === 1) {
-        pathLabel = parts[0];
-      } else {
-        // Show last 2 segments: "docs / development"
-        pathLabel = parts.slice(-2).join(' / ');
-      }
-      if (pathLabel) {
-        right = '<span class="file-path" title="' + escHtml(f.dir) + '">' + escHtml(pathLabel) + '</span>';
-      }
+      var lastDir = f.dir.split('/').pop() || f.dir;
+      right = '<span class="file-path">' + escHtml(lastDir) + '</span>';
     }
-
     return '<div class="file-item' + (f.active ? ' active' : '') + (f.isAiConfig ? ' ai' : '')
       + '" data-uri="' + escHtml(f.uri) + '" title="' + escHtml(f.relPath) + '" style="--depth:' + depth + '">'
       + icon + '<span class="file-name">' + escHtml(f.label) + '</span>'
@@ -2903,727 +2350,6 @@ const SCRIPT = /* javascript */`
   qs('#btn-pdf')?.addEventListener('click',    () => vsc.postMessage({ type: 'exportPdf' }));
   qs('#btn-print')?.addEventListener('click',  () => vsc.postMessage({ type: 'print' }));
 
-  // ── Token section breakdown panel ─────────────────────────────────────────
-  var tokSections = (typeof __TOK_SECTIONS__ !== 'undefined') ? __TOK_SECTIONS__ : [];
-  var tokModel    = (typeof __TOK_MODEL__    !== 'undefined') ? __TOK_MODEL__    : '';
-
-  function renderTokPanel(sections, model) {
-    var body   = qs('#tok-panel-body');
-    var total  = qs('#tok-panel-total');
-    var mdl    = qs('#tok-panel-model');
-    if (!body) return;
-    if (mdl)   mdl.textContent = model || '';
-    var sum    = sections.reduce(function(a, s) { return a + s.tokens; }, 0);
-    var max    = Math.max.apply(null, sections.map(function(s) { return s.tokens; })) || 1;
-    body.innerHTML = sections.map(function(s) {
-      var barW = Math.round((s.tokens / max) * 60);
-      var cls  = s.level === 0 ? '' : 'h' + s.level;
-      return '<div class="tok-row" data-heading="' + escHtml(s.heading) + '">'
-        + '<span class="tok-row-name ' + cls + '">' + escHtml(s.heading) + '</span>'
-        + '<div class="tok-row-bar" style="width:' + barW + 'px"></div>'
-        + '<span class="tok-row-count">' + s.tokens.toLocaleString() + '</span>'
-        + '</div>';
-    }).join('');
-    if (total) total.textContent = sum.toLocaleString() + ' tok';
-    // Click row → scroll to that heading in preview
-    qsa('.tok-row', body).forEach(function(row) {
-      row.addEventListener('click', function() {
-        var h = row.getAttribute('data-heading') || '';
-        var id = h.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-        var el = document.getElementById(id);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        closeTokPanel();
-      });
-    });
-  }
-
-  function openTokPanel() {
-    renderTokPanel(tokSections, tokModel);
-    var panel = qs('#tok-panel');
-    var btn   = qs('#stat-tok');
-    if (!panel || !btn) return;
-    var r = btn.getBoundingClientRect();
-    panel.style.top  = (r.bottom + 6) + 'px';
-    panel.style.right = '8px';
-    panel.classList.add('open');
-  }
-  function closeTokPanel() {
-    qs('#tok-panel')?.classList.remove('open');
-  }
-
-  qs('#stat-tok')?.addEventListener('click', function(e) {
-    e.stopPropagation();
-    if (qs('#tok-panel')?.classList.contains('open')) { closeTokPanel(); } else { openTokPanel(); }
-  });
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('#tok-panel') && !e.target.closest('#stat-tok')) closeTokPanel();
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PROMPT RUNNER — Chat UI
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  var chatState = {
-    messages: [],          // { role, content, el }
-    model: 'claude-sonnet-4-5',
-    provider: 'anthropic',
-    streaming: false,
-    streamEl: null,        // the DOM element receiving streaming text
-    streamText: '',        // accumulated stream text
-    hasKeys: [],           // providers that have keys configured
-    models: [],            // available models from extension
-    open: false,
-  };
-
-  // ── Open / close chat panel ────────────────────────────────────────────────
-  function openChat() {
-    if (chatState.open) return;
-    chatState.open = true;
-    document.body.classList.add('chat-mode');
-    if (!editMode) enterEditMode();  // show file on the left while chatting on the right
-    qs('#btn-run')?.classList.add('active');
-    // 🟡 Fix: reset stale streaming state in case panel was closed mid-stream
-    if (chatState.streaming) {
-      chatState.streaming = false;
-      chatState.streamEl  = null;
-      chatState.streamText = '';
-      var sendBtn = qs('#btn-chat-send');
-      if (sendBtn) { sendBtn.classList.remove('chat-stop'); sendBtn.disabled = false; }
-    }
-    updateChatSysInfo();
-    populateSuggestions();
-    vsc.postMessage({ type: 'getModels' }); // get available models + check which keys exist
-    updateChatVisibility();
-    qs('#chat-input')?.focus();
-  }
-
-  function closeChat() {
-    chatState.open = false;
-    document.body.classList.remove('chat-mode');
-    qs('#btn-run')?.classList.remove('active');
-    if (!isClipboardMode) {
-      var active = tabs.find(function(t) { return t.uri === activeTabUri; });
-      if (active && !active.isAiConfig) exitEditMode(false, false, false);
-    }
-  }
-
-  // Update the system-prompt info badge at top of chat panel
-  function updateChatSysInfo() {
-    var info = qs('#chat-sys-info');
-    if (!info) return;
-    var fname = qs('.fname')?.textContent || 'current file';
-    var tok   = qs('#stat-tok')?.textContent || '';
-    info.innerHTML = '<strong>System:</strong> ' + escHtml(fname)
-      + (tok ? '<span class="chat-sys-tok">' + escHtml(tok) + '</span>' : '');
-  }
-
-  // Escape closes chat if open
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && chatState.open && !chatState.streaming) {
-      closeChat();
-    }
-  }, true);
-
-  qs('#btn-run')?.addEventListener('click', function() {
-    if (chatState.open) { closeChat(); } else { openChat(); }
-  });
-
-  // Populate suggestion chips based on filename context
-  function populateSuggestions() {
-    var sugDiv = qs('#chat-suggestions');
-    if (!sugDiv) return;
-    var fname = (qs('.fname')?.textContent || '').toLowerCase();
-    var prompts = fname.includes('claude') || fname.includes('agent') || fname.includes('skill')
-      ? [
-          'What are the main rules in this config?',
-          'Summarise what this agent is supposed to do',
-          'What would you never do based on these instructions?',
-          'How many tokens does this use? Am I wasting any?',
-        ]
-      : fname.includes('cursor') || fname.includes('rules')
-      ? [
-          'What coding patterns does this enforce?',
-          'What are the most important constraints here?',
-          'Summarise these rules in one paragraph',
-        ]
-      : [
-          'Summarise this document in 3 bullet points',
-          'What are the key decisions documented here?',
-          'What is missing or unclear in this document?',
-        ];
-    sugDiv.innerHTML = '';
-    prompts.slice(0, 3).forEach(function(p) {
-      var btn = document.createElement('button');
-      btn.className = 'chat-suggestion';
-      btn.textContent = p;
-      btn.addEventListener('click', function() {
-        var inp = qs('#chat-input');
-        if (inp) { inp.value = p; inp.focus(); }
-      });
-      sugDiv.appendChild(btn);
-    });
-  }
-
-  // ── Visibility logic ───────────────────────────────────────────────────────
-  function updateChatVisibility() {
-    var setup    = qs('#chat-setup');
-    var empty    = qs('#chat-empty');
-    var messages = qs('#chat-messages');
-    if (!setup || !empty || !messages) return;
-
-    var hasAnyKey = chatState.hasKeys.length > 0;
-    if (!hasAnyKey) {
-      setup.classList.add('show');
-      empty.style.display = 'none';
-      messages.style.display = 'none';
-    } else if (chatState.messages.length === 0) {
-      setup.classList.remove('show');
-      empty.style.display = '';
-      messages.style.display = 'none';
-    } else {
-      setup.classList.remove('show');
-      empty.style.display = 'none';
-      messages.style.display = 'flex';
-    }
-  }
-
-  // ── Model menu ─────────────────────────────────────────────────────────────
-  function buildModelMenu(models, configured) {
-    chatState.models = models || [];
-    chatState.hasKeys = configured || [];
-
-    var menu = qs('#chat-model-menu');
-    if (!menu) return;
-
-    // Group by provider
-    var groups = { anthropic: [], openai: [], google: [] };
-    chatState.models.forEach(function(m) {
-      if (groups[m.provider]) groups[m.provider].push(m);
-    });
-
-    var icons = { anthropic: '✦', openai: '◎', google: '◇' };
-    var names = { anthropic: 'Anthropic', openai: 'OpenAI', google: 'Google' };
-    var providerColors = { anthropic: '#f97316', openai: '#22c55e', google: '#3b82f6' };
-
-    var html = '';
-    ['anthropic', 'openai', 'google'].forEach(function(prov) {
-      var list = groups[prov];
-      if (!list.length) return;
-      html += '<div class="model-group-label">' + names[prov] + '</div>';
-      list.forEach(function(m) {
-        var ctx = m.context >= 1000000
-          ? (m.context / 1000000).toFixed(0) + 'M'
-          : (m.context / 1000) + 'K';
-        var active = m.id === chatState.model ? ' active' : '';
-        html += '<div class="model-opt' + active + '" data-model="' + m.id + '" data-provider="' + m.provider + '">'
-          + '<span class="model-provider-icon">' + icons[prov] + '</span>'
-          + '<span class="model-opt-label">' + m.label + '</span>'
-          + '<span class="model-opt-ctx">' + ctx + '</span>'
-          + '</div>';
-      });
-      html += '<div class="model-group-sep"></div>';
-    });
-    html += '<div class="model-menu-footer">⚙ Manage API keys</div>';
-    menu.innerHTML = html;
-
-    qsa('.model-opt', menu).forEach(function(opt) {
-      opt.addEventListener('click', function() {
-        chatState.model    = opt.getAttribute('data-model') || chatState.model;
-        chatState.provider = opt.getAttribute('data-provider') || chatState.provider;
-        var label = qs('#chat-model-label');
-        if (label) label.textContent = opt.querySelector('.model-opt-label')?.textContent || '';
-        // Update provider dot colour
-        var dot = qs('#btn-chat-model .provider-dot');
-        if (dot) dot.style.background = providerColors[chatState.provider] || 'var(--accent)';
-        menu.classList.remove('open');
-        updateChatVisibility();
-      });
-    });
-
-    // "Manage API keys" footer
-    var footer = menu.querySelector('.model-menu-footer');
-    if (footer) footer.addEventListener('click', function() {
-      vsc.postMessage({ type: 'openSettings' });
-      menu.classList.remove('open');
-    });
-
-    // Set initial model to first configured provider's first model
-    if (chatState.hasKeys.length > 0 && chatState.models.length > 0) {
-      var firstProv = chatState.hasKeys[0];
-      var firstModel = chatState.models.find(function(m) { return m.provider === firstProv; });
-      if (firstModel) {
-        chatState.model    = firstModel.id;
-        chatState.provider = firstModel.provider;
-        var label = qs('#chat-model-label');
-        if (label) label.textContent = firstModel.label;
-        var dot = qs('#btn-chat-model .provider-dot');
-        if (dot) dot.style.background = providerColors[firstProv] || 'var(--accent)';
-      }
-    }
-    updateChatVisibility();
-  }
-
-  qs('#btn-chat-model')?.addEventListener('click', function(e) {
-    e.stopPropagation();
-    qs('#chat-model-menu')?.classList.toggle('open');
-  });
-  document.addEventListener('click', function(e) {
-    if (!e.target.closest('.chat-model-wrap')) qs('#chat-model-menu')?.classList.remove('open');
-  });
-
-  // ── Setup screen provider buttons ──────────────────────────────────────────
-  qsa('.cs-provider-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      var provider = btn.getAttribute('data-provider');
-      vsc.postMessage({ type: 'setApiKey', provider });
-    });
-  });
-
-  // ── New chat ───────────────────────────────────────────────────────────────
-  qs('#btn-chat-new')?.addEventListener('click', function() {
-    chatState.messages = [];
-    chatState.streaming = false;
-    var msgs = qs('#chat-messages');
-    if (msgs) msgs.innerHTML = '';
-    updateChatVisibility();
-    qs('#chat-input')?.focus();
-  });
-
-  // ── Render a message bubble ────────────────────────────────────────────────
-  function appendMessage(role, content, streaming) {
-    var msgs = qs('#chat-messages');
-    if (!msgs) return null;
-
-    var modelObj  = chatState.models.find(function(m) { return m.id === chatState.model; });
-    var senderName = role === 'user' ? 'You' : (modelObj ? modelObj.label : 'Assistant');
-
-    // Build meta row purely via DOM (never mix innerHTML + appendChild — it destroys nodes)
-    var meta = document.createElement('div');
-    meta.className = 'chat-msg-meta';
-
-    var nameSpan = document.createElement('span');
-    nameSpan.textContent = senderName;
-
-    var copyBtn = document.createElement('button');
-    copyBtn.className = 'chat-msg-copy';
-    copyBtn.textContent = 'Copy';
-
-    if (role === 'user') {
-      meta.appendChild(nameSpan);
-      meta.appendChild(copyBtn);
-    } else {
-      meta.appendChild(copyBtn);
-      meta.appendChild(nameSpan);
-    }
-
-    var bubble = document.createElement('div');
-    bubble.className = 'chat-bubble';
-    if (streaming) {
-      bubble.innerHTML = '<span class="chat-cursor"></span>';
-    } else if (role === 'user') {
-      // 🔴 Security fix: user input rendered as plain text only — never as HTML.
-      // renderChatMarkdown calls marked.parse() + innerHTML which would allow XSS.
-      bubble.textContent = content;
-    } else {
-      // Assistant content comes from the LLM — render as markdown for readability
-      bubble.innerHTML = renderChatMarkdown(content);
-    }
-
-    // Copy button: copies the bubble's text content
-    copyBtn.addEventListener('click', function() {
-      var text = bubble.textContent || '';
-      navigator.clipboard.writeText(text);
-      copyBtn.textContent = '✓ Copied';
-      setTimeout(function() { copyBtn.textContent = 'Copy'; }, 1600);
-    });
-
-    var wrap = document.createElement('div');
-    wrap.className = 'chat-msg ' + role;
-    wrap.appendChild(meta);
-    wrap.appendChild(bubble);
-
-    msgs.appendChild(wrap);
-
-    // Only auto-scroll if user is already near the bottom (don't hijack manual scrolling)
-    var threshold = 80;
-    var nearBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < threshold;
-    if (nearBottom || streaming) msgs.scrollTop = msgs.scrollHeight;
-
-    updateChatVisibility();
-    return bubble;
-  }
-
-  // ── Markdown rendering inside chat ────────────────────────────────────────
-  // marked.js is already bundled in this webview — use it for full GitHub-
-  // accurate rendering so code blocks, lists, and inline code all look right.
-  function renderChatMarkdown(text) {
-    try { return marked.parse(text || ''); } catch { return escHtml(text || ''); }
-  }
-
-  // ── Send a message ─────────────────────────────────────────────────────────
-  function sendChatMessage() {
-    if (chatState.streaming) return;
-    var input = qs('#chat-input');
-    var text  = input ? input.value.trim() : '';
-    if (!text) return;
-
-    // Add user message
-    chatState.messages.push({ role: 'user', content: text });
-    appendMessage('user', text, false);
-    input.value = '';
-    input.style.height = 'auto'; // reset textarea height
-
-    // Show send button as stop, disable model picker (changing model mid-stream corrupts history)
-    var sendBtn = qs('#btn-chat-send');
-    if (sendBtn) sendBtn.classList.add('chat-stop');
-    var modelBtn = qs('#btn-chat-model');
-    if (modelBtn) modelBtn.disabled = true;
-    chatState.streaming = true;
-
-    // Create assistant bubble (streaming placeholder)
-    chatState.streamText = '';
-    chatState.streamEl   = appendMessage('assistant', '', true);
-
-    // Send to extension
-    vsc.postMessage({
-      type:         'promptRun',
-      provider:     chatState.provider,
-      model:        chatState.model,
-      systemPrompt: currentMarkdown,
-      messages:     chatState.messages.map(function(m) { return { role: m.role, content: m.content }; }),
-    });
-  }
-
-  qs('#btn-chat-send')?.addEventListener('click', function() {
-    if (chatState.streaming) {
-      // Stop: just reset state (we can't cancel fetch easily, but UI resets)
-      chatState.streaming = false;
-      var sendBtn = qs('#btn-chat-send');
-      if (sendBtn) sendBtn.classList.remove('chat-stop');
-      finaliseStream();
-    } else {
-      sendChatMessage();
-    }
-  });
-
-  qs('#chat-input')?.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendChatMessage();
-    }
-  });
-
-  // Auto-resize textarea as user types
-  qs('#chat-input')?.addEventListener('input', function() {
-    var ta = qs('#chat-input');
-    if (!ta) return;
-    ta.style.height = 'auto';
-    ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
-  });
-
-  // ── Handle streaming chunks from extension ─────────────────────────────────
-  function handlePromptChunk(text) {
-    if (!chatState.streamEl) return;
-    chatState.streamText += text;
-    // Show plain text while streaming (fast), render markdown fully on done
-    var preview = chatState.streamText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
-      .replace(/\n/g,'<br>');
-    chatState.streamEl.innerHTML = preview + '<span class="chat-cursor"></span>';
-    var msgs = qs('#chat-messages');
-    if (msgs) msgs.scrollTop = msgs.scrollHeight; // always scroll during streaming
-  }
-
-  function finaliseStream() {
-    if (chatState.streamEl) {
-      var content = chatState.streamText;
-      // 🟡 Fix: show a clear message if the model returned an empty response
-      if (!content.trim()) {
-        chatState.streamEl.innerHTML =
-          '<em class="text-faint">(The model returned an empty response. Try rephrasing your question.)</em>';
-      } else {
-        // Render full markdown now that streaming is complete
-        chatState.streamEl.innerHTML = renderChatMarkdown(content);
-      }
-      chatState.messages.push({ role: 'assistant', content: content });
-    }
-    chatState.streamEl   = null;
-    chatState.streamText = '';
-    chatState.streaming  = false;
-    var sendBtn = qs('#btn-chat-send');
-    if (sendBtn) { sendBtn.classList.remove('chat-stop'); sendBtn.disabled = false; }
-    // 🟠 Fix: re-enable model picker after streaming ends
-    var modelBtn = qs('#btn-chat-model');
-    if (modelBtn) modelBtn.disabled = false;
-  }
-
-  function handlePromptError(err) {
-    if (chatState.streamEl) {
-      chatState.streamEl.innerHTML =
-        '<div style="color:#ef4444;display:flex;align-items:center;gap:6px">'
-        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
-        + escHtml(err) + '</div>';
-    }
-    finaliseStream();
-  }
-
-  // ── Handle messages from extension ────────────────────────────────────────
-  // (these are added to the existing window.addEventListener('message') handler below)
-  // Registering additional handlers here via a simple dispatcher
-  window.addEventListener('message', function(ev) {
-    var msg = ev.data;
-    if (msg.type === 'modelsList')    { buildModelMenu(msg.models, msg.configured); }
-    if (msg.type === 'promptStart')   { /* already showing streaming bubble */ }
-    if (msg.type === 'promptChunk')   { handlePromptChunk(msg.text); }
-    if (msg.type === 'promptDone')    { finaliseStream(); }
-    if (msg.type === 'promptError')   { handlePromptError(msg.error); }
-    if (msg.type === 'contextSummary') { renderContextComposer(msg.summary); }
-    if (msg.type === 'contextCopied') {
-      var btn = qs('#btn-ctx-copy');
-      if (btn) { btn.textContent = '✓ Copied!'; setTimeout(function() { btn.textContent = 'Copy merged'; }, 2000); }
-    }
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // CONTEXT COMPOSER — sidebar section
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  var ctxSelected = {};   // fullPath → boolean (selected state per file)
-  var ctxSummary  = null; // last received summary
-
-  function renderContextComposer(summary) {
-    ctxSummary = summary;
-    var body = qs('#ctx-body');
-    if (!body) return;
-
-    var files = (summary && summary.files) || [];
-    if (!files.length) {
-      body.innerHTML = '<div class="ctx-empty">No AI config files found in this workspace or parent directories.</div>';
-      return;
-    }
-
-    // Initialise selection from summary (default = all selected)
-    files.forEach(function(f) {
-      if (ctxSelected[f.fullPath] === undefined) ctxSelected[f.fullPath] = f.selected !== false;
-    });
-
-    var maxTok       = Math.max.apply(null, files.map(function(f) { return f.tokens; })) || 1;
-    var ctxWindow    = summary.contextWindow || 200000;
-    var windowLabel  = ctxWindow >= 1000000
-      ? (ctxWindow / 1000000).toFixed(0) + 'M'
-      : (ctxWindow / 1000) + 'K';
-
-    function getTotal() {
-      return files.reduce(function(s, f) { return s + (ctxSelected[f.fullPath] ? f.tokens : 0); }, 0);
-    }
-    function fmtTok(n, exact) {
-      var prefix = exact ? '' : '~';
-      return n >= 1000 ? prefix + (n / 1000).toFixed(1) + 'K' : prefix + n;
-    }
-
-    function updateBar() {
-      var total = getTotal();
-      var pct   = Math.min(100, (total / ctxWindow) * 100);
-      var fill  = qs('#ctx-bar-fill');
-      var lbl   = qs('#ctx-total-label');
-      if (fill) {
-        fill.style.width = pct + '%';
-        fill.className   = 'ctx-bar-fill' + (pct > 80 ? ' danger' : pct > 55 ? ' warn' : '');
-      }
-      if (lbl) {
-        lbl.innerHTML = '<strong>' + fmtTok(total, true) + '</strong> / ' + windowLabel + ' tok (' + Math.round(pct) + '%)';
-      }
-    }
-
-    function fileRow(f) {
-      var chk  = ctxSelected[f.fullPath] ? ' checked' : '';
-      var barW = Math.round((f.tokens / maxTok) * 32);
-      return '<div class="ctx-file" data-path="' + escHtml(f.fullPath) + '">'
-        + '<input type="checkbox" data-path="' + escHtml(f.fullPath) + '"' + chk + '>'
-        + '<span class="ctx-file-name" title="' + escHtml(f.relPath) + '">' + escHtml(f.filename) + '</span>'
-        + '<div class="ctx-file-bar" style="width:' + barW + 'px"></div>'
-        + '<span class="ctx-file-tok">' + fmtTok(f.tokens, f.exact) + '</span>'
-        + (f.modelLabel ? '<span class="ctx-file-model">' + escHtml(f.modelLabel) + '</span>' : '')
-        + '</div>';
-    }
-
-    // Build HTML
-    var html = '<div class="ctx-bar-wrap">'
-      + '<div class="ctx-bar-track"><div class="ctx-bar-fill" id="ctx-bar-fill" style="width:0%"></div></div>'
-      + '<div class="ctx-total"><span>Context window used</span><span id="ctx-total-label"></span></div>'
-      + '</div>';
-
-    var parents   = files.filter(function(f) { return f.scope === 'parent'; });
-    var workspace = files.filter(function(f) { return f.scope === 'workspace'; });
-
-    if (parents.length) {
-      html += '<div class="ctx-scope-label">↑ Parent dirs (read by Claude Code)</div>';
-      parents.forEach(function(f) { html += fileRow(f); });
-    }
-    if (workspace.length) {
-      if (parents.length) html += '<div class="ctx-scope-label">This workspace</div>';
-      workspace.forEach(function(f) { html += fileRow(f); });
-    }
-
-    html += '<div class="ctx-actions">'
-      + '<button class="ctx-btn ctx-btn-copy" id="btn-ctx-copy">Copy merged</button>'
-      + '<button class="ctx-btn ctx-btn-view" id="btn-ctx-view">View merged</button>'
-      + '</div>';
-
-    body.innerHTML = html;
-    updateBar();
-
-    // Checkbox events — update selection + bar
-    qsa('.ctx-file input[type="checkbox"]', body).forEach(function(cb) {
-      cb.addEventListener('change', function(e) {
-        e.stopPropagation();
-        ctxSelected[cb.getAttribute('data-path')] = cb.checked;
-        updateBar();
-      });
-    });
-
-    // Click row = toggle checkbox
-    qsa('.ctx-file', body).forEach(function(row) {
-      row.addEventListener('click', function(e) {
-        if (e.target.tagName === 'INPUT') return;
-        var cb = row.querySelector('input[type="checkbox"]');
-        if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }
-      });
-    });
-
-    // Copy merged
-    qs('#btn-ctx-copy')?.addEventListener('click', function() {
-      var btn   = qs('#btn-ctx-copy');
-      var paths = Object.keys(ctxSelected).filter(function(p) { return ctxSelected[p]; });
-      vsc.postMessage({ type: 'contextCopy', selectedPaths: paths });
-      if (btn) { btn.textContent = '✓ Copying…'; }
-    });
-
-    // View merged — opens merged content as clipboard preview
-    qs('#btn-ctx-view')?.addEventListener('click', function() {
-      var paths = Object.keys(ctxSelected).filter(function(p) { return ctxSelected[p]; });
-      vsc.postMessage({ type: 'contextView', selectedPaths: paths });
-    });
-  }
-
-  // Expand context section → trigger discovery
-  qs('#sec-context .sb-header')?.addEventListener('click', function() {
-    var sec = qs('#sec-context');
-    if (!sec) return;
-    sec.classList.toggle('collapsed');
-    if (!sec.classList.contains('collapsed') && (!ctxSummary || !ctxSummary.files.length)) {
-      qs('#ctx-body').innerHTML = '<div class="ctx-empty">Scanning…</div>';
-      vsc.postMessage({ type: 'contextRefresh' });
-    }
-  });
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PROMPT HISTORY UI
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  function toggleHistory() {
-    var inHistory = document.body.classList.toggle('chat-history');
-    var btn = qs('#btn-chat-history');
-    if (btn) btn.classList.toggle('active', inHistory);
-    if (inHistory) {
-      vsc.postMessage({ type: 'getHistory', fileOnly: false });
-    }
-  }
-
-  qs('#btn-chat-history')?.addEventListener('click', function() {
-    toggleHistory();
-  });
-
-  qs('#btn-history-clear')?.addEventListener('click', function() {
-    vsc.postMessage({ type: 'clearHistory' });
-  });
-
-  function renderHistory(runs) {
-    var list  = qs('#history-list');
-    var count = qs('#history-count');
-    var foot  = qs('#history-footer-count');
-    if (!list) return;
-    if (count) count.textContent = String(runs.length);
-    if (foot)  foot.textContent  = runs.length + ' run' + (runs.length !== 1 ? 's' : '');
-    if (!runs.length) {
-      list.innerHTML = '<div class="history-empty">No runs yet — send a message to start.</div>';
-      return;
-    }
-    // Group by date
-    var groups = {};
-    runs.forEach(function(r) {
-      var d = new Date(r.timestamp);
-      var today = new Date();
-      var label;
-      if (d.toDateString() === today.toDateString()) {
-        label = 'Today';
-      } else {
-        var yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
-        label = d.toDateString() === yesterday.toDateString()
-          ? 'Yesterday'
-          : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-      }
-      if (!groups[label]) groups[label] = [];
-      groups[label].push(r);
-    });
-    var html = '';
-    Object.keys(groups).forEach(function(label) {
-      html += '<div class="history-section-label">' + escHtml(label) + '</div>';
-      groups[label].forEach(function(r) {
-        var firstUser = r.messages.find(function(m) { return m.role === 'user'; });
-        var preview   = firstUser ? firstUser.content.slice(0, 80) : '(no messages)';
-        var time      = new Date(r.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-        html += '<div class="history-item" data-run-id="' + escHtml(r.id) + '">'
-          + '<div class="hi-row1">'
-          + '<span class="hi-file">' + escHtml(r.file) + '</span>'
-          + '<span class="hi-model">' + escHtml(r.modelLabel) + '</span>'
-          + '<span class="hi-date">' + time + '</span>'
-          + '</div>'
-          + '<div class="hi-preview">' + escHtml(preview) + (firstUser && firstUser.content.length > 80 ? '…' : '') + '</div>'
-          + '</div>';
-      });
-    });
-    list.innerHTML = html;
-
-    // Click a history item → restore that conversation in the chat
-    qsa('.history-item', list).forEach(function(item) {
-      item.addEventListener('click', function() {
-        var id  = item.getAttribute('data-run-id');
-        var run = runs.find(function(r) { return r.id === id; });
-        if (!run) return;
-        // Restore the conversation
-        chatState.messages = run.messages.filter(function(m) { return m.role === 'user' || m.role === 'assistant'; });
-        var msgs = qs('#chat-messages');
-        if (msgs) {
-          msgs.innerHTML = '';
-          chatState.messages.forEach(function(m) { appendMessage(m.role, m.content, false); });
-        }
-        // Exit history mode
-        document.body.classList.remove('chat-history');
-        var btn = qs('#btn-chat-history');
-        if (btn) btn.classList.remove('active');
-        updateChatVisibility();
-        qs('#chat-input')?.focus();
-      });
-    });
-  }
-
-  // Handle history messages from extension
-  window.addEventListener('message', function(ev) {
-    var msg = ev.data;
-    if (msg.type === 'historyData') {
-      renderHistory(msg.runs || []);
-    }
-    if (msg.type === 'historyCount') {
-      var badge = qs('#history-count');
-      if (badge) badge.textContent = String(msg.count || 0);
-    }
-  });
-
-  // Initialise history count on load
-  vsc.postMessage({ type: 'getHistory', fileOnly: false });
-
   // ── Theme picker ───────────────────────────────────────────────────────────
   function applyTheme(t) {
     document.documentElement.setAttribute('data-m', t);
@@ -3671,57 +2397,8 @@ const SCRIPT = /* javascript */`
     sec.querySelector('.sb-header')?.addEventListener('click', e => {
       if (e.target.closest('.sb-action')) return;
       sec.classList.toggle('collapsed');
-      // When TOC collapses/expands, toggle no-toc so Notebooks fills the space
-      if (sec.id === 'sec-toc') {
-        qs('#sidebar')?.classList.toggle('no-toc', sec.classList.contains('collapsed'));
-      }
     });
   });
-
-  // ── Sidebar resize ─────────────────────────────────────────────────────────
-  (function() {
-    var sidebarRes = qs('#sidebar-resizer');
-    var sidebar    = qs('#sidebar');
-    if (!sidebarRes || !sidebar) return;
-
-    // Restore saved width
-    try {
-      var saved = localStorage.getItem('markr-sidebar-width');
-      if (saved) document.documentElement.style.setProperty('--sidebar-width', saved + 'px');
-    } catch {}
-
-    var startX = 0, startW = 0;
-
-    sidebarRes.addEventListener('mousedown', function(e) {
-      if (e.button !== 0) return;
-      e.preventDefault();
-      startX = e.clientX;
-      startW = sidebar.getBoundingClientRect().width;
-      document.body.classList.add('resizing-sidebar');
-
-      var sbMoveHandler = function(ev) {
-        var newW = Math.max(180, Math.min(420, startW + (ev.clientX - startX)));
-        document.documentElement.style.setProperty('--sidebar-width', newW + 'px');
-      };
-      var sbUpHandler = function() {
-        document.body.classList.remove('resizing-sidebar');
-        document.removeEventListener('mousemove', sbMoveHandler);
-        document.removeEventListener('mouseup', sbUpHandler);
-        try {
-          var w = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width'));
-          localStorage.setItem('markr-sidebar-width', String(Math.round(w)));
-        } catch {}
-      };
-      document.addEventListener('mousemove', sbMoveHandler);
-      document.addEventListener('mouseup', sbUpHandler);
-    });
-
-    // Double-click resets to default width
-    sidebarRes.addEventListener('dblclick', function() {
-      document.documentElement.style.setProperty('--sidebar-width', '240px');
-      try { localStorage.removeItem('markr-sidebar-width'); } catch {}
-    });
-  })();
 
   qs('#btn-new-file')?.addEventListener('click', e => { e.stopPropagation(); vsc.postMessage({ type: 'newFile' }); });
 
@@ -4032,7 +2709,6 @@ const SCRIPT = /* javascript */`
         aiBadge.style.display = msg.isAiConfig ? '' : 'none';
       }
       updateStats(msg.markdown);
-      if (msg.tokStr) setTokDisplay(msg.tokStr, msg.modelLabel || '', msg.sections || null);
       // Reset undo/redo history and dirty state whenever a new file is loaded
       resetHistory();
       markClean();
@@ -4076,7 +2752,6 @@ const SCRIPT = /* javascript */`
       // Real-time update from fs.watch — file changed on disk (agent wrote it)
       currentMarkdown = msg.markdown;
       updateStats(msg.markdown);
-      if (msg.tokStr) setTokDisplay(msg.tokStr, msg.modelLabel || '', msg.sections || null);
 
       // ── Update the visible preview ─────────────────────────────────────────
       // In split-edit mode: update the right-hand split-preview pane
@@ -4230,10 +2905,6 @@ const SCRIPT = /* javascript */`
   // ── Init ───────────────────────────────────────────────────────────────────
   if (typeof __FILES__ !== 'undefined') renderFileList(__FILES__);
   buildTOC(); setupScrollSpy(); addCopyButtons(); setupHeadingAnchors(); setupMermaid();
-  // Sync no-toc class based on initial TOC section state (showTOC setting)
-  if (qs('#sec-toc')?.classList.contains('collapsed')) {
-    qs('#sidebar')?.classList.add('no-toc');
-  }
   renderTabBar();
   qs('#btn-sidebar')?.classList.add('on');
 })();
@@ -4271,12 +2942,6 @@ export class MarkdownPreviewPanel {
   public  static currentPanel: MarkdownPreviewPanel | undefined;
   /** Set by extension.ts so "Source" button doesn't trigger the auto-close loop. */
   public  static setSuppressAutoClose: (val: boolean) => void = () => {};
-  /** Called by extension.ts when webview requests a prompt run. */
-  public  static onPromptRun: ((msg: unknown) => void) | undefined;
-  /** Called by extension.ts when webview requests available models. */
-  public  static onGetModels: (() => void) | undefined;
-  /** Called by extension.ts when webview requests prompt history. */
-  public  static onGetHistory: ((relPath?: string) => void) | undefined;
   private readonly _panel: vscode.WebviewPanel;
   private _document: vscode.TextDocument;
   private readonly _disposables: vscode.Disposable[] = [];
@@ -4352,11 +3017,6 @@ export class MarkdownPreviewPanel {
   }
 
   /** Send clipboard preview to the webview as a temporary overlay (no tab mutation). */
-  /** Post any message to the webview from outside the class. */
-  public postMessage(msg: object): void {
-    this._panel.webview.postMessage(msg);
-  }
-
   public _sendClipboardPreview(text: string): void {
     this._clipboardMode = true;
     const rawText = text;
@@ -4387,8 +3047,6 @@ export class MarkdownPreviewPanel {
 
     this._panel.webview.onDidReceiveMessage(async msg => {
       if (msg.type === 'openLink') { vscode.env.openExternal(vscode.Uri.parse(msg.href)); }
-      if (msg.type === 'setApiKey')    { vscode.commands.executeCommand('markr.setApiKey', msg.provider); }
-      if (msg.type === 'openSettings') { vscode.commands.executeCommand('workbench.action.openSettings', 'markr'); }
       if (msg.type === 'copyMarkdown') {
         vscode.env.clipboard.writeText(this._document.getText()).then(() =>
           vscode.window.setStatusBarMessage('$(check) Markr: Markdown copied', 3000)
@@ -4496,54 +3154,6 @@ export class MarkdownPreviewPanel {
       }
       if (msg.type === 'dismissClipboard') {
         this._clipboardMode = false;
-      }
-      // ── Context Composer & Prompt Runner ──────────────────────────────────
-      if (msg.type === 'promptRun') {
-        MarkdownPreviewPanel.onPromptRun?.(msg);
-      }
-      if (msg.type === 'getModels') {
-        MarkdownPreviewPanel.onGetModels?.();
-      }
-      if (msg.type === 'getHistory') {
-        const relPath = vscode.workspace.asRelativePath(this._document.uri);
-        MarkdownPreviewPanel.onGetHistory?.(msg.fileOnly ? relPath : undefined);
-      }
-      if (msg.type === 'clearHistory') {
-        vscode.commands.executeCommand('markr.clearPromptHistory');
-      }
-      if (msg.type === 'contextRefresh') {
-        // Webview requests a fresh context discovery
-        const { ContextComposer } = await import('./contextComposer');
-        const composer = new ContextComposer();
-        const summary  = await composer.discover(this._document.uri);
-        this._panel.webview.postMessage({ type: 'contextSummary', summary });
-      }
-      if (msg.type === 'contextCopy') {
-        const { ContextComposer } = await import('./contextComposer');
-        const composer = new ContextComposer();
-        const summary  = await composer.discover(this._document.uri);
-        if (msg.selectedPaths && Array.isArray(msg.selectedPaths)) {
-          const sel = new Set<string>(msg.selectedPaths);
-          summary.files.forEach(f => { f.selected = sel.has(f.fullPath); });
-        }
-        const merged = composer.mergeContext(summary.files);
-        await vscode.env.clipboard.writeText(merged);
-        const count  = summary.files.filter(f => f.selected).length;
-        vscode.window.setStatusBarMessage(`$(check) Markr: merged context copied (${count} files)`, 3000);
-        this._panel.webview.postMessage({ type: 'contextCopied', count });
-      }
-      if (msg.type === 'contextView') {
-        // Show the merged context as a clipboard-style preview
-        const { ContextComposer } = await import('./contextComposer');
-        const { countTokens, detectModel, fmtTokens } = await import('./tokenEngine');
-        const composer = new ContextComposer();
-        const summary  = await composer.discover(this._document.uri);
-        if (msg.selectedPaths && Array.isArray(msg.selectedPaths)) {
-          const sel = new Set<string>(msg.selectedPaths);
-          summary.files.forEach(f => { f.selected = sel.has(f.fullPath); });
-        }
-        const merged = composer.mergeContext(summary.files);
-        this._sendClipboardPreview(merged);
       }
       if (msg.type === 'saveFile') {
         // Explicit save triggered by the user (⌘S or Save button).
@@ -4839,13 +3449,8 @@ export class MarkdownPreviewPanel {
     const relPath    = vscode.workspace.asRelativePath(this._document.uri);
     const aiKind     = aiDocKind(filename, relPath);
     const autoEdit   = !!aiKind;
-    const model      = detectModel(filename, relPath);
-    const tokCount   = countTokens(text, model);
-    const tokStr     = fmtTokens(tokCount);
-    const modelLbl   = modelLabel(model);
-    const sections   = sectionTokens(text, model);
-    const sectionsJson = JSON.stringify(sections);
-    const statsTitle = `${stats.words.toLocaleString()} words · ${stats.headings} heading${stats.headings !== 1 ? 's' : ''} · ${stats.codeBlocks} code block${stats.codeBlocks !== 1 ? 's' : ''} · ${tokStr}${modelLbl ? ' (' + modelLbl + ')' : ''}`;
+    const tokStr     = tokenEstimate(stats.chars);
+    const statsTitle = `${stats.words.toLocaleString()} words · ${stats.headings} heading${stats.headings !== 1 ? 's' : ''} · ${stats.codeBlocks} code block${stats.codeBlocks !== 1 ? 's' : ''}`;
 
     return /* html */`<!DOCTYPE html>
 <html lang="en" data-m="${mode}">
@@ -4876,7 +3481,7 @@ export class MarkdownPreviewPanel {
     <span class="stats" title="${statsTitle}">
       <span id="stat-time">${readingTime(stats.words)}</span>m
       · <span id="stat-words">${stats.words.toLocaleString()}</span>w
-      · <button id="stat-tok" class="tok-btn${autoEdit ? ' stats-accent' : ''}" title="Click to see token breakdown by section">${tokStr}${modelLbl ? '<span class="tok-model">' + modelLbl + '</span>' : ''}</button>
+      · <span id="stat-tok" class="${autoEdit ? 'stats-accent' : ''}" title="${stats.chars.toLocaleString()} chars">${tokStr}</span>
     </span>
     <span id="save-status" class="save-status"></span>
     <span id="diff-chip"></span>
@@ -4885,7 +3490,6 @@ export class MarkdownPreviewPanel {
     <div class="sep-v"></div>
     <button id="btn-edit" class="tb-btn${autoEdit ? ' accent' : ''}" title="Split edit mode">${autoEdit ? '⚡ Edit' : 'Edit'}</button>
     <button id="btn-save-file" class="tb-btn" title="Save (⌘S / Ctrl+S)">Save</button>
-    <button id="btn-run" class="tb-btn" title="Open Prompt Runner — test this file as a system prompt">▶ Run</button>
     <button id="btn-source" class="tb-btn" title="Open Markdown source in VS Code editor">${ICON.source} Source</button>
     <div class="sep-v"></div>
     <button id="btn-paste-preview" class="tb-btn" title="Preview Clipboard — instantly render Markdown you copied from Claude, ChatGPT, Notion, or anywhere. No file needed.">${ICON.paste} Preview Clipboard</button>
@@ -4974,17 +3578,6 @@ export class MarkdownPreviewPanel {
       </div>
       <div class="sb-body" id="files-list"></div>
     </div>
-    <!-- ── Context Composer ──────────────────────────────────────────────── -->
-    <div class="sb-section collapsed" id="sec-context">
-      <div class="sb-header">
-        <span class="sb-title">Context</span>
-        <span class="sb-chevron">${ICON.chevron}</span>
-      </div>
-      <div class="sb-body" id="ctx-body" style="padding:0">
-        <div class="ctx-empty">Click ▸ to discover AI config files in scope</div>
-      </div>
-    </div>
-
     <div class="sb-section flex-fill ${showTOC ? '' : 'collapsed'}" id="sec-toc">
       <div class="sb-header">
         <span class="sb-title">On this page</span>
@@ -4993,7 +3586,6 @@ export class MarkdownPreviewPanel {
       <div class="sb-body" id="toc-body"></div>
     </div>
   </div>
-  <div id="sidebar-resizer" title="Drag to resize · Double-click to reset"></div>
   <div id="main-col">
     <!-- Clipboard preview banner — shown when content comes from clipboard -->
     <div id="clipboard-banner">
@@ -5011,98 +3603,12 @@ export class MarkdownPreviewPanel {
       <textarea id="edit-area" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Start writing Markdown…"></textarea>
       <div id="split-resizer" title="Drag to resize editor and preview"></div>
       <div id="split-preview"><article class="markdown-body">${body}</article></div>
-
-      <!-- ── Prompt Runner chat panel ─────────────────────────────────── -->
-      <div id="chat-panel">
-        <!-- Header: system prompt info + model picker + new chat -->
-        <div id="chat-header">
-          <span class="chat-sys-info" id="chat-sys-info">
-            <strong>System:</strong> ${filename}
-          </span>
-          <button id="btn-chat-new" title="Start a new conversation">New chat</button>
-          <button id="btn-chat-history" title="Browse prompt history">
-            History <span class="history-badge" id="history-count">0</span>
-          </button>
-          <div class="chat-model-wrap">
-            <button id="btn-chat-model">
-              <span class="provider-dot"></span>
-              <span id="chat-model-label">Claude 4 Sonnet</span>
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-            <div id="chat-model-menu">
-              <!-- populated by JS from MODELS list -->
-            </div>
-          </div>
-        </div>
-
-        <!-- Setup screen — shown when no API key is configured -->
-        <div id="chat-setup">
-          <div class="ce-icon">⚡</div>
-          <div class="cs-title">Set up Prompt Runner</div>
-          <div class="cs-sub">Test your AI config files against real models — without leaving VS Code.</div>
-          <button class="cs-provider-btn" data-provider="anthropic">
-            <span class="cs-provider-icon">✦</span>
-            <div><div style="font-weight:600">Anthropic</div><div style="font-size:11px;opacity:.6">Claude 4, 3.5 Sonnet</div></div>
-          </button>
-          <button class="cs-provider-btn" data-provider="openai">
-            <span class="cs-provider-icon">◎</span>
-            <div><div style="font-weight:600">OpenAI</div><div style="font-size:11px;opacity:.6">GPT-4o, o3-mini</div></div>
-          </button>
-          <button class="cs-provider-btn" data-provider="google">
-            <span class="cs-provider-icon">◇</span>
-            <div><div style="font-weight:600">Google</div><div style="font-size:11px;opacity:.6">Gemini 2.0 Flash</div></div>
-          </button>
-          <div class="cs-lock">🔒 Keys stored in VS Code's encrypted secret storage — never in plain text or git</div>
-        </div>
-
-        <!-- Empty state — shown before first message -->
-        <div id="chat-empty">
-          <div class="ce-icon">💬</div>
-          <div class="ce-title">Test your prompt</div>
-          <div class="ce-sub">Your file is the system prompt. Try one of these:</div>
-          <div id="chat-suggestions"></div>
-        </div>
-
-        <!-- Messages -->
-        <div id="chat-messages" style="display:none"></div>
-
-        <!-- Input -->
-        <!-- History panel — shown when History button is active -->
-        <div id="chat-history-panel">
-          <div class="history-list" id="history-list">
-            <div class="history-empty">No runs yet — send a message to start building history.</div>
-          </div>
-          <div class="history-footer">
-            <span id="history-footer-count">0 runs</span>
-            <button class="history-clear-btn" id="btn-history-clear">Clear history</button>
-          </div>
-        </div>
-
-        <div id="chat-input-wrap">
-          <textarea id="chat-input" rows="1" placeholder="Ask anything about this file… (Enter to send, Shift+Enter for newline)"></textarea>
-          <button id="btn-chat-send" title="Send (Enter)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 </div>
 
 <button id="top-btn" title="Back to top">${ICON.arrowUp}</button>
 <div id="rich-copy-toast">✓ Copied with formatting</div>
-
-<!-- Token section breakdown panel -->
-<div id="tok-panel">
-  <div class="tok-panel-hdr">
-    Token breakdown
-    <span class="tok-panel-model" id="tok-panel-model"></span>
-  </div>
-  <div class="tok-panel-body" id="tok-panel-body"></div>
-  <div class="tok-total">
-    Total context: <strong id="tok-panel-total"></strong>
-  </div>
-</div>
 
 <!-- Mermaid zoom modal -->
 <div class="mermaid-modal" id="mermaid-modal">
@@ -5115,7 +3621,7 @@ export class MarkdownPreviewPanel {
         <span class="zoom-level" id="mermaid-zoom-level">100%</span>
         <button id="mermaid-zoom-in"  title="Zoom in">+</button>
         <button id="mermaid-zoom-reset" title="Reset zoom">Reset</button>
-        <div class="tb-sep"></div>
+        <div style="width:1px;height:16px;background:var(--border);margin:0 4px;flex-shrink:0"></div>
         <button id="mermaid-copy-img" title="Copy diagram as PNG image">🖼 Copy image</button>
         <button class="mermaid-modal-close" id="mermaid-modal-close">✕</button>
       </div>
@@ -5161,7 +3667,7 @@ export class MarkdownPreviewPanel {
       <div class="sp-row"><span class="sp-desc">Heading 1 / 2 / 3</span><div class="sp-keys"><span class="sp-key">⌘⇧1</span><span class="sp-key">⌘⇧2</span><span class="sp-key">⌘⇧3</span></div></div>
       <div class="sp-row"><span class="sp-desc">Indent (Tab)</span><div class="sp-keys"><span class="sp-key">Tab</span></div></div>
       <div class="sp-row"><span class="sp-desc">Continue list (Enter)</span><div class="sp-keys"><span class="sp-key">↵</span></div></div>
-      <div class="sp-row"><span class="sp-desc">Paste image from clipboard</span><div class="sp-keys"><span class="sp-key">⌘V</span> <span class="sp-hint">(with image)</span></div></div>
+      <div class="sp-row"><span class="sp-desc">Paste image from clipboard</span><div class="sp-keys"><span class="sp-key">⌘V</span> <span style="font-size:11px;color:var(--text-faint)">(with image)</span></div></div>
     </div>
     <div class="sp-section">
       <div class="sp-section-title">Toolbar</div>
@@ -5189,8 +3695,6 @@ export class MarkdownPreviewPanel {
   const __FILES_LOADING__ = ${filesLoadingJson};
   const __CURRENT_URI__ = ${currentUriJson};
   const __AUTOEDIT__ = ${autoEdit};
-  const __TOK_SECTIONS__ = ${sectionsJson};
-  const __TOK_MODEL__    = ${JSON.stringify(modelLbl)};
 </script>
 <script nonce="${nonce}">${SCRIPT}</script>
 </body>
@@ -5236,23 +3740,19 @@ export class MarkdownPreviewPanel {
       this._prevMarkdown = rawText;
 
       const { meta, body } = extractFrontmatter(rawText);
-      const rendered  = applyGithubAlerts(marked.parse(body) as string);
-      const stats     = docStats(rawText);
-      const filename  = this._document.uri.path.split('/').pop() ?? '';
-      const relPath   = vscode.workspace.asRelativePath(this._document.uri);
-      const model     = detectModel(filename, relPath);
-      const tokNow    = countTokens(rawText, model);
-      const tokPrev   = countTokens(prevBlocks.join('\n\n'), model);
-      const tokDelta  = tokNow - tokPrev;
-      const sections  = sectionTokens(rawText, model);
+      const rendered = applyGithubAlerts(marked.parse(body) as string);
+      const stats    = docStats(rawText);
+      const tokDelta = Math.round(stats.chars / 4) - Math.round(docStats(prevBlocks.join('\n\n')).chars / 4);
 
+      // agentUpdate handles both preview-only mode AND split-edit mode:
+      // — in preview mode: updates the scroller
+      // — in split-edit mode (editMode=true): updates textarea + right pane
+      //   This is intentional — the agent wrote to disk, so disk IS the truth.
       this._panel.webview.postMessage({
         type: 'agentUpdate',
         html: (meta ? renderFrontmatter(meta) : '') + rendered,
         markdown: rawText,
-        tokStr: fmtTokens(tokNow),
-        modelLabel: modelLabel(model),
-        sections,
+        tokStr: tokenEstimate(stats.chars),
         words: stats.words,
         tokDelta,
         prevBlocks,
