@@ -1010,17 +1010,42 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 
 /* === Sidebar ===============================================================*/
 #sidebar {
-  width: 240px; min-width: 240px; display: flex; flex-direction: column;
+  width: var(--sidebar-width, 240px);
+  min-width: 0; display: flex; flex-direction: column;
   background: var(--bg-panel); border-right: 1px solid var(--border);
-  overflow: hidden; transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease; flex-shrink: 0;
+  overflow: hidden; flex-shrink: 0;
+  transition: opacity 0.2s ease; /* only transition opacity, not width — avoids lag during resize */
 }
-#sidebar.hidden { width: 0; min-width: 0; opacity: 0; overflow: hidden; }
+#sidebar.hidden { width: 0 !important; opacity: 0; overflow: hidden; }
+
+/* ── Sidebar resize handle ───────────────────────────────────────────────── */
+#sidebar-resizer {
+  width: 5px; flex-shrink: 0; cursor: col-resize; position: relative;
+  background: transparent;
+  transition: background 0.15s;
+}
+#sidebar-resizer::after {
+  content: ''; position: absolute; inset: 0 0 0 2px;
+  border-left: 1px solid var(--border);
+}
+#sidebar-resizer:hover,
+body.resizing-sidebar #sidebar-resizer { background: var(--accent-bg); }
+body.resizing-sidebar #sidebar-resizer::after { border-left-color: var(--accent); }
+body.resizing-sidebar { cursor: col-resize !important; user-select: none; }
+/* Prevent text selection flash during resize */
+body.resizing-sidebar * { pointer-events: none !important; }
+body.resizing-sidebar #sidebar-resizer { pointer-events: all !important; }
+
 .sb-section { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0; }
 .sb-section.flex-fill { flex: 1; overflow: hidden; }
 #sec-files   { flex: 0 1 42%; min-height: 120px; overflow: hidden; }
 #sec-context { flex: 0 0 auto; overflow: hidden; }
 #sec-toc     { flex: 1 1 36%; min-height: 120px; overflow: hidden; }
-#sidebar.no-toc #sec-files { flex: 1 1 auto; }
+
+/* When TOC is collapsed, Notebooks expands to fill remaining sidebar height */
+#sidebar.no-toc #sec-files { flex: 1 1 auto; min-height: 0; }
+/* When both TOC and Context are collapsed, Notebooks takes everything */
+#sidebar.no-toc #sec-context { flex: 0 0 auto; }
 
 /* ── Context Composer sidebar section ────────────────────────────────────── */
 .ctx-bar-wrap { padding: 8px 12px 4px; flex-shrink: 0; }
@@ -3617,8 +3642,57 @@ const SCRIPT = /* javascript */`
     sec.querySelector('.sb-header')?.addEventListener('click', e => {
       if (e.target.closest('.sb-action')) return;
       sec.classList.toggle('collapsed');
+      // When TOC collapses/expands, toggle no-toc so Notebooks fills the space
+      if (sec.id === 'sec-toc') {
+        qs('#sidebar')?.classList.toggle('no-toc', sec.classList.contains('collapsed'));
+      }
     });
   });
+
+  // ── Sidebar resize ─────────────────────────────────────────────────────────
+  (function() {
+    var sidebarRes = qs('#sidebar-resizer');
+    var sidebar    = qs('#sidebar');
+    if (!sidebarRes || !sidebar) return;
+
+    // Restore saved width
+    try {
+      var saved = localStorage.getItem('markr-sidebar-width');
+      if (saved) document.documentElement.style.setProperty('--sidebar-width', saved + 'px');
+    } catch {}
+
+    var startX = 0, startW = 0;
+
+    sidebarRes.addEventListener('mousedown', function(e) {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      startX = e.clientX;
+      startW = sidebar.getBoundingClientRect().width;
+      document.body.classList.add('resizing-sidebar');
+
+      function onMove(e) {
+        var newW = Math.max(180, Math.min(420, startW + (e.clientX - startX)));
+        document.documentElement.style.setProperty('--sidebar-width', newW + 'px');
+      }
+      function onUp() {
+        document.body.classList.remove('resizing-sidebar');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        try {
+          var w = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-width'));
+          localStorage.setItem('markr-sidebar-width', String(Math.round(w)));
+        } catch {}
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+
+    // Double-click resets to default width
+    sidebarRes.addEventListener('dblclick', function() {
+      document.documentElement.style.setProperty('--sidebar-width', '240px');
+      try { localStorage.removeItem('markr-sidebar-width'); } catch {}
+    });
+  })();
 
   qs('#btn-new-file')?.addEventListener('click', e => { e.stopPropagation(); vsc.postMessage({ type: 'newFile' }); });
 
@@ -4127,6 +4201,10 @@ const SCRIPT = /* javascript */`
   // ── Init ───────────────────────────────────────────────────────────────────
   if (typeof __FILES__ !== 'undefined') renderFileList(__FILES__);
   buildTOC(); setupScrollSpy(); addCopyButtons(); setupHeadingAnchors(); setupMermaid();
+  // Sync no-toc class based on initial TOC section state (showTOC setting)
+  if (qs('#sec-toc')?.classList.contains('collapsed')) {
+    qs('#sidebar')?.classList.add('no-toc');
+  }
   renderTabBar();
   qs('#btn-sidebar')?.classList.add('on');
 })();
@@ -4886,6 +4964,7 @@ export class MarkdownPreviewPanel {
       <div class="sb-body" id="toc-body"></div>
     </div>
   </div>
+  <div id="sidebar-resizer" title="Drag to resize · Double-click to reset"></div>
   <div id="main-col">
     <!-- Clipboard preview banner — shown when content comes from clipboard -->
     <div id="clipboard-banner">

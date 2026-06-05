@@ -7,6 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.11.1] — 2026-06-05
+
+### Changed
+- **Notebooks fills height when "On this page" is collapsed**: collapsing the TOC section now lets the Notebooks file list expand to fill all remaining sidebar height — no wasted empty space
+- **Resizable sidebar**: drag the thin handle between the sidebar and the main content to set your preferred sidebar width (180px – 420px). Width is remembered across sessions. Double-click the handle to reset to the default 240px.
+
+---
+
 ## [3.11.0] — 2026-06-05
 
 ### Added
