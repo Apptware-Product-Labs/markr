@@ -129,40 +129,22 @@ function modelLabel(model: AiModel): string {
 }
 
 /**
- * Count tokens accurately per model.
- * - Claude: content-aware heuristic (code ~3 chars/tok, prose ~3.5 chars/tok)
- * - GPT-4 (cl100k): uses gpt-tokenizer for exact counts
- * - GPT-4o (o200k): same library, o200k encoder
- * - Generic: content-aware heuristic (average of above)
+ * Count tokens per model — content-aware heuristic (no external tokenizer library).
+ * Separates code blocks (~3 chars/tok) from prose for better accuracy.
  */
 function countTokens(text: string, model: AiModel): number {
   if (!text) return 0;
 
-  if (model === 'gpt4' || model === 'gpt4o') {
-    try {
-      // gpt-tokenizer provides exact cl100k/o200k token counts
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { encode } = model === 'gpt4o'
-        ? require('gpt-tokenizer/model/gpt-4o')
-        : require('gpt-tokenizer');
-      return (encode(text) as number[]).length;
-    } catch {
-      // Fallback if tokenizer fails (e.g. very long text, unusual chars)
-    }
-  }
-
-  // Claude / generic: content-aware heuristic
-  // Extract code blocks (tokenise at ~3 chars/token — more symbols, shorter tokens)
   let codeChars = 0;
   const prose = text
-    .replace(/```[\s\S]*?```/g, m => { codeChars += m.length; return ''; })
-    .replace(/`[^`\n]+`/g,      m => { codeChars += m.length; return ''; });
+    .replace(/```[\s\S]*?```/g, (m: string) => { codeChars += m.length; return ''; })
+    .replace(/`[^`\n]+`/g,      (m: string) => { codeChars += m.length; return ''; });
 
   const codeTokens  = Math.round(codeChars / 3);
-  // Prose: Claude ~3.5 chars/token, generic ~3.8
-  const charsPerTok = model === 'claude' ? 3.5 : 3.8;
-  const proseTokens = Math.round(prose.length / charsPerTok);
-
+  const ratioMap: Record<AiModel, number> = {
+    claude: 3.5, gpt4: 4.0, gpt4o: 3.8, llama3: 4.0, gemini: 3.3, mistral: 3.6, generic: 3.8,
+  };
+  const proseTokens = Math.round(prose.length / (ratioMap[model] ?? 3.8));
   return codeTokens + proseTokens;
 }
 

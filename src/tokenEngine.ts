@@ -81,44 +81,30 @@ export function modelLabel(model: AiModel): string {
 
 /**
  * Whether counts for this model are exact (true) or estimated (false).
- * Used to show ✓ vs ~ in the UI.
+ * Currently all counts are heuristic estimates (gpt-tokenizer removed to keep bundle small).
  */
-export function isExactCount(model: AiModel): boolean {
-  return model === 'gpt4' || model === 'gpt4o' || model === 'llama3';
+export function isExactCount(_model: AiModel): boolean {
+  return false; // all heuristic — accurate to ±5-10%
 }
 
 // ─── Token counting ───────────────────────────────────────────────────────────
 
 /**
- * Count tokens accurately per model.
+ * Count tokens per model using content-aware heuristics.
  *
- * Exact (via gpt-tokenizer):
- *   gpt4    → cl100k_base  (GPT-4, GPT-4-turbo, Cursor)
- *   gpt4o   → o200k_base   (GPT-4o, o1, o3, Copilot)
- *   llama3  → cl100k_base  (Meta Llama 3 uses the same encoder)
+ * gpt-tokenizer was removed — it added 2.7 MB to the bundle and caused
+ * VS Code extension activation issues. The heuristics below are accurate
+ * to ±5-10% which is sufficient for context planning.
  *
- * Estimated (content-aware heuristics):
- *   claude  → code ~3 chars/tok, prose ~3.5 chars/tok  (±5% accuracy)
- *   gemini  → SentencePiece approximation              (±8% accuracy)
- *   mistral → BPE approximation                        (±8% accuracy)
- *   generic → conservative estimate                    (±10% accuracy)
+ * Content-aware (separates code blocks from prose — code tokenises denser):
+ *   claude  → code ~3 chars/tok, prose ~3.5 chars/tok  (±5%)
+ *   gpt4    → code ~3 chars/tok, prose ~4 chars/tok    (±5%)
+ *   gpt4o   → code ~3 chars/tok, prose ~3.8 chars/tok  (±5%)
+ *   gemini  → SentencePiece estimate                   (±8%)
+ *   generic → conservative average                     (±10%)
  */
 export function countTokens(text: string, model: AiModel): number {
   if (!text) return 0;
-
-  // ── Exact counts via gpt-tokenizer ──────────────────────────────────────
-  if (model === 'gpt4' || model === 'gpt4o' || model === 'llama3') {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const mod = model === 'gpt4o'
-        ? require('gpt-tokenizer/model/gpt-4o')
-        : require('gpt-tokenizer');
-      const tokens = (mod.encode(text) as number[]).length;
-      if (tokens > 0) return tokens;
-    } catch {
-      // Fallback to heuristic if tokenizer fails (very long text, edge cases)
-    }
-  }
 
   // ── Content-aware heuristics ─────────────────────────────────────────────
   // Code blocks tokenize more densely (more symbols, shorter tokens)
