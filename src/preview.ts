@@ -1108,11 +1108,11 @@ body.resizing-sidebar #sidebar-resizer { pointer-events: all !important; }
 .sb-section.collapsed .sb-body { display: none; }
 .sb-section.collapsed #file-search-wrap { display: none; }
 .sb-ai-label {
-  padding: 8px 10px 2px; font-size: 10px; font-weight: 700;
-  letter-spacing: 0.07em; text-transform: uppercase;
-  color: var(--text-faint); font-family: inherit;
+  padding: 7px 10px 2px; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted); font-family: inherit;   /* readable, not faint */
 }
-.sb-ai-label.accent { color: var(--accent); opacity: 0.8; }
+.sb-ai-label.accent { color: var(--accent); font-weight: 700; opacity: 1; }
 
 /* File search input */
 #file-search-wrap {
@@ -1163,43 +1163,62 @@ body.resizing-sidebar #sidebar-resizer { pointer-events: all !important; }
   border: 1.5px solid var(--border); border-top-color: var(--accent);
   animation: spin 0.8s linear infinite;
 }
-/* === File list — Source Control style ======================================
-   Compact rows: icon + filename left, path/badge right (dim).
-   Matches VS Code's SCM panel aesthetic. ===================================*/
+/* === File list ===============================================================
+   Clean, readable rows: filename clearly visible, path secondary but legible.
+   Folder headers look like VS Code Explorer sections, not tiny uppercase.  */
+
+/* Folder group header — clear and readable, not invisible uppercase text */
 .file-dir {
-  width: 100%; display: flex; align-items: center; gap: 4px;
-  padding: 3px 8px 3px calc(8px + (var(--depth, 0) * 12px));
+  width: 100%; display: flex; align-items: center; gap: 5px;
+  padding: 5px 8px 3px calc(6px + (var(--depth, 0) * 12px));
   border: none; background: transparent; cursor: pointer; text-align: left;
-  font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--text-faint); white-space: nowrap; margin-top: 4px;
+  font-size: 12px; font-weight: 600;
+  color: var(--text-muted); white-space: nowrap;
 }
-.file-dir:hover { background: var(--bg-hover); color: var(--text-muted); }
+.file-dir:hover { background: var(--bg-hover); color: var(--text); }
 .file-dir .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-.file-dir .folder-count { font-size: 9px; color: var(--text-faint); margin-left: 3px; }
-.folder-chevron { width: 9px; height: 9px; transition: transform 0.12s; flex-shrink: 0; }
+.file-dir .folder-count {
+  font-size: 10px; color: var(--text-faint);
+  background: var(--bg-hover); border-radius: 8px; padding: 0 5px;
+}
+.folder-chevron { width: 9px; height: 9px; transition: transform 0.12s; flex-shrink: 0; color: var(--text-faint); }
 .file-dir.collapsed .folder-chevron { transform: rotate(-90deg); }
+
+/* File rows — filename is fully readable, path is clearly secondary */
 .file-item {
   display: flex; align-items: center;
-  padding: 3px 8px 3px calc(10px + (var(--depth, 0) * 12px));
-  gap: 5px; font-size: 12.5px; font-family: inherit;
-  color: var(--text-muted); cursor: pointer;
-  border-left: 2px solid transparent;
-  transition: background 0.08s, color 0.08s, border-color 0.08s;
+  padding: 4px 8px 4px calc(10px + (var(--depth, 0) * 12px));
+  gap: 6px; font-size: 12.5px; font-family: inherit;
+  color: var(--text);   /* ← filename readable at full contrast */
+  cursor: pointer; border-left: 2px solid transparent;
+  transition: background 0.08s, border-color 0.08s;
   user-select: none; min-width: 0;
 }
-.file-item:hover { background: var(--bg-hover); color: var(--text); }
-.file-item:hover .file-path { opacity: 0.7; }
-.file-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-bg); }
-.file-item svg { flex-shrink: 0; opacity: 0.4; }
+.file-item:hover { background: var(--bg-hover); }
+.file-item.active {
+  color: var(--accent); border-left-color: var(--accent);
+  background: var(--accent-bg);
+}
+.file-item svg { flex-shrink: 0; opacity: 0.45; }
 .file-item.active svg, .file-item.ai svg { opacity: 0.9; }
 .file-item.ai svg { color: var(--accent); }
-.file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-/* Right-side metadata — path or AI kind badge, dim and right-aligned like SCM */
-.file-path {
-  font-size: 10.5px; color: var(--text-faint); flex-shrink: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  max-width: 90px; opacity: 0.5; transition: opacity 0.1s;
+
+/* Filename — always at full text contrast */
+.file-name {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0; color: var(--text);
 }
+.file-item.active .file-name { color: var(--accent); }
+
+/* Path label — clearly secondary but actually readable (no opacity hack) */
+.file-path {
+  font-size: 11px; color: var(--text-faint); flex-shrink: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 100px;
+  /* opacity is NOT used here — var(--text-faint) is already dim enough */
+}
+
+/* AI kind badge */
 .file-ai-kind {
   flex-shrink: 0; font-size: 9px; line-height: 1; color: var(--accent);
   background: var(--accent-bg); border: 1px solid var(--accent-border);
@@ -1918,8 +1937,14 @@ const SCRIPT = /* javascript */`
     return Object.keys(node.dirs).sort().map(name => {
       const child = node.dirs[name];
       const collapsed = collapsedFolders.has(child.path);
+      // Folder icon (open when expanded, closed when collapsed)
+      var folderIcon = collapsed
+        ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-faint);flex-shrink:0"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>'
+        : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);opacity:.6;flex-shrink:0"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
       let html = '<button class="file-dir' + (collapsed ? ' collapsed' : '') + '" data-dir="' + escHtml(child.path) + '" style="--depth:' + depth + '">'
-        + '<span class="folder-chevron">▾</span><span class="folder-name">' + escHtml(child.name) + '</span>'
+        + '<span class="folder-chevron">▾</span>'
+        + folderIcon
+        + '<span class="folder-name">' + escHtml(child.name) + '</span>'
         + '<span class="folder-count">' + treeCount(child) + '</span></button>';
       if (!collapsed) {
         child.files.sort((a, b) => a.label.localeCompare(b.label)).forEach(f => { html += fileItemHtml(f, depth + 1); });
@@ -1937,18 +1962,32 @@ const SCRIPT = /* javascript */`
   }
 
   function fileItemHtml(f, depth = 0) {
-    // SCM-style: compact icon + filename left, path or AI-kind badge right (dim)
     const icon = f.isAiConfig
       ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>'
       : '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h8l4 4v8H2V2z" opacity=".35"/><path d="M10 2v4h4"/></svg>';
-    // Right-side: AI kind badge OR parent directory (last segment only)
+
+    // Right-side: AI kind badge OR readable path
     var right = '';
     if (f.aiKind) {
       right = '<span class="file-ai-kind">' + escHtml(f.aiKind) + '</span>';
     } else if (f.dir) {
-      var lastDir = f.dir.split('/').pop() || f.dir;
-      right = '<span class="file-path">' + escHtml(lastDir) + '</span>';
+      // Show full path but cap at 2 segments so it's readable, not truncated
+      // e.g. "docs/development/contributing.md" → "docs / development"
+      var parts = f.dir.split('/').filter(Boolean);
+      var pathLabel;
+      if (parts.length === 0) {
+        pathLabel = '';
+      } else if (parts.length === 1) {
+        pathLabel = parts[0];
+      } else {
+        // Show last 2 segments: "docs / development"
+        pathLabel = parts.slice(-2).join(' / ');
+      }
+      if (pathLabel) {
+        right = '<span class="file-path" title="' + escHtml(f.dir) + '">' + escHtml(pathLabel) + '</span>';
+      }
     }
+
     return '<div class="file-item' + (f.active ? ' active' : '') + (f.isAiConfig ? ' ai' : '')
       + '" data-uri="' + escHtml(f.uri) + '" title="' + escHtml(f.relPath) + '" style="--depth:' + depth + '">'
       + icon + '<span class="file-name">' + escHtml(f.label) + '</span>'
