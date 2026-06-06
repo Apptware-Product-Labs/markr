@@ -36,7 +36,12 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 
 ## See it in action
 
-<!-- ── NEW in v3.9 ─────────────────────────────────────────────────────── -->
+<!-- ── NEW in v4.x ─────────────────────────────────────────────────────── -->
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-14-token-breakdown.gif" alt="Token section breakdown — click the token count to see which section costs the most" width="100%" />
+<p align="center"><sub>✦ Click the token counter → see a breakdown by section with proportional bars. Supports Claude, GPT-4, GPT-4o, DeepSeek, Kimi, Llama 3, Gemini, Mistral & more. Click any row to jump there.</sub></p>
+
+<br/>
 
 <img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-07-auto-open.gif" alt="AI config files open automatically in Markr — no text editor tab" width="100%" />
 <p align="center"><sub>✦ Double-click CLAUDE.md, .cursorrules, or any AI config — Markr opens automatically, text editor closes. Markr is the editor.</sub></p>
@@ -132,6 +137,8 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 | Syntax highlighting | Basic | ✅ 190+ languages |
 | Copy code buttons | ✗ | ✅ Hover to reveal |
 | Word count + reading time | ✗ | ✅ Always visible |
+| Token counter (model-aware) | ✗ | ✅ Claude, GPT-4, GPT-4o, DeepSeek, Kimi, Llama 3, Gemini, Mistral |
+| Token section breakdown | ✗ | ✅ Click to see which section costs the most — jump to it |
 | Export to HTML / PDF | ✗ | ✅ One click |
 | Themes | VS Code only | ✅ Light, Dark, Notion, Linear |
 | Focus / reading mode | ✗ | ✅ Distraction-free |

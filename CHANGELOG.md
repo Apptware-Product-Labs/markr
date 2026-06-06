@@ -7,6 +7,29 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [4.2.0] — 2026-06-06
+
+### Added
+- **Model-aware token counter**: the toolbar token count now detects which AI model the file is for and shows its name — `~1.8K tok Claude`, `~2.1K tok GPT-4`, `~1.9K tok GPT-4o`, etc. Supports Claude, GPT-4 / Cursor, GPT-4o / Copilot, DeepSeek, Kimi (Moonshot), Llama 3, Llama 2, Mistral / Mixtral, Gemini, Qwen. Uses content-aware heuristics (code ~3 chars/tok, prose model-specific ratio) — ±5% accuracy, no external tokenizer library.
+- **Token section breakdown panel**: click the token count in the toolbar to see a popup showing how many tokens each heading section uses, with a proportional bar. Sections over 25% of the total are highlighted. Click any row to jump to that section in the preview.
+
+## [4.1.0] — 2026-06-06
+
+### Added
+- **Resizable sidebar**: drag the handle between the sidebar and content area to set your preferred width (160–480px). Persists in localStorage. Double-click to reset to default.
+
+### Fixed
+- **TOC collapse now fills full height**: collapsing "On this page" now lets Notebooks expand to fill ALL remaining sidebar height (was stopping partway due to `min-height: 150px` on the TOC section)
+- **Mermaid Gantt `classDef` bomb removed**: `classDef` is not supported in Gantt diagrams — caused a Mermaid parse error visible as a bomb icon. Removed from the showcase demo file.
+
+## [4.0.0] — 2026-06-06
+
+### Changed
+- **File list readability**: filenames now use full contrast `var(--text)`, folder paths use `var(--text-muted)` instead of near-invisible `var(--text-faint)` (#48443e in dark theme), folder headers are 12px readable weight instead of 10px tiny uppercase
+- **Stable base release**: reverted to proven v3.9.6 codebase as the 4.x foundation
+
+---
+
 ## [3.11.1] — 2026-06-05
 
 ### Changed

@@ -44,18 +44,30 @@ export interface ExplorerFileEntry {
 // ─── Tree Items ───────────────────────────────────────────────────────────────
 
 export class MarkrFileItem extends vscode.TreeItem {
-  constructor(public readonly entry: ExplorerFileEntry) {
+  constructor(public readonly entry: ExplorerFileEntry, active = false) {
     super(entry.label, vscode.TreeItemCollapsibleState.None);
     this.resourceUri = entry.uri;
-    this.tooltip = entry.relPath;
+    this.tooltip    = entry.relPath;
+
     if (entry.isAiConfig) {
-      this.iconPath = new vscode.ThemeIcon('star');
-      this.description = entry.aiKind;
+      // AI config files get a distinctive star icon; active ones get an eye icon
+      this.iconPath    = new vscode.ThemeIcon(
+        active ? 'eye' : 'star-full',
+        active
+          ? new vscode.ThemeColor('focusBorder')            // accent highlight when active
+          : new vscode.ThemeColor('charts.yellow'),
+      );
+      this.description = entry.aiKind + (active ? '  ◉' : '');
+    } else {
+      // Regular files: DON'T set iconPath — VS Code then auto-uses the user's file icon
+      // theme (same icons as in Explorer: TypeScript, Python, YAML, etc.)
+      this.description = active ? '◉' : undefined;
     }
+
     this.contextValue = entry.isAiConfig ? 'markrAiFile' : 'markrFile';
     this.command = {
       command: 'markr.openFile',
-      title: 'Open in Markr',
+      title:   'Open in Markr',
       arguments: [entry.uri],
     };
   }
@@ -68,7 +80,7 @@ export class MarkrFolderItem extends vscode.TreeItem {
     public readonly children: (MarkrFolderItem | MarkrFileItem)[],
   ) {
     super(label, vscode.TreeItemCollapsibleState.Collapsed);
-    this.iconPath = new vscode.ThemeIcon('folder');
+    this.iconPath = new vscode.ThemeIcon('folder-opened');
     this.tooltip = folderPath;
     this.contextValue = 'markrFolder';
     const total = countFolderFiles(children);
@@ -107,17 +119,16 @@ function buildFolderNode(files: ExplorerFileEntry[]): FolderNode {
 function folderNodeToItems(
   node: FolderNode,
   basePath: string = '',
+  activeUri: string = '',
 ): (MarkrFolderItem | MarkrFileItem)[] {
   const items: (MarkrFolderItem | MarkrFileItem)[] = [];
-  // Subdirectories first (alphabetical)
   for (const [name, child] of [...node.dirs.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
     const childPath = basePath ? `${basePath}/${name}` : name;
-    const children = folderNodeToItems(child, childPath);
+    const children = folderNodeToItems(child, childPath, activeUri);
     items.push(new MarkrFolderItem(name, childPath, children));
   }
-  // Files inside this level (alphabetical)
   for (const f of [...node.files].sort((a, b) => a.label.localeCompare(b.label))) {
-    items.push(new MarkrFileItem(f));
+    items.push(new MarkrFileItem(f, f.uri.toString() === activeUri));
   }
   return items;
 }
@@ -147,6 +158,16 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
   private _files: ExplorerFileEntry[] = [];
   private _loading = true;
   private _scanPromise: Promise<void> | null = null;
+  private _activeUri = '';
+
+  /** Mark a URI as the currently active file in Markr and refresh the tree. */
+  setActiveFile(uri: string): void {
+    if (this._activeUri === uri) return;
+    this._activeUri = uri;
+    this._onDidChangeTreeData.fire(); // re-render so the ◉ indicator updates
+  }
+
+  get activeUri(): string { return this._activeUri; }
 
   constructor() {
     this._scan();
@@ -174,7 +195,6 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
   private async _doScan(): Promise<void> {
     try {
       const maxFiles = vscode.workspace.getConfiguration('markr').get<number>('maxWorkspaceFiles', 500);
-      // Broad exclusion list keeps the scan fast even in large monorepos
       const exclude = [
         '**/node_modules/**', '**/.git/**', '**/.vscode/**',
         '**/.next/**', '**/out/**', '**/dist/**', '**/build/**',
@@ -184,6 +204,35 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
         '**/__pycache__/**', '**/.pytest_cache/**',
         '**/vendor/**', '**/public/**',
       ].join(',');
+
+      // ── Instant Phase: stat well-known AI config names at workspace root ──
+      // No filesystem traversal — shows AI configs in the tree immediately.
+      const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
+      if (wsRoot) {
+        const knownNames = ['CLAUDE.md','claude.local.md','.cursorrules','agent.md','agents.md',
+          'skill.md','skills.md','system-prompt.md','copilot-instructions.md','.windsurfrules',
+          'windsurf.md','deepseek.md','kimi.md','llama.md','gemini.md','mistral.md','qwen.md'];
+        const instantUris: vscode.Uri[] = [];
+        await Promise.all(knownNames.map(async name => {
+          try {
+            const uri = vscode.Uri.joinPath(wsRoot, name);
+            await vscode.workspace.fs.stat(uri);
+            instantUris.push(uri);
+          } catch { /* not found */ }
+        }));
+        if (instantUris.length) {
+          // Show AI configs immediately, then the full scan will replace this
+          this._files = instantUris.map(uri => {
+            const label = nodePath.basename(uri.fsPath);
+            const relPath = vscode.workspace.asRelativePath(uri);
+            const lower = label.toLowerCase();
+            const isAiConfig = AI_CONFIG_NAMES.has(lower) || /^claude(\.local)?\.md$/i.test(lower);
+            return { label, relPath, uri, isAiConfig, aiKind: aiDocKindExplorer(label, relPath), dir: '' };
+          });
+          this._onDidChangeTreeData.fire(); // show AI configs NOW
+        }
+      }
+
       const uris = await vscode.workspace.findFiles('**/*.md', `{${exclude}}`, maxFiles);
       uris.sort((a, b) =>
         vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)),
@@ -240,7 +289,7 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
     if (aiEntries.length > 0) {
       sections.push(new MarkrSectionItem(
         `AI Configs (${aiEntries.length})`,
-        aiEntries.map(f => new MarkrFileItem(f)),
+        aiEntries.map(f => new MarkrFileItem(f, f.uri.toString() === this._activeUri)),
         vscode.TreeItemCollapsibleState.Expanded,
         'star',
       ));
@@ -248,14 +297,14 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
 
     // ── Workspace section with folder tree ──────────────────────────────────
     if (docEntries.length > 0) {
-      const treeItems = folderNodeToItems(buildFolderNode(docEntries));
+      const treeItems = folderNodeToItems(buildFolderNode(docEntries), '', this._activeUri);
       sections.push(new MarkrSectionItem(
         `Workspace (${docEntries.length})`,
         treeItems,
         docEntries.length <= 20
           ? vscode.TreeItemCollapsibleState.Expanded
           : vscode.TreeItemCollapsibleState.Collapsed,
-        'folder-opened',
+        'files',
       ));
     }
 

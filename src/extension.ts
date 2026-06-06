@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { MarkdownPreviewPanel } from './preview';
-import { MarkrExplorerProvider, AI_CONFIG_TEMPLATES } from './markrExplorer';
+import { MarkrExplorerProvider, MarkrFileItem, AI_CONFIG_TEMPLATES } from './markrExplorer';
 
 export async function activate(context: vscode.ExtensionContext) {
 
@@ -13,6 +13,20 @@ export async function activate(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(treeView);
 
+  /** Reveal and highlight the given URI in the Activity Bar. Shows the Markr panel. */
+  function revealInExplorer(uri: vscode.Uri): void {
+    const uriStr = uri.toString();
+    // Mark as active (adds ◉ indicator and updates icon colour)
+    explorerProvider.setActiveFile(uriStr);
+    // Bring the Markr sidebar into view so the user sees it
+    vscode.commands.executeCommand('workbench.view.extension.markr-sidebar').then(() => {
+      const entry = explorerProvider.getFiles().find(f => f.uri.toString() === uriStr);
+      if (!entry) return;
+      // Pass active=true so the revealed item has the highlight icon
+      treeView.reveal(new MarkrFileItem(entry, true), { select: true, focus: false }).catch(() => {});
+    }, () => {});
+  }
+
   // ── Commands ───────────────────────────────────────────────────────────────
 
   // openPreview: smart fallback — if no .md file is active, show workspace quick-pick
@@ -21,6 +35,7 @@ export async function activate(context: vscode.ExtensionContext) {
       const editor = vscode.window.activeTextEditor;
       if (editor?.document.languageId === 'markdown') {
         MarkdownPreviewPanel.createOrShow(editor.document);
+        revealInExplorer(editor.document.uri);
         return;
       }
       // No markdown file active — show workspace picker
@@ -63,6 +78,7 @@ export async function activate(context: vscode.ExtensionContext) {
       if (!picked) return;
       const doc = await vscode.workspace.openTextDocument(picked.uri);
       MarkdownPreviewPanel.createOrShow(doc);
+      revealInExplorer(picked.uri);
     })
   );
 
@@ -72,6 +88,7 @@ export async function activate(context: vscode.ExtensionContext) {
       try {
         const doc = await vscode.workspace.openTextDocument(uri);
         MarkdownPreviewPanel.createOrShow(doc);
+        revealInExplorer(uri);
       } catch (e) {
         vscode.window.showErrorMessage(`Markr: could not open file — ${e instanceof Error ? e.message : String(e)}`);
       }
@@ -170,6 +187,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
       const doc = await vscode.workspace.openTextDocument(fileUri);
       MarkdownPreviewPanel.createOrShow(doc);
+      revealInExplorer(fileUri);
     })
   );
 
@@ -296,10 +314,15 @@ export async function activate(context: vscode.ExtensionContext) {
   // ── Document listeners ─────────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument(({ document }) => {
+      // Content changed in the SAME file — only re-renders if Markr is showing it
       if (document.languageId === 'markdown') MarkdownPreviewPanel.update(document);
     }),
     vscode.window.onDidChangeActiveTextEditor(editor => {
-      if (editor?.document.languageId === 'markdown') MarkdownPreviewPanel.update(editor.document);
+      // User switched to a different editor — Markr follows
+      if (editor?.document.languageId === 'markdown') {
+        MarkdownPreviewPanel.followEditor(editor.document);
+        explorerProvider.setActiveFile(editor.document.uri.toString()); // update ◉ indicator
+      }
     }),
     vscode.window.onDidChangeTextEditorSelection(event => {
       const cfg = vscode.workspace.getConfiguration('markr');

@@ -1,111 +1,128 @@
-# CLAUDE.md — BenchMark Platform
+# Markr — AI Agent Workbench for VS Code
 
-> You are working on **BenchMark**, an employee resource management platform built with Next.js 16, Supabase, and Tailwind CSS. Read this file completely before writing any code.
+> **Vision:** Be the Postman for AI agents — the tool every AI developer has open while they build, test, and iterate on their agent stack. Not just a markdown preview, but a full workbench for writing, testing, and managing AI context.
 
 ---
 
-## Project Context
+## What Markr Is
 
-BenchMark manages employee allocation, leave, timesheets, reimbursements, and org-chart visualisation for Apptware Labs and its clients. It is a multi-tenant SaaS product — every query must be scoped to `tenant_id`.
+Markr is a VS Code / Cursor extension. It starts as a GitHub-accurate Markdown preview and AI config file editor, and evolves into the essential AI development companion:
 
-**Current sprint:** Phase 1 Foundation — hardening the engineering substrate before adding features.
+- **See** your CLAUDE.md, .cursorrules, agent.md rendered beautifully in split-edit mode
+- **Watch** your files update in real-time as Claude Code or any AI agent edits them
+- **Measure** exact token counts per model — Claude, GPT-4, GPT-4o, Llama 3, Gemini
+- **Compose** your full context — see all AI configs in scope, combined token count
+- **Test** — run your system prompt against real models without leaving VS Code
+
+**Publisher:** Apptware Labs Pvt Ltd | **License:** All Rights Reserved (free for personal use)
 
 ---
 
 ## Architecture
 
-| Layer | Technology | Notes |
-|-------|-----------|-------|
-| Frontend | Next.js 16 App Router + React 19 | Server components by default |
-| Database | Supabase (PostgreSQL) | 69 migrations, RLS enabled |
-| Auth | Supabase Auth | Service-role key is server-only |
-| Styling | Tailwind CSS 4 + shadcn/ui | Components in `src/components/ui/` |
-| State | Zustand (sparingly) + SWR | SWR for all data fetching |
-| Validation | React Hook Form + Zod | Every mutating route uses `safeParse` |
-| Email | Resend | Transactional only |
-
----
-
-## Critical Rules
-
-### Multi-tenancy — never skip this
-Every database query MUST include `tenant_id`:
-
-```sql
--- ✅ Correct
-SELECT * FROM employees WHERE tenant_id = current_tenant_id();
-
--- ❌ Wrong — leaks data across tenants
-SELECT * FROM employees;
-```
-
-Every new table must include:
-```sql
-tenant_id UUID NOT NULL REFERENCES tenants(id)
-```
-
-### API route conventions
-
-```typescript
-// Every mutating route pattern
-export async function POST(req: Request) {
-  const body = await req.json();
-  const parsed = MySchema.safeParse(body);
-  if (!parsed.success) return ApiErrors.badRequest(parsed.error);
-
-  // ... business logic
-
-  return NextResponse.json({ ok: true });
-}
-```
-
-### File structure
 ```
 src/
-├── app/           # Next.js App Router pages + API routes
-├── components/    # Feature-based folders + ui/ for shadcn primitives
-├── lib/           # Utilities, Supabase client, helpers
-├── schemas/       # Zod schemas — one per domain
-├── types/         # TypeScript types
-└── services/      # Domain services (Phase 1 Sprint 4)
+├── extension.ts        Entry point — activates commands, wires modules together
+├── preview.ts          Main WebviewPanel — all HTML/CSS/JS for the editor UI
+│                       (large by design: webview JS lives here as template literals)
+├── markrExplorer.ts    Activity Bar TreeDataProvider — file tree + search
+├── tokenEngine.ts      Token counting — model-aware, exact for GPT/Llama, est. for Claude
+├── contextComposer.ts  Context Composer — discover all AI configs in scope, merge them
+└── promptRunner.ts     Prompt Runner — SecretStorage keys, streaming API to Claude/GPT/Gemini
 ```
 
+### Key design constraints
+
+1. **Webview JS lives in SCRIPT template literal in preview.ts**
+   All client-side JavaScript is inside `const SCRIPT = \`...\`` in preview.ts.
+   **Do NOT use backtick template literals inside SCRIPT** — it breaks esbuild parsing.
+   Use string concatenation: `'value: ' + variable + ' end'`
+
+2. **Extension host ↔ Webview communication via postMessage only**
+   Extension sends: `panel.webview.postMessage({ type: 'xxx', ...data })`
+   Webview sends: `vsc.postMessage({ type: 'xxx', ...data })`
+
+3. **API keys in SecretStorage only**
+   Never store keys in settings.json, never in code, never in git.
+   Use `context.secrets.store/get/delete` via the PromptRunner class.
+
+4. **Token counting uses tokenEngine.ts**
+   Import `countTokens`, `detectModel`, `fmtTokens` from `./tokenEngine`.
+   Never use `chars / 4` directly — call the model-aware functions.
+
+5. **Keep .vsix under 5 MB**
+   GIF files → `.vscodeignore`, loaded from GitHub raw URLs in README.
+   Dependencies must be lightweight (no WASM bundles).
+
 ---
 
-## What NOT to do
+## Adding a New Feature
 
-- Never import the service-role key in a `"use client"` file
-- Never use `any` (ESLint will error after Sprint 1 lands)
-- Never skip input validation on POST/PUT/PATCH/DELETE routes
-- Never query `hq_*` prefixed tables — those belong to BenchMark HQ
+### If it's UI-only (new button, panel, etc.):
+1. Add CSS to the `CSS` constant in preview.ts
+2. Add HTML to the `_buildPage()` return value
+3. Add JS event handlers to the `SCRIPT` constant
+4. If the feature needs extension-side data: add a postMessage handler
+
+### If it needs extension logic (file I/O, API calls, etc.):
+1. Create a new `src/featureName.ts` module
+2. Export the class/functions
+3. Import and instantiate in `extension.ts`
+4. Wire up commands/webview messages
+
+### If it adds a new AI model:
+1. Add the model to `AiModel` type in `tokenEngine.ts`
+2. Add detection logic to `detectModel()`
+3. Add display label to `modelLabel()`
+4. Add token counting logic to `countTokens()`
+5. Add context window size to `CONTEXT_WINDOWS` in `contextComposer.ts`
+6. Add model to `MODELS` array in `promptRunner.ts`
 
 ---
 
-## Current Sprint Tickets
+## Current Features
 
-| ID | Title | Status |
-|----|-------|--------|
-| F1.1 | CI pipeline (ESLint + TypeScript + Playwright) | 🟡 In progress |
-| F1.2 | Self-host fonts (remove Google Fonts CDN call) | ⬜ Backlog |
-| F1.3 | TypeScript strict mode | ⬜ Backlog |
-| F1.5 | Regenerate database types via `supabase gen types` | ⬜ Backlog |
-| F1.6 | ESLint `no-any` rule | ⬜ Backlog |
-| T1.4 | Add `tenant_id` to all new tables | 🟡 In progress |
+| Feature | Status | File |
+|---------|--------|------|
+| Markdown preview (GitHub-accurate) | ✅ | preview.ts |
+| Split edit mode | ✅ | preview.ts |
+| AI config auto-detection | ✅ | preview.ts, markrExplorer.ts |
+| Activity Bar panel + folder tree | ✅ | markrExplorer.ts |
+| Agent Watch (fs.watch live reload) | ✅ | preview.ts |
+| Token counter (model-aware) | ✅ | tokenEngine.ts |
+| Token section breakdown panel | ✅ | preview.ts |
+| Mermaid diagrams + copy as PNG | ✅ | preview.ts |
+| Copy table as rich HTML / PNG | ✅ | preview.ts |
+| Rich copy (Cmd+C) to Slack/Docs | ✅ | preview.ts |
+| Paste & Preview clipboard panel | ✅ | preview.ts |
+| File search in sidebar | ✅ | preview.ts |
+| Context Composer | 🔨 | contextComposer.ts |
+| Prompt Runner | 🔨 | promptRunner.ts |
+| MCP config editor | 📋 planned | — |
+| Prompt history | 📋 planned | — |
 
 ---
 
-## Useful Commands
+## Commands
 
 ```bash
-npm run dev          # Start dev server
-npm run build        # Production build
-npm run lint         # ESLint
-npm run typecheck    # TypeScript check
-supabase start       # Local Supabase
-supabase gen types typescript --local > src/types/database.ts
+npm run build        # Development build (esbuild, fast)
+npm run watch        # Watch mode — rebuilds on save
+npm run package      # Package .vsix for marketplace upload
+node scripts/make-icon.js   # Regenerate icon.png from icon.svg
+bash scripts/demo-agent-edit.sh  # Simulate agent editing CLAUDE.md (for GIF recording)
 ```
 
 ---
 
-> [!IMPORTANT]
-> The `public.tenants`, `public.audit_log`, and `provision_tenant()` RPC are consumed by BenchMark HQ. Renaming or changing their schema silently breaks the HQ admin app. Always file a paired HQ PR.
+## Important Rules
+
+- Never query `hq_*` tables — those belong to BenchMark HQ (different product)
+- Never commit API keys — they live in SecretStorage
+- Keep CLAUDE.md under 4,000 tokens — the token counter in Markr's toolbar shows exactly
+- When adding AI config filenames: update **both** `AI_CONFIG_NAMES` in markrExplorer.ts AND preview.ts
+
+---
+
+> [!NOTE]
+> This CLAUDE.md is also a demo file for Markr's agent watch and token counting features. Open it in Markr to see the token section breakdown — click the token count in the toolbar.

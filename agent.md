@@ -1,54 +1,62 @@
-# Markr Agent
+# Skill: Code Review
 
-> You are the **Markr development agent**. Your job is to help build and improve the Markr VS Code extension — an AI-native markdown preview and agent workbench.
-
----
-
-## Your Capabilities
-
-You can:
-- Read and modify TypeScript source files in `src/`
-- Update the webview HTML/CSS/JS in `preview.ts`
-- Add new commands to `package.json` and `extension.ts`
-- Write new feature modules (`src/featureName.ts`)
-- Update `CHANGELOG.md` and bump versions in `package.json`
-- Run `npm run build` to verify your changes compile
-- Never push or create git commits without being asked
-
-## What You Should NOT Do
-
-- Never commit API keys or secrets
-- Never use `chars / 4` for token counting — use `tokenEngine.ts`
-- Never add backtick template literals inside the `SCRIPT` const in `preview.ts`
-- Never modify `out/` directly — always change source and rebuild
-- Never bump a version without also updating `CHANGELOG.md`
+> This skill reviews TypeScript and JavaScript code for correctness, security, and maintainability. It specialises in VS Code extension patterns, webview security, and async/streaming code.
 
 ---
 
-## Current Focus
+## Trigger
 
-The extension is in active development toward becoming the **GitLens for AI** — the essential VS Code companion for building, testing, and iterating on AI agent configurations.
-
-Priority features:
-1. A/B prompt comparison (two config versions side-by-side)
-2. MCP config visual editor
-3. Prompt version history with diff view
-4. Community template library
+Use this skill when asked to:
+- Review a diff or PR before merging
+- Audit a specific file for security issues
+- Check error handling in async code
+- Validate streaming/SSE implementations
 
 ---
 
-## Key Files to Know
+## Review Checklist
 
-| File | Purpose |
-|------|---------|
-| `src/preview.ts` | Everything — webview HTML/CSS/JS + extension panel |
-| `src/tokenEngine.ts` | Model-aware token counting |
-| `src/promptRunner.ts` | Streaming API calls to Claude/GPT/Gemini |
-| `src/contextComposer.ts` | Discovers AI config files in scope |
-| `src/promptHistory.ts` | Saves/retrieves prompt run history |
-| `src/extension.ts` | Activation + command wiring |
+### Security
+- [ ] User input rendered via `textContent` not `innerHTML`
+- [ ] API keys in SecretStorage, not settings or code
+- [ ] HTTP response status codes checked before parsing body
+- [ ] No sensitive data in URLs or query strings (use headers)
+
+### Correctness
+- [ ] Double-callback guards on streaming (use `finished` flag)
+- [ ] Panel disposal handled — `postMessage` wrapped in try/catch
+- [ ] Promise rejections caught and reported to user
+- [ ] Request timeout set on all `https.request` calls
+
+### VS Code Patterns
+- [ ] Disposables registered with `context.subscriptions`
+- [ ] `fs.watch` cleaned up in `dispose()`
+- [ ] `retainContextWhenHidden` set when webview state must persist
+- [ ] No synchronous I/O on large files in extension host
 
 ---
 
-> [!IMPORTANT]
-> Always run `npm run build` before declaring a task complete. A clean build is the minimum bar.
+## Output Format
+
+```
+## Review: [file/PR name]
+
+### 🔴 Critical
+- [issue]: [why it matters] → [fix]
+
+### 🟠 High  
+- [issue]: [why it matters] → [fix]
+
+### 🟢 Looks Good
+- [positive observations]
+```
+
+---
+
+## Context
+
+This skill has knowledge of:
+- Markr's architecture (see `CLAUDE.md`)
+- Common VS Code extension pitfalls
+- Anthropic, OpenAI, and Google streaming API patterns
+- XSS vectors in VS Code webviews

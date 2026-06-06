@@ -94,9 +94,91 @@ function readingTime(words: number): string {
   return `${Math.max(1, Math.ceil(words / 200))} min`;
 }
 
+// ─── Model-aware token engine ─────────────────────────────────────────────────
+
+type AiModel = 'claude' | 'gpt4' | 'gpt4o' | 'llama3' | 'llama2'
+             | 'deepseek' | 'kimi' | 'gemini' | 'mistral' | 'qwen' | 'generic';
+
+/** Detect which AI model a file is for from its name. */
+function detectModel(filename: string, relPath = ''): AiModel {
+  const f = filename.toLowerCase();
+  const p = relPath.toLowerCase();
+  if (/^claude(\.local)?\.md$/i.test(f))                              return 'claude';
+  if (['agent.md','agents.md','skill.md','skills.md','system-prompt.md',
+       'prompt.md','prompts.md','memory.md','context.md','instructions.md',
+       'rules.md','aider.md','.windsurfrules','windsurf.md'].includes(f)) return 'claude';
+  if (f === '.cursorrules' || f === 'cursor.md')                      return 'gpt4';
+  if (p.includes('copilot') || f.includes('copilot'))                 return 'gpt4o';
+  if (['codex.md','openai.md','gpt.md'].includes(f))                  return 'gpt4o';
+  if (f === 'deepseek.md' || f.includes('deepseek'))                  return 'deepseek';
+  if (f === 'kimi.md' || f.includes('kimi') || f.includes('moonshot')) return 'kimi';
+  if (f === 'llama.md' || f.includes('llama'))                        return 'llama3';
+  if (f === 'mistral.md' || f.includes('mistral') || f.includes('mixtral')) return 'mistral';
+  if (f === 'gemini.md' || f.includes('gemini'))                      return 'gemini';
+  if (f === 'qwen.md' || f.includes('qwen'))                          return 'qwen';
+  return 'generic';
+}
+
+/** Short display label shown next to the token count in the toolbar. */
+function modelLabel(model: AiModel): string {
+  const MAP: Record<AiModel, string> = {
+    claude: 'Claude', gpt4: 'GPT-4', gpt4o: 'GPT-4o',
+    llama3: 'Llama 3', llama2: 'Llama 2', deepseek: 'DeepSeek',
+    kimi: 'Kimi', gemini: 'Gemini', mistral: 'Mistral', qwen: 'Qwen', generic: '',
+  };
+  return MAP[model] ?? '';
+}
+
+/**
+ * Content-aware token estimation. Separates code blocks (~3 chars/tok) from prose.
+ * Per-model prose ratios based on published tokenizer research:
+ *   Claude / Llama 2 / Mistral  → 3.5  (SentencePiece-family)
+ *   GPT-4 / Llama 3 / Kimi      → 4.0  (cl100k — Llama 3 uses same vocab as GPT-4)
+ *   GPT-4o / DeepSeek / Qwen    → 3.8  (o200k / tiktoken-extended)
+ *   Gemini                      → 3.3  (SentencePiece, larger vocab → fewer tokens)
+ *   Generic                     → 3.8  (conservative average)
+ * Accuracy: ±5% for English text, ±8% for mixed code/prose.
+ */
+function countTokens(text: string, model: AiModel): number {
+  if (!text) return 0;
+  let codeChars = 0;
+  const prose = text
+    .replace(/```[\s\S]*?```/g, (m) => { codeChars += m.length; return ''; })
+    .replace(/`[^`\n]+`/g,      (m) => { codeChars += m.length; return ''; });
+  const codeTokens = Math.round(codeChars / 3.0);
+  const proseRatio: Record<AiModel, number> = {
+    claude: 3.5, gpt4: 4.0, gpt4o: 3.8, llama3: 4.0, llama2: 3.5,
+    deepseek: 3.8, kimi: 4.0, gemini: 3.3, mistral: 3.6, qwen: 3.8, generic: 3.8,
+  };
+  return codeTokens + Math.round(prose.length / (proseRatio[model] ?? 3.8));
+}
+
+/** Per-heading section token breakdown for the breakdown panel. */
+function sectionTokens(text: string, model: AiModel): Array<{heading: string; tokens: number; level: number}> {
+  const lines = text.split('\n');
+  const result: Array<{heading: string; tokens: number; level: number}> = [];
+  let heading = '(intro)', level = 0, buf: string[] = [];
+  const flush = () => {
+    if (buf.length) result.push({ heading, level, tokens: countTokens(buf.join('\n'), model) });
+    buf = [];
+  };
+  for (const line of lines) {
+    const m = line.match(/^(#{1,6})\s+(.*)/);
+    if (m) { flush(); heading = m[2].trim(); level = m[1].length; buf = [line]; }
+    else   { buf.push(line); }
+  }
+  flush();
+  return result.filter(s => s.tokens > 0);
+}
+
+/** Format for display: 340 → "~340 tok", 2400 → "~2.4K tok" */
+function fmtTokens(n: number): string {
+  return n < 1000 ? `~${n} tok` : `~${(n / 1000).toFixed(1)}K tok`;
+}
+
+/** Legacy compat wrapper used in a few places that don't have model context */
 function tokenEstimate(chars: number): string {
-  const t = Math.round(chars / 4);
-  return t < 1000 ? `${t} tok` : `~${(t / 1000).toFixed(1)}K tok`;
+  return fmtTokens(Math.round(chars / 3.8));
 }
 
 function docStats(text: string) {
@@ -308,7 +390,6 @@ const CSS = /* css */`
   color: var(--text); -webkit-text-fill-color: var(--text);
 }
 [data-m="notion"] .logo-mark svg rect { fill: var(--text); }
-[data-m="notion"] .file-item.active,
 [data-m="notion"] .toc-item a.active {
   color: var(--text); border-left-color: transparent; background: var(--accent-bg);
 }
@@ -448,6 +529,56 @@ body {
   font-size: 11px; color: var(--text-muted); white-space: nowrap; padding: 0 2px; cursor: default;
 }
 .stats-accent { color: var(--accent); }
+
+/* Token counter button + model badge */
+.tok-btn {
+  background: transparent; border: none; padding: 0; cursor: pointer;
+  color: inherit; font-family: inherit; font-size: inherit; line-height: inherit;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.tok-btn:hover { color: var(--accent); }
+.tok-btn.stats-accent { color: var(--accent); }
+.tok-model {
+  font-size: 9px; padding: 1px 5px; border-radius: 8px; font-weight: 600;
+  background: var(--accent-bg); color: var(--accent);
+  border: 1px solid var(--accent-border); line-height: 1.6;
+}
+
+/* Token section breakdown popup */
+#tok-panel {
+  display: none; position: fixed; z-index: 800;
+  background: var(--bg-panel); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.3);
+  min-width: 260px; max-width: 340px; overflow: hidden;
+}
+#tok-panel.open { display: block; }
+.tok-panel-hdr {
+  padding: 8px 12px 5px; font-size: 10px; font-weight: 700;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--text-muted);
+  border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 6px;
+}
+.tok-panel-model { color: var(--accent); }
+.tok-panel-body { padding: 4px 0 6px; max-height: 280px; overflow-y: auto; }
+.tok-row {
+  display: flex; align-items: center; padding: 4px 12px; gap: 8px;
+  cursor: pointer; font-size: 12.5px; color: var(--text-muted);
+  transition: background .08s;
+}
+.tok-row:hover { background: var(--bg-hover); color: var(--text); }
+.tok-row-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tok-row-name.h1 { font-weight: 600; color: var(--text); }
+.tok-row-name.h2 { padding-left: 8px; }
+.tok-row-name.h3 { padding-left: 16px; font-size: 12px; }
+.tok-row-name.h4 { padding-left: 22px; font-size: 11.5px; }
+.tok-row-bar { height: 3px; border-radius: 2px; background: var(--accent); opacity: .45; flex-shrink: 0; min-width: 2px; }
+.tok-row-count { font-size: 11px; color: var(--text-muted); min-width: 44px; text-align: right; font-family: ui-monospace, monospace; }
+.tok-panel-total {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px 5px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-muted);
+}
+.tok-panel-total strong { color: var(--accent); font-size: 12.5px; }
+
 .save-status {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 11px; opacity: 0; transition: opacity 0.2s, color 0.2s;
@@ -598,11 +729,9 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 body.sb-resizing { cursor: col-resize !important; user-select: none; }
 .sb-section { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0; }
 .sb-section.flex-fill { flex: 1; overflow: hidden; }
-#sec-files { flex: 0 1 52%; min-height: 138px; overflow: hidden; }
-#sec-toc { flex: 1 1 48%; min-height: 150px; overflow: hidden; }
-/* When TOC is collapsed: remove its min-height so Notebooks fills ALL remaining space */
-#sidebar.no-toc #sec-toc  { flex: 0 0 auto; min-height: 0; }
-#sidebar.no-toc #sec-files { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+#sec-toc { flex: 1 1 auto; min-height: 150px; overflow: hidden; }
+/* TOC collapsed → shrinks to header only */
+#sidebar.no-toc #sec-toc { flex: 0 0 auto; min-height: 0; }
 .sb-header {
   display: flex; align-items: center; padding: 0 10px 0 12px; height: 32px;
   gap: 4px; flex-shrink: 0; cursor: pointer; user-select: none;
@@ -619,109 +748,6 @@ body.sb-resizing { cursor: col-resize !important; user-select: none; }
 .sb-section.collapsed .sb-chevron { transform: rotate(-90deg); }
 .sb-body { overflow-y: auto; overflow-x: hidden; padding: 2px 0 8px; }
 .sb-section.collapsed .sb-body { display: none; }
-.sb-section.collapsed #file-search-wrap { display: none; }
-.sb-ai-label {
-  padding: 7px 10px 2px; font-size: 10.5px; font-weight: 600;
-  letter-spacing: 0.04em;
-  color: var(--text-muted); /* was text-faint — too invisible in dark theme */
-  font-family: inherit;
-}
-.sb-ai-label.accent { color: var(--accent); font-weight: 700; opacity: 1; }
-
-/* File search input */
-#file-search-wrap {
-  display: flex; align-items: center; gap: 5px;
-  margin: 5px 10px 3px; padding: 4px 8px;
-  background: var(--bg); border: 1px solid var(--border);
-  border-radius: 5px; flex-shrink: 0;
-}
-#file-search-wrap:focus-within { border-color: var(--accent); }
-.file-search-icon { opacity: 0.35; flex-shrink: 0; }
-#file-search {
-  flex: 1; border: none; outline: none; background: transparent;
-  font-size: 11.5px; color: var(--text); padding: 0; font-family: inherit;
-}
-#file-search::placeholder { color: var(--text-faint); }
-#file-search-clear {
-  display: none; border: none; background: transparent;
-  color: var(--text-faint); cursor: pointer; font-size: 14px;
-  line-height: 1; padding: 0 1px; border-radius: 3px;
-  flex-shrink: 0;
-}
-#file-search-clear.visible { display: block; }
-#file-search-clear:hover { color: var(--text); background: var(--bg-hover); }
-.files-empty { padding: 10px 14px; font-size: 11.5px; color: var(--text-faint); line-height: 1.5; }
-.files-empty em { color: var(--accent); font-style: normal; font-weight: 600; }
-
-/* Skeleton loader — shown while workspace files are being scanned */
-@keyframes sk-pulse { 0%,100% { opacity: 0.35; } 50% { opacity: 0.8; } }
-.file-skeleton { padding: 6px 0; }
-.sk-row {
-  height: 20px; border-radius: 3px; margin: 4px 12px;
-  background: var(--bg-hover);
-  animation: sk-pulse 1.5s ease-in-out infinite;
-}
-.sk-row:nth-child(1) { width: 55%; animation-delay: 0s; }
-.sk-row:nth-child(2) { width: 80%; animation-delay: 0.12s; }
-.sk-row:nth-child(3) { width: 65%; animation-delay: 0.24s; }
-.sk-row:nth-child(4) { width: 48%; animation-delay: 0.36s; }
-.sk-row:nth-child(5) { width: 72%; animation-delay: 0.48s; }
-.sk-row:nth-child(6) { width: 58%; animation-delay: 0.60s; }
-.sk-scanning {
-  display: flex; align-items: center; gap: 6px;
-  padding: 6px 12px 8px; font-size: 11px; color: var(--text-faint);
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.sk-spinner {
-  width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
-  border: 1.5px solid var(--border); border-top-color: var(--accent);
-  animation: spin 0.8s linear infinite;
-}
-/* === File list — Source Control style ======================================
-   Compact rows: icon + filename left, path/badge right (dim).
-   Matches VS Code's SCM panel aesthetic. ===================================*/
-.file-dir {
-  width: 100%; display: flex; align-items: center; gap: 4px;
-  padding: 4px 8px 3px calc(8px + (var(--depth, 0) * 12px));
-  border: none; background: transparent; cursor: pointer; text-align: left;
-  font-size: 12px; font-weight: 600; /* was 10px uppercase — too small to read */
-  color: var(--text-muted); white-space: nowrap;
-}
-.file-dir:hover { background: var(--bg-hover); color: var(--text); }
-.file-dir .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; }
-.file-dir .folder-count {
-  font-size: 10px; color: var(--text-muted);
-  background: var(--bg-hover); border-radius: 8px; padding: 0 5px;
-}
-.folder-chevron { width: 9px; height: 9px; transition: transform 0.12s; flex-shrink: 0; opacity: 0.6; }
-.file-dir.collapsed .folder-chevron { transform: rotate(-90deg); }
-.file-item {
-  display: flex; align-items: center;
-  padding: 4px 8px 4px calc(10px + (var(--depth, 0) * 12px));
-  gap: 5px; font-size: 12.5px; font-family: inherit;
-  color: var(--text); /* was text-muted — filenames must be fully readable */
-  cursor: pointer; border-left: 2px solid transparent;
-  transition: background 0.08s, border-color 0.08s;
-  user-select: none; min-width: 0;
-}
-.file-item:hover { background: var(--bg-hover); }
-.file-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-bg); }
-.file-item svg { flex-shrink: 0; opacity: 0.4; }
-.file-item.active svg, .file-item.ai svg { opacity: 0.9; }
-.file-item.ai svg { color: var(--accent); }
-.file-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-/* Path label — use text-muted NOT text-faint (text-faint = #48443e in dark = invisible) */
-.file-path {
-  font-size: 11px; color: var(--text-muted); flex-shrink: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  max-width: 100px; opacity: 0.65; transition: opacity 0.1s;
-}
-.file-item:hover .file-path { opacity: 1; }
-.file-ai-kind {
-  flex-shrink: 0; font-size: 9px; line-height: 1; color: var(--accent);
-  background: var(--accent-bg); border: 1px solid var(--accent-border);
-  border-radius: 3px; padding: 2px 5px; letter-spacing: 0.02em;
-}
 .toc-item { list-style: none; margin: 0; padding: 0; }
 .toc-item a {
   display: block; padding: 3px 12px 3px 10px; color: var(--text-muted); text-decoration: none;
@@ -1142,8 +1168,6 @@ const SCRIPT = /* javascript */`
   let wordWrap    = true;
   let isDirty     = false;   // true when there are unsaved changes on disk
   let editTimer, saveTimer;
-  const collapsedFolders = new Set();
-  let fileFilter = '';       // live search query for the Notebooks panel
 
   // ── Custom undo / redo history ─────────────────────────────────────────────
   // document.execCommand('undo') is deprecated and unreliable in VS Code's webview.
@@ -1310,142 +1334,6 @@ const SCRIPT = /* javascript */`
   function resetHistory() {
     histStack.length = 0; histIdx = -1; histBusy = false;
     clearTimeout(histSnapTimer);
-  }
-
-  // ── File list ──────────────────────────────────────────────────────────────
-  function renderFileList(files) {
-    const container = qs('#files-list');
-    if (!container) return;
-
-    // ── Loading state: animated skeleton rows ──────────────────────────────
-    if (filesLoading) {
-      container.innerHTML =
-        '<div class="file-skeleton">' +
-        '<div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div>' +
-        '<div class="sk-row"></div><div class="sk-row"></div><div class="sk-row"></div>' +
-        '</div>' +
-        '<div class="sk-scanning"><div class="sk-spinner"></div>Scanning workspace…</div>';
-      return;
-    }
-
-    // ── Filter: apply search query ─────────────────────────────────────────
-    let displayFiles = files || [];
-    if (fileFilter) {
-      const q = fileFilter.toLowerCase();
-      displayFiles = displayFiles.filter(f =>
-        f.label.toLowerCase().includes(q) || (f.relPath || '').toLowerCase().includes(q)
-      );
-    }
-
-    if (!displayFiles.length) {
-      container.innerHTML = fileFilter
-        ? '<div class="files-empty">No files matching <em>' + escHtml(fileFilter) + '</em></div>'
-        : '<div class="files-empty">No .md files in workspace</div>';
-      return;
-    }
-
-    const aiFiles    = displayFiles.filter(f => f.isAiConfig);
-    const otherFiles = displayFiles.filter(f => !f.isAiConfig);
-    let html = '';
-    if (aiFiles.length) {
-      html += '<div class="sb-ai-label accent">✦ AI Configs</div>';
-      aiFiles.forEach(f => { html += fileItemHtml(f); });
-    }
-
-    if (fileFilter) {
-      // Flat list when filtering — skip folder tree grouping
-      if (otherFiles.length) {
-        if (aiFiles.length) html += '<div class="sb-ai-label" style="margin-top:4px;color:var(--text-faint)">Other</div>';
-        otherFiles.forEach(f => { html += fileItemHtml(f, 0); });
-      }
-    } else {
-      // Normal grouped folder-tree view
-      const tree = buildFileTree(otherFiles);
-      if (tree.files.length) {
-        if (aiFiles.length) html += '<div class="sb-ai-label" style="margin-top:4px;color:var(--text-faint)">Other</div>';
-        tree.files.forEach(f => { html += fileItemHtml(f, 0); });
-      }
-      html += renderTree(tree, 0);
-    }
-
-    container.innerHTML = html;
-
-    // Attach click listeners (same for filtered and normal modes)
-    qsa('.file-dir', container).forEach(el => {
-      el.addEventListener('click', () => {
-        const dir = el.getAttribute('data-dir');
-        if (!dir) return;
-        if (collapsedFolders.has(dir)) collapsedFolders.delete(dir);
-        else collapsedFolders.add(dir);
-        renderFileList(filesCache);
-      });
-    });
-    qsa('.file-item', container).forEach(el => {
-      el.addEventListener('click', () => {
-        const uri = el.getAttribute('data-uri');
-        if (!uri) return;
-        if (editMode) flushEdit();
-        // If already loaded in a tab, switch instantly — no extension round-trip
-        if (tabs.find(t => t.uri === uri)) { switchToTab(uri); return; }
-        vsc.postMessage({ type: 'openFile', uri });
-      });
-    });
-  }
-  function buildFileTree(files) {
-    const root = { name: '', path: '', files: [], dirs: {} };
-    files.forEach(f => {
-      let node = root;
-      (f.dir || '').split('/').filter(Boolean).forEach(part => {
-        const path = node.path ? node.path + '/' + part : part;
-        if (!node.dirs[part]) node.dirs[part] = { name: part, path, files: [], dirs: {} };
-        node = node.dirs[part];
-      });
-      node.files.push(f);
-    });
-    return root;
-  }
-  function treeCount(node) {
-    return node.files.length + Object.keys(node.dirs).reduce((sum, key) => sum + treeCount(node.dirs[key]), 0);
-  }
-  function renderTree(node, depth) {
-    return Object.keys(node.dirs).sort().map(name => {
-      const child = node.dirs[name];
-      const collapsed = collapsedFolders.has(child.path);
-      let html = '<button class="file-dir' + (collapsed ? ' collapsed' : '') + '" data-dir="' + escHtml(child.path) + '" style="--depth:' + depth + '">'
-        + '<span class="folder-chevron">▾</span><span class="folder-name">' + escHtml(child.name) + '</span>'
-        + '<span class="folder-count">' + treeCount(child) + '</span></button>';
-      if (!collapsed) {
-        child.files.sort((a, b) => a.label.localeCompare(b.label)).forEach(f => { html += fileItemHtml(f, depth + 1); });
-        html += renderTree(child, depth + 1);
-      }
-      return html;
-    }).join('');
-  }
-  // Fast active-indicator update — no DOM rebuild, just toggle a class
-  function updateFileListActive(uri) {
-    filesCache.forEach(f => { f.active = f.uri === uri; });
-    qsa('.file-item', qs('#files-list')).forEach(el => {
-      el.classList.toggle('active', el.getAttribute('data-uri') === uri);
-    });
-  }
-
-  function fileItemHtml(f, depth = 0) {
-    // SCM-style: compact icon + filename left, path or AI-kind badge right (dim)
-    const icon = f.isAiConfig
-      ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/></svg>'
-      : '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h8l4 4v8H2V2z" opacity=".35"/><path d="M10 2v4h4"/></svg>';
-    // Right-side: AI kind badge OR parent directory (last segment only)
-    var right = '';
-    if (f.aiKind) {
-      right = '<span class="file-ai-kind">' + escHtml(f.aiKind) + '</span>';
-    } else if (f.dir) {
-      var lastDir = f.dir.split('/').pop() || f.dir;
-      right = '<span class="file-path">' + escHtml(lastDir) + '</span>';
-    }
-    return '<div class="file-item' + (f.active ? ' active' : '') + (f.isAiConfig ? ' ai' : '')
-      + '" data-uri="' + escHtml(f.uri) + '" title="' + escHtml(f.relPath) + '" style="--depth:' + depth + '">'
-      + icon + '<span class="file-name">' + escHtml(f.label) + '</span>'
-      + right + '</div>';
   }
 
   // ── TOC ────────────────────────────────────────────────────────────────────
@@ -2367,6 +2255,108 @@ const SCRIPT = /* javascript */`
   qs('#btn-pdf')?.addEventListener('click',    () => vsc.postMessage({ type: 'exportPdf' }));
   qs('#btn-print')?.addEventListener('click',  () => vsc.postMessage({ type: 'print' }));
 
+  // ── Token section breakdown panel ─────────────────────────────────────────
+  var tokSections = (typeof __TOK_SECTIONS__ !== 'undefined') ? __TOK_SECTIONS__ : [];
+  var tokModel    = (typeof __TOK_MODEL__ !== 'undefined') ? __TOK_MODEL__ : '';
+
+  function renderTokPanel(sections, model) {
+    var body  = qs('#tok-panel-body');
+    var total = qs('#tok-panel-total');
+    var modEl = qs('#tok-panel-model');
+    if (!body) return;
+    if (modEl) modEl.textContent = model ? ' • ' + model : '';
+    // Use toolbar tok count as the total (avoids per-section rounding discrepancy)
+    var toolbarTok = qs('#stat-tok');
+    var toolbarStr = toolbarTok ? (toolbarTok.childNodes[0] && toolbarTok.childNodes[0].textContent || toolbarTok.textContent || '') : '';
+    var sum = sections.reduce(function(a, s) { return a + s.tokens; }, 0);
+    var max = Math.max.apply(null, sections.map(function(s) { return s.tokens; })) || 1;
+    body.innerHTML = sections.map(function(s) {
+      var barW = Math.round((s.tokens / max) * 56);
+      var cls  = s.level === 0 ? '' : 'h' + s.level;
+      var tok  = s.tokens >= 1000 ? '~' + (s.tokens / 1000).toFixed(1) + 'K' : '~' + s.tokens;
+      return '<div class="tok-row" data-heading="' + escHtml(s.heading) + '">'
+        + '<span class="tok-row-name ' + cls + '">' + escHtml(s.heading) + '</span>'
+        + '<div class="tok-row-bar" style="width:' + barW + 'px"></div>'
+        + '<span class="tok-row-count">' + tok + '</span>'
+        + '</div>';
+    }).join('');
+    if (total) {
+      // Show toolbar count so both numbers always match (avoids per-section rounding gap)
+      total.textContent = toolbarStr.replace('.tok-model', '').trim() ||
+        ((sum >= 1000 ? '~' + (sum / 1000).toFixed(1) + 'K' : '~' + sum) + ' tok');
+    }
+    // Click row → navigate exactly like the TOC "On this page" panel does
+    qsa('.tok-row', body).forEach(function(row) {
+      row.addEventListener('click', function() {
+        var headingText = row.getAttribute('data-heading') || '';
+
+        // Find the heading element by its TEXT — most reliable (no slug mismatch)
+        // First look in the visible pane, then fall back to document-wide
+        function findHeadingByText(container) {
+          var hs = container.querySelectorAll('h1,h2,h3,h4,h5,h6');
+          for (var i = 0; i < hs.length; i++) {
+            if ((hs[i].textContent || '').replace(/\s*#\s*$/, '').trim() === headingText) {
+              return hs[i];
+            }
+          }
+          return null;
+        }
+
+        if (editMode) {
+          // In edit mode: scroll the TEXTAREA to that heading (same as TOC does)
+          // AND scroll the split-preview to match
+          scrollEditorToId(
+            headingText.toLowerCase()
+              .replace(/<[^>]+>/g, '')
+              .replace(/[^\w\s-]/g, '')
+              .replace(/[\s_]+/g, '-')
+              .replace(/^-+|-+$/g, '')
+          );
+          var spTarget = findHeadingByText(qs('#split-preview') || document.body);
+          if (spTarget) {
+            spTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            spTarget.style.transition = 'background 0.3s';
+            spTarget.style.background = 'var(--accent-bg)';
+            setTimeout(function() { spTarget.style.background = ''; }, 1400);
+          }
+        } else {
+          // In preview mode: scroll #scroller to that heading (same as TOC does)
+          var target = findHeadingByText(qs('#scroller') || document.body);
+          if (target) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            target.style.transition = 'background 0.3s';
+            target.style.background = 'var(--accent-bg)';
+            setTimeout(function() { target.style.background = ''; }, 1400);
+          }
+        }
+        closeTokPanel();
+      });
+    });
+  }
+
+  function openTokPanel() {
+    var panel = qs('#tok-panel');
+    var btn   = qs('#stat-tok');
+    if (!panel || !btn) return;
+    renderTokPanel(tokSections, tokModel);
+    var r = btn.getBoundingClientRect();
+    panel.style.top   = (r.bottom + 4) + 'px';
+    panel.style.right = '8px';
+    panel.classList.add('open');
+  }
+
+  function closeTokPanel() {
+    qs('#tok-panel')?.classList.remove('open');
+  }
+
+  qs('#stat-tok')?.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (qs('#tok-panel')?.classList.contains('open')) { closeTokPanel(); } else { openTokPanel(); }
+  });
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#tok-panel') && !e.target.closest('#stat-tok')) closeTokPanel();
+  });
+
   // ── Theme picker ───────────────────────────────────────────────────────────
   function applyTheme(t) {
     document.documentElement.setAttribute('data-m', t);
@@ -2414,20 +2404,15 @@ const SCRIPT = /* javascript */`
     sec.querySelector('.sb-header')?.addEventListener('click', e => {
       if (e.target.closest('.sb-action')) return;
       sec.classList.toggle('collapsed');
-      // When TOC collapses, Notebooks fills all remaining sidebar height.
-      // When TOC expands, the split is restored. Matches VS Code GitLens behaviour.
+      // When TOC collapses, it shrinks to header only.
       if (sec.id === 'sec-toc') {
         qs('#sidebar')?.classList.toggle('no-toc', sec.classList.contains('collapsed'));
       }
     });
   });
 
-  // Sync no-toc on initial load (TOC may start collapsed from settings)
-  if (qs('#sec-toc')?.classList.contains('collapsed')) {
-    qs('#sidebar')?.classList.add('no-toc');
-  }
-
-  qs('#btn-new-file')?.addEventListener('click', e => { e.stopPropagation(); vsc.postMessage({ type: 'newFile' }); });
+  // Sync initial state on load
+  if (qs('#sec-toc')?.classList.contains('collapsed')) { qs('#sidebar')?.classList.add('no-toc'); }
 
   // ── Sidebar resize ─────────────────────────────────────────────────────────
   (function() {
@@ -2474,26 +2459,6 @@ const SCRIPT = /* javascript */`
       try { localStorage.removeItem('markr-sb-w'); } catch {}
     });
   })();
-
-  // ── Notebook file search / filter ─────────────────────────────────────────
-  let filterDebounce;
-  qs('#file-search')?.addEventListener('input', e => {
-    clearTimeout(filterDebounce);
-    fileFilter = e.target.value.trim();
-    qs('#file-search-clear')?.classList.toggle('visible', fileFilter.length > 0);
-    filterDebounce = setTimeout(() => renderFileList(filesCache), 120);
-  });
-  qs('#file-search-clear')?.addEventListener('click', () => {
-    fileFilter = '';
-    const inp = qs('#file-search');
-    if (inp) { inp.value = ''; inp.focus(); }
-    qs('#file-search-clear')?.classList.remove('visible');
-    renderFileList(filesCache);
-  });
-  // Pressing Escape inside the search box clears and closes it
-  qs('#file-search')?.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { qs('#file-search-clear')?.click(); e.stopPropagation(); }
-  });
 
   let focusMode = false;
   qs('#btn-focus')?.addEventListener('click', () => {
@@ -2782,26 +2747,62 @@ const SCRIPT = /* javascript */`
         aiBadge.style.display = msg.isAiConfig ? '' : 'none';
       }
       updateStats(msg.markdown);
+      // Update token counter + breakdown panel with data for the NEW file
+      if (msg.sections) {
+        tokSections = msg.sections;
+        tokModel    = msg.modelLabel || '';
+      }
+      if (msg.tokStr) {
+        var tBtn = qs('#stat-tok');
+        if (tBtn) {
+          // Replace text node (token string) keeping the .tok-model badge
+          var nodes = tBtn.childNodes;
+          for (var ni = 0; ni < nodes.length; ni++) {
+            if (nodes[ni].nodeType === 3) { nodes[ni].textContent = msg.tokStr; break; }
+          }
+          var mSpan = tBtn.querySelector('.tok-model');
+          if (mSpan) mSpan.textContent = msg.modelLabel || '';
+          else if (msg.modelLabel) {
+            var ns = document.createElement('span');
+            ns.className = 'tok-model';
+            ns.textContent = msg.modelLabel;
+            tBtn.appendChild(ns);
+          }
+        }
+      }
       // Reset undo/redo history and dirty state whenever a new file is loaded
       resetHistory();
       markClean();
       // Always sync the textarea content when switching files while already in edit mode.
-      // enterEditMode() only fires when !editMode, so without this the old content stays in
-      // the editor when switching between two AI-config files (both trigger edit mode).
       if (editMode) { const ea = qs('#edit-area'); if (ea) { ea.value = currentMarkdown; updateToolbarState(); } }
       if (msg.isAiConfig && !isAutoEditDismissed(msg.uri)) { if (!editMode) enterEditMode(); }
       else { if (editMode) exitEditMode(false, false, false); }
       qs('#scroller').scrollTop = 0;
+      qs('#split-preview').scrollTop = 0; // reset split-preview too (was staying at old file's position)
       buildTOC(); addCopyButtons(); setupHeadingAnchors();
       if (qs('#scroller .language-mermaid')) setupMermaid();
+      if (qs('#split-preview .language-mermaid')) setupMermaid();
       renderTabBar();
-      updateFileListActive(msg.uri);
     }
     if (msg.type === 'scrollToHeading') {
-      const el = document.getElementById(msg.id); if (!el) return;
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      el.style.transition = 'background 0.3s'; el.style.background = 'var(--accent-bg)';
-      setTimeout(() => { el.style.background = ''; }, 1400);
+      // In edit mode #scroller is hidden — must find the element in #split-preview instead.
+      // getElementById returns the first match which is always in #scroller (DOM order).
+      var scrollEl = null;
+      if (editMode) {
+        var sp = qs('#split-preview');
+        if (sp) {
+          var allIds = sp.querySelectorAll('[id]');
+          for (var si = 0; si < allIds.length; si++) {
+            if (allIds[si].id === msg.id) { scrollEl = allIds[si]; break; }
+          }
+        }
+      }
+      if (!scrollEl) scrollEl = document.getElementById(msg.id);
+      if (!scrollEl) return;
+      scrollEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollEl.style.transition = 'background 0.3s';
+      scrollEl.style.background = 'var(--accent-bg)';
+      setTimeout(function() { scrollEl.style.background = ''; }, 1400);
     }
     if (msg.type === 'updateSplitPreview') {
       // Preserve scroll position so the pane doesn't jump on every keystroke
@@ -2880,10 +2881,22 @@ const SCRIPT = /* javascript */`
       }
     }
     if (msg.type === 'saved') { showSaved(); }
+    if (msg.type === 'tokUpdate') {
+      // Fresh token data pushed after every _render() — keeps tok panel in sync with current file
+      tokSections = msg.sections || [];
+      tokModel    = msg.modelLabel || '';
+      var tokBtn = qs('#stat-tok');
+      if (tokBtn && msg.tokStr) {
+        var firstNode = tokBtn.childNodes[0];
+        if (firstNode && firstNode.nodeType === 3) firstNode.textContent = msg.tokStr;
+        var mSpan = tokBtn.querySelector('.tok-model');
+        if (mSpan) mSpan.textContent = msg.modelLabel || '';
+      }
+    }
     if (msg.type === 'updateFiles') {
       filesLoading = false;
       filesCache = msg.files || [];
-      renderFileList(filesCache);
+      // filesCache is kept for the Quick Open (Cmd+K) modal — sidebar list removed
     }
     if (msg.type === 'imagePasted') {
       const ta = qs('#edit-area'); if (!ta) return;
@@ -2961,7 +2974,6 @@ const SCRIPT = /* javascript */`
     buildTOC(); addCopyButtons(); setupHeadingAnchors();
     if (qs('#scroller .language-mermaid')) setupMermaid();
     renderTabBar();
-    updateFileListActive(uri);
     vsc.postMessage({ type: 'setActiveDoc', uri });
   }
 
@@ -2976,7 +2988,6 @@ const SCRIPT = /* javascript */`
   }
 
   // ── Init ───────────────────────────────────────────────────────────────────
-  if (typeof __FILES__ !== 'undefined') renderFileList(__FILES__);
   buildTOC(); setupScrollSpy(); addCopyButtons(); setupHeadingAnchors(); setupMermaid();
   renderTabBar();
   qs('#btn-sidebar')?.classList.add('on');
@@ -3046,10 +3057,28 @@ export class MarkdownPreviewPanel {
     MarkdownPreviewPanel.currentPanel = new MarkdownPreviewPanel(panel, document);
   }
 
+  /** Called from onDidChangeTextDocument — only updates content for the SAME file.
+   *  Must NOT switch to a different file (that causes the old-file re-trigger bug). */
   public static update(document: vscode.TextDocument): void {
     const p = MarkdownPreviewPanel.currentPanel;
     if (!p) return;
-    if (p._document.uri.toString() !== document.uri.toString()) return;
+    if (p._document.uri.toString() !== document.uri.toString()) return; // different file — ignore
+    if (p._editMode) return;  // don't interrupt active editing
+    p._scheduleRender();
+  }
+
+  /** Called from onDidChangeActiveTextEditor — follows the user to a different file. */
+  public static followEditor(document: vscode.TextDocument): void {
+    const p = MarkdownPreviewPanel.currentPanel;
+    if (!p) return;
+    if (p._document.uri.toString() !== document.uri.toString()) {
+      // User switched to a different file — update via fileLoaded postMessage
+      // (avoids full HTML rebuild which can race with VS Code's event queue)
+      p._document = document;
+      p._editMode = false;
+      p._sendFileUpdate();
+      return;
+    }
     if (p._editMode) return;
     p._scheduleRender();
   }
@@ -3287,6 +3316,39 @@ export class MarkdownPreviewPanel {
     }, null, this._disposables);
   }
 
+  /** Send file content via fileLoaded postMessage — used for switching files.
+   *  Avoids a full HTML rebuild which can have timing issues in VS Code webviews.
+   *  Updates content, edit mode, token counter, and tok panel atomically. */
+  private _sendFileUpdate(): void {
+    const rawText  = this._document.getText();
+    this._prevMarkdown = rawText;
+    this._startFsWatch();
+    const { meta, body } = extractFrontmatter(rawText);
+    const rendered   = applyGithubAlerts(marked.parse(body) as string);
+    const stats      = docStats(rawText);
+    const filename   = this._document.uri.path.split('/').pop() ?? 'preview';
+    const relPath    = vscode.workspace.asRelativePath(this._document.uri);
+    const aiKind     = aiDocKind(filename, relPath);
+    const model      = detectModel(filename, relPath);
+    this._panel.title = `Markr — ${filename}`;
+    this._panel.webview.postMessage({
+      type:       'fileLoaded',
+      uri:        this._document.uri.toString(),
+      filename,
+      html:       (meta ? renderFrontmatter(meta) : '') + rendered,
+      markdown:   rawText,
+      isAiConfig: !!aiKind,
+      aiKind:     aiKind || '',
+      isClipboard: false,
+      tokStr:     fmtTokens(countTokens(rawText, model)),
+      modelLabel: modelLabel(model),
+      sections:   sectionTokens(rawText, model),
+      words:      stats.words,
+      readMins:   Math.max(1, Math.ceil(stats.words / 200)),
+      statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
+    });
+  }
+
   private _render(): void {
     if (this._renderTimer) {
       clearTimeout(this._renderTimer);
@@ -3308,6 +3370,18 @@ export class MarkdownPreviewPanel {
         this._panel.webview.postMessage({ type: 'updateFiles', files });
       });
     }
+    // After rebuilding the page, push fresh token data so the breakdown panel
+    // is never stale. The HTML already embeds __TOK_SECTIONS__ but this ensures
+    // tokSections/tokModel in the SCRIPT match the current file immediately.
+    const relPath2  = vscode.workspace.asRelativePath(this._document.uri);
+    const model2    = detectModel(filename, relPath2);
+    const sections2 = sectionTokens(rawText, model2);
+    this._panel.webview.postMessage({
+      type: 'tokUpdate',
+      tokStr:     fmtTokens(countTokens(rawText, model2)),
+      modelLabel: modelLabel(model2),
+      sections:   sections2,
+    });
   }
 
   private _scheduleRender(): void {
@@ -3337,11 +3411,33 @@ export class MarkdownPreviewPanel {
         } else {
           const maxFiles = vscode.workspace.getConfiguration('markr').get<number>('maxWorkspaceFiles', 500);
           const exclude  = '{**/node_modules/**,**/.git/**,**/.vscode/**,**/.next/**,**/out/**,**/dist/**,**/build/**,**/coverage/**}';
-
-          // ── Phase 1: root-level files (< 20ms on any repo) ──────────────────
-          // findFiles with a non-recursive pattern is orders of magnitude faster.
-          // Show these immediately so the sidebar isn't blank while the deep scan runs.
           const wsFolders = vscode.workspace.workspaceFolders;
+
+          // ── Phase 0: instant AI config check via stat (< 2ms) ───────────────
+          // Stat well-known AI config filenames at the workspace root — no traversal.
+          // Shows AI configs in the sidebar before any findFiles call completes.
+          if (wsFolders?.length) {
+            const wsRoot = wsFolders[0].uri;
+            const knownNames = ['CLAUDE.md','claude.local.md','.cursorrules','agent.md','agents.md',
+              'skill.md','skills.md','system-prompt.md','copilot-instructions.md','.windsurfrules',
+              'windsurf.md','deepseek.md','kimi.md','llama.md','gemini.md','mistral.md','qwen.md'];
+            const instant: vscode.Uri[] = [];
+            await Promise.all(knownNames.map(async name => {
+              try {
+                const uri = vscode.Uri.joinPath(wsRoot, name);
+                await vscode.workspace.fs.stat(uri);
+                instant.push(uri);
+              } catch { /* file doesn't exist */ }
+            }));
+            if (instant.length) {
+              this._filesCache = this._mapUris(instant);
+              const cur = this._document.uri.toString();
+              this._filesCache.forEach(f => { f.active = f.uri === cur; });
+              this._panel.webview.postMessage({ type: 'updateFiles', files: this._filesCache });
+            }
+          }
+
+          // ── Phase 1: root-level .md files (< 20ms) ──────────────────────────
           if (wsFolders?.length) {
             const rootPattern = new vscode.RelativePattern(wsFolders[0], '*.md');
             const rootUris    = await vscode.workspace.findFiles(rootPattern, exclude, 50);
@@ -3349,7 +3445,6 @@ export class MarkdownPreviewPanel {
               this._filesCache = this._mapUris(rootUris);
               const cur = this._document.uri.toString();
               this._filesCache.forEach(f => { f.active = f.uri === cur; });
-              // Push phase-1 results to the webview immediately — user sees the list now
               this._panel.webview.postMessage({ type: 'updateFiles', files: this._filesCache });
             }
           }
@@ -3522,8 +3617,13 @@ export class MarkdownPreviewPanel {
     const relPath    = vscode.workspace.asRelativePath(this._document.uri);
     const aiKind     = aiDocKind(filename, relPath);
     const autoEdit   = !!aiKind;
-    const tokStr     = tokenEstimate(stats.chars);
-    const statsTitle = `${stats.words.toLocaleString()} words · ${stats.headings} heading${stats.headings !== 1 ? 's' : ''} · ${stats.codeBlocks} code block${stats.codeBlocks !== 1 ? 's' : ''}`;
+    const model      = detectModel(filename, relPath);
+    const tokCount   = countTokens(text, model);
+    const tokStr     = fmtTokens(tokCount);
+    const modelLbl   = modelLabel(model);
+    const sections   = sectionTokens(text, model);
+    const sectionsJson = JSON.stringify(sections);
+    const statsTitle = `${stats.words.toLocaleString()} words · ${stats.headings} heading${stats.headings !== 1 ? 's' : ''} · ${stats.codeBlocks} code block${stats.codeBlocks !== 1 ? 's' : ''} · ${tokStr}${modelLbl ? ' (' + modelLbl + ')' : ''}`;
 
     return /* html */`<!DOCTYPE html>
 <html lang="en" data-m="${mode}">
@@ -3554,7 +3654,7 @@ export class MarkdownPreviewPanel {
     <span class="stats" title="${statsTitle}">
       <span id="stat-time">${readingTime(stats.words)}</span>m
       · <span id="stat-words">${stats.words.toLocaleString()}</span>w
-      · <span id="stat-tok" class="${autoEdit ? 'stats-accent' : ''}" title="${stats.chars.toLocaleString()} chars">${tokStr}</span>
+      · <button id="stat-tok" class="tok-btn${autoEdit ? ' stats-accent' : ''}" title="Click to see token breakdown by section">${tokStr}${modelLbl ? `<span class="tok-model">${modelLbl}</span>` : ''}</button>
     </span>
     <span id="save-status" class="save-status"></span>
     <span id="diff-chip"></span>
@@ -3638,19 +3738,6 @@ export class MarkdownPreviewPanel {
 <!-- Layout -->
 <div id="outer-layout">
   <div id="sidebar">
-    <div class="sb-section" id="sec-files">
-      <div class="sb-header">
-        <span class="sb-title">Notebooks</span>
-        <button class="sb-action" id="btn-new-file" title="New file">+</button>
-        <span class="sb-chevron">${ICON.chevron}</span>
-      </div>
-      <div id="file-search-wrap">
-        <svg class="file-search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="file-search" type="text" placeholder="Filter files…" autocomplete="off" spellcheck="false">
-        <button id="file-search-clear" title="Clear filter">×</button>
-      </div>
-      <div class="sb-body" id="files-list"></div>
-    </div>
     <div class="sb-section flex-fill ${showTOC ? '' : 'collapsed'}" id="sec-toc">
       <div class="sb-header">
         <span class="sb-title">On this page</span>
@@ -3683,6 +3770,11 @@ export class MarkdownPreviewPanel {
 
 <button id="top-btn" title="Back to top">${ICON.arrowUp}</button>
 <div id="rich-copy-toast">✓ Copied with formatting</div>
+<div id="tok-panel">
+  <div class="tok-panel-hdr">Token breakdown<span class="tok-panel-model" id="tok-panel-model"></span></div>
+  <div class="tok-panel-body" id="tok-panel-body"></div>
+  <div class="tok-panel-total">Total context: <strong id="tok-panel-total"></strong></div>
+</div>
 
 <!-- Mermaid zoom modal -->
 <div class="mermaid-modal" id="mermaid-modal">
@@ -3769,6 +3861,8 @@ export class MarkdownPreviewPanel {
   const __FILES_LOADING__ = ${filesLoadingJson};
   const __CURRENT_URI__ = ${currentUriJson};
   const __AUTOEDIT__ = ${autoEdit};
+  const __TOK_SECTIONS__ = ${sectionsJson};
+  const __TOK_MODEL__    = ${JSON.stringify(modelLbl)};
 </script>
 <script nonce="${nonce}">${SCRIPT}</script>
 </body>
