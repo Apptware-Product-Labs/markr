@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr – AI Config Editor & Markdown Preview",
   "description": "The AI config editor & Markdown preview for VS Code — auto-opens CLAUDE.md / .cursorrules / agent.md in split-edit mode, real-time Agent Watch (live preview while Claude edits), copy diagrams as PNG, rich copy to Slack, Mermaid, TOC, themes, PDF export",
-  "version": "4.3.0",
+  "version": "4.6.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
@@ -103,9 +103,12 @@
     "commands": [
       {
         "command": "markr.openPreview",
-        "title": "Open Markr Preview",
+        "title": "Open in Markr",
         "category": "Markr",
-        "icon": "$(open-preview)"
+        "icon": {
+          "light": "images/markr-icon-light.svg",
+          "dark":  "images/markr-icon-dark.svg"
+        }
       },
       {
         "command": "markr.openShowcase",
@@ -172,7 +175,7 @@
       "editor/title": [
         {
           "command": "markr.openPreview",
-          "when": "editorLangId == markdown",
+          "when": "editorLangId == markdown || resourceFilename =~ /^(CLAUDE\\.md|\\.cursorrules|agent\\.md|agents\\.md|skill\\.md|system-prompt\\.md|\\.windsurfrules|copilot-instructions\\.md)$/",
           "group": "navigation"
         }
       ],
@@ -229,6 +232,11 @@
           "type": "boolean",
           "default": false,
           "description": "When enabled, opening CLAUDE.md, .cursorrules, agent.md, or any AI config file automatically opens it in Markr alongside the text editor. Off by default — enable in Settings if you want this behaviour."
+        },
+        "markr.showTokenLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline token cost above each heading in Markdown and AI config files (section tokens · % of model context window). Disable for a cleaner editor."
         }
       }
     }

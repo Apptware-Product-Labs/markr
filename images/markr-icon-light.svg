@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none">
+  <!-- Same shape, slightly darker orange for light theme readability -->
+  <path d="M8 1L1 8L8 15L15 8Z"
+        fill="none" stroke="#C2540A" stroke-width="1.4" stroke-linejoin="round"/>
+  <path d="M8 5L5 8L8 11L11 8Z" fill="#C2540A"/>
+</svg>

@@ -9,7 +9,26 @@ export const AI_CONFIG_NAMES = new Set([
   'copilot-instructions.md', '.cursorrules', 'cursor.md', 'windsurf.md',
   'aider.md', 'gpt.md', 'openai.md', 'anthropic.md', 'context.md',
   'instructions.md', 'memory.md', 'rules.md', 'prompt.md', 'prompts.md',
+  'deepseek.md', 'kimi.md', 'llama.md', 'mistral.md', 'qwen.md',
 ]);
+
+// Filename suffix patterns — e.g. review-agent.md, backend-skill.md
+const AI_NAME_PATTERN_EXP =
+  /[-_](agent|skill|skills|prompt|prompts|instructions?|rules?|context|memory|system|assistant|bot)\.md$/i;
+
+// Folder patterns — files inside these dirs are treated as AI configs
+const AI_FOLDER_PATTERN_EXP =
+  /(^|\/)(\.(claude|cursor|github)|skills?|agents?|prompts?|instructions?|memories|rules|contexts)(\/|$)/i;
+
+/** True if a file should be treated as an AI config (name, pattern, or folder). */
+export function isAiConfigFile(label: string, relPath = ''): boolean {
+  const lower = label.toLowerCase();
+  if (AI_CONFIG_NAMES.has(lower)) return true;
+  if (/^claude(\.local)?\.md$/i.test(label)) return true;
+  if (AI_NAME_PATTERN_EXP.test(lower)) return true;
+  if (relPath && AI_FOLDER_PATTERN_EXP.test(relPath)) return true;
+  return false;
+}
 
 export function aiDocKindExplorer(label: string, relPath = ''): string {
   const lower = label.toLowerCase();
@@ -26,7 +45,7 @@ export function aiDocKindExplorer(label: string, relPath = ''): string {
   if (lower.includes('system') || lower.includes('prompt')) return 'Prompt';
   if (lower.includes('context') || lower.includes('memory')) return 'Context';
   if (lower.includes('rule') || lower.includes('instruction')) return 'Rules';
-  if (AI_CONFIG_NAMES.has(lower) || /^claude(\.local)?\.md$/i.test(lower)) return 'AI Doc';
+  if (isAiConfigFile(lower, relPath)) return 'AI Doc';
   return '';
 }
 
@@ -177,14 +196,36 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
   getFiles(): ExplorerFileEntry[] { return this._files; }
 
   refresh(): void {
-    this._files = [];
-    this._loading = true;
+    // Keep showing existing files while re-scanning — no flicker of "Scanning workspace…"
+    // Only show the loading spinner on the very first scan when the list is empty.
     this._scanPromise = null;
     this._scan();
   }
 
+  /** Incrementally add a newly-created file without a full re-scan. */
+  addFile(uri: vscode.Uri): void {
+    const label = nodePath.basename(uri.fsPath);
+    if (!label.endsWith('.md') && !label.startsWith('.cursorrules') && !label.startsWith('.windsurf')) return;
+    if (this._files.some(f => f.uri.toString() === uri.toString())) return;
+    const relPath = vscode.workspace.asRelativePath(uri);
+    const dir = nodePath.dirname(relPath) === '.' ? '' : nodePath.dirname(relPath);
+    const lower = label.toLowerCase();
+    const isAiConfig = isAiConfigFile(lower, relPath);
+    this._files.push({ label, relPath, uri, isAiConfig, aiKind: aiDocKindExplorer(label, relPath), dir });
+    this._onDidChangeTreeData.fire();
+  }
+
+  /** Incrementally remove a deleted file without a full re-scan. */
+  removeFile(uri: vscode.Uri): void {
+    const before = this._files.length;
+    this._files = this._files.filter(f => f.uri.toString() !== uri.toString());
+    if (this._files.length !== before) this._onDidChangeTreeData.fire();
+  }
+
   private _scan(): void {
     if (this._scanPromise) { return; }
+    // Only show loading spinner if we have nothing to show yet
+    if (this._files.length === 0) this._loading = true;
     this._scanPromise = this._doScan().finally(() => {
       this._scanPromise = null;
       this._loading = false;
@@ -226,7 +267,7 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
             const label = nodePath.basename(uri.fsPath);
             const relPath = vscode.workspace.asRelativePath(uri);
             const lower = label.toLowerCase();
-            const isAiConfig = AI_CONFIG_NAMES.has(lower) || /^claude(\.local)?\.md$/i.test(lower);
+            const isAiConfig = isAiConfigFile(lower, relPath);
             return { label, relPath, uri, isAiConfig, aiKind: aiDocKindExplorer(label, relPath), dir: '' };
           });
           this._onDidChangeTreeData.fire(); // show AI configs NOW
@@ -242,7 +283,7 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
         const relPath = vscode.workspace.asRelativePath(uri);
         const dir = nodePath.dirname(relPath) === '.' ? '' : nodePath.dirname(relPath);
         const lower = label.toLowerCase();
-        const isAiConfig = AI_CONFIG_NAMES.has(lower) || /^claude(\.local)?\.md$/i.test(lower);
+        const isAiConfig = isAiConfigFile(lower, relPath);
         const aiKind = aiDocKindExplorer(label, relPath);
         return { label, relPath, uri, isAiConfig, aiKind, dir };
       });

@@ -5,10 +5,11 @@
  * (current dir + parent dirs — exactly how Claude Code reads CLAUDE.md files),
  * counts their tokens, and lets the user compose a merged context block.
  *
- * Architecture:
- *   - ContextComposer class: pure business logic, no VS Code UI
- *   - Called by extension.ts to populate the webview sidebar
- *   - Sends messages to webview via postMessage
+ * Performance notes:
+ *   - Static mtime cache: tokens are NOT re-counted unless the file changed on disk.
+ *   - Streaming: discover() calls onFile() for each file as soon as it's found,
+ *     so the webview can render rows incrementally instead of waiting for a full scan.
+ *   - mergeContext() reads from cache when possible (same mtime check).
  */
 
 import * as vscode from 'vscode';
@@ -36,21 +37,26 @@ export interface ContextSummary {
   selectedTokens: number;
   totalTokens:    number;
   model:          AiModel;       // primary model (most files target)
-  contextWindow:  number;        // context window for the primary model (chars for % bar)
+  contextWindow:  number;        // context window for the primary model (tokens)
 }
 
 // Context window sizes by model (tokens)
 const CONTEXT_WINDOWS: Record<AiModel, number> = {
-  claude:  200_000,
-  gpt4:    128_000,
-  gpt4o:   128_000,
-  llama3:  128_000,
-  gemini:  1_000_000,
-  mistral: 128_000,
-  generic: 128_000,
+  claude:   200_000,
+  gpt4:     128_000,
+  gpt4o:    128_000,
+  llama3:   128_000,
+  llama2:     4_096,
+  deepseek: 128_000,
+  kimi:     128_000,
+  gemini: 1_000_000,
+  mistral:  128_000,
+  qwen:     128_000,
+  generic:  128_000,
 };
 
-// ─── AI config filenames (shared with markrExplorer) ─────────────────────────
+// ─── AI config detection ─────────────────────────────────────────────────────
+// Three layers: exact name → filename pattern → folder path → content heuristic.
 
 const AI_CONFIG_FILENAMES = new Set([
   'claude.md', 'claude.local.md',
@@ -61,12 +67,54 @@ const AI_CONFIG_FILENAMES = new Set([
   'system-prompt.md', 'prompt.md', 'prompts.md',
   'aider.md', 'codex.md', 'openai.md', 'gpt.md', 'gemini.md',
   'instructions.md', 'memory.md', 'rules.md', 'context.md',
+  'deepseek.md', 'kimi.md', 'llama.md', 'mistral.md', 'qwen.md',
 ]);
 
-function isAiConfig(filename: string): boolean {
-  return AI_CONFIG_FILENAMES.has(filename.toLowerCase())
-    || /^claude(\.local)?\.md$/i.test(filename);
+// Filename suffix patterns — catches my-agent.md, review-skill.md, etc.
+const AI_NAME_PATTERN =
+  /[-_](agent|skill|skills|prompt|prompts|instructions?|rules?|context|memory|system|assistant|bot)\.md$/i;
+
+// Folder patterns — anything inside these directories is treated as an AI config
+const AI_FOLDER_PATTERN =
+  /(^|\/)(\.(claude|cursor|github)|skills?|agents?|prompts?|instructions?|memories|rules|contexts)(\/|$)/i;
+
+/**
+ * Returns true if the file is an AI config by name, pattern, or folder.
+ * Optionally pass `content` (first ~600 chars) for a lightweight heading heuristic.
+ */
+function isAiConfig(filename: string, relPath?: string, content?: string): boolean {
+  const lower = filename.toLowerCase();
+
+  // Layer 1 — exact known name
+  if (AI_CONFIG_FILENAMES.has(lower)) return true;
+  if (/^claude(\.local)?\.md$/i.test(filename)) return true;
+
+  // Layer 2 — filename pattern  (e.g. review-agent.md, deployment-skill.md)
+  if (AI_NAME_PATTERN.test(lower)) return true;
+
+  // Layer 3 — folder pattern  (e.g. skills/review.md, .claude/commands/commit.md)
+  if (relPath && AI_FOLDER_PATTERN.test(relPath)) return true;
+
+  // Layer 4 — content heuristic: has both ## Trigger AND ## Instructions → Claude skill
+  // Only runs when content is already in memory (avoids extra I/O in the walk phase).
+  if (content) {
+    const head = content.slice(0, 600).toLowerCase();
+    const hasTrigger      = /^##\s+trigger/m.test(head);
+    const hasInstructions = /^##\s+(instructions?|steps?|how to|what to do)/m.test(head);
+    const hasRole         = /^##\s+(role|persona|system prompt)/m.test(head);
+    const hasFrontmatter  = /^---[\s\S]{0,200}\b(role|model|agent|skill)\s*:/m.test(head);
+    if ((hasTrigger && hasInstructions) || hasRole || hasFrontmatter) return true;
+  }
+
+  return false;
 }
+
+// ─── Static mtime cache ───────────────────────────────────────────────────────
+// Keyed by absolute path → { mtime (ms), tokens, content }
+// Survives across multiple ContextComposer instances in the same process.
+
+interface CacheEntry { mtime: number; tokens: number; content: string; }
+const _fileCache = new Map<string, CacheEntry>();
 
 // ─── ContextComposer ─────────────────────────────────────────────────────────
 
@@ -74,41 +122,54 @@ export class ContextComposer {
 
   /**
    * Discover all AI config files in scope for the given document.
-   * "In scope" means: same directory + every parent up to filesystem root,
-   * plus other AI configs found within the workspace.
    *
-   * This mirrors exactly how Claude Code reads CLAUDE.md hierarchically.
+   * @param activeDocUri  The URI of the file open in Markr (used to start the
+   *                      directory walk). Falls back to workspace root.
+   * @param onFile        Optional streaming callback — called with each ContextFile
+   *                      as soon as it is found, before the full scan completes.
+   *                      Use this to stream rows to the webview progressively.
    */
-  async discover(activeDocUri?: vscode.Uri): Promise<ContextSummary> {
+  async discover(
+    activeDocUri?: vscode.Uri,
+    onFile?: (f: ContextFile) => void,
+  ): Promise<ContextSummary> {
     const files: ContextFile[] = [];
     const seen  = new Set<string>();
 
-    // ── 1. Walk up from the active document / workspace root ─────────────
+    const wsRoot    = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
     const startPath = activeDocUri
       ? nodePath.dirname(activeDocUri.fsPath)
-      : vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+      : wsRoot;
 
-    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-
+    // ── 1. Walk up from the active document to the filesystem root ────────
+    // In the walk phase we check name/pattern only (no file read yet — fast).
+    // relPath and content checks happen inside _buildEntry after the cache hit.
     let dir = startPath;
     while (dir && dir !== nodePath.dirname(dir)) {
-      const isParent = wsRoot && !dir.startsWith(wsRoot);
+      const isParent = !!(wsRoot && !dir.startsWith(wsRoot));
       try {
         const entries = fs.readdirSync(dir);
         for (const entry of entries) {
-          if (!isAiConfig(entry)) continue;
+          // Quick name/pattern check — no I/O yet
+          const tentativeRel = wsRoot && nodePath.join(dir, entry).startsWith(wsRoot)
+            ? nodePath.join(dir, entry).slice(wsRoot.length + 1).replace(/\\/g, '/')
+            : entry;
+          if (!isAiConfig(entry, tentativeRel)) continue;
           const fullPath = nodePath.join(dir, entry);
           if (seen.has(fullPath)) continue;
           seen.add(fullPath);
           const file = this._buildEntry(fullPath, wsRoot, isParent ? 'parent' : 'workspace', true);
-          if (file) files.push(file);
+          if (file) {
+            files.push(file);
+            onFile?.(file);
+          }
         }
-      } catch { /* dir not readable — skip */ }
+      } catch { /* dir not readable */ }
+      if (dir === wsRoot) break;
       dir = nodePath.dirname(dir);
-      if (dir === wsRoot && isParent) break;
     }
 
-    // ── 2. Also find AI configs elsewhere in the workspace ───────────────
+    // ── 2. Workspace scan — all .md files, content heuristic on unknowns ──
     if (wsRoot) {
       try {
         const maxFiles = vscode.workspace.getConfiguration('markr').get<number>('maxWorkspaceFiles', 500);
@@ -118,22 +179,43 @@ export class ContextComposer {
           maxFiles,
         );
         for (const uri of uris) {
-          const fn = nodePath.basename(uri.fsPath);
-          if (!isAiConfig(fn) || seen.has(uri.fsPath)) continue;
-          seen.add(uri.fsPath);
-          const file = this._buildEntry(uri.fsPath, wsRoot, 'workspace', false);
-          if (file) files.push(file);
+          if (seen.has(uri.fsPath)) continue;
+          const fn      = nodePath.basename(uri.fsPath);
+          const relPath = vscode.workspace.asRelativePath(uri.fsPath);
+
+          // Quick check (no read) — name or folder pattern
+          if (isAiConfig(fn, relPath)) {
+            seen.add(uri.fsPath);
+            const file = this._buildEntry(uri.fsPath, wsRoot, 'workspace', false);
+            if (file) { files.push(file); onFile?.(file); }
+            continue;
+          }
+
+          // Content heuristic for unrecognised .md files
+          // Only reads cached content (free) or does a small readFileSync
+          try {
+            const stat   = fs.statSync(uri.fsPath);
+            const cached = _fileCache.get(uri.fsPath);
+            const content = (cached && cached.mtime === stat.mtimeMs)
+              ? cached.content
+              : fs.readFileSync(uri.fsPath, 'utf-8');
+            if (isAiConfig(fn, relPath, content)) {
+              seen.add(uri.fsPath);
+              const file = this._buildEntry(uri.fsPath, wsRoot, 'workspace', false);
+              if (file) { files.push(file); onFile?.(file); }
+            }
+          } catch { /* unreadable */ }
         }
       } catch { /* scan failed */ }
     }
 
-    // Sort: parent-scope first (hierarchically read first), then workspace alphabetically
+    // Sort: parent-scope first, then workspace alphabetically
     files.sort((a, b) => {
       if (a.scope !== b.scope) return a.scope === 'parent' ? -1 : 1;
       return a.relPath.localeCompare(b.relPath);
     });
 
-    // Determine primary model (most common among selected files)
+    // Primary model = most common among selected files
     const modelCounts: Partial<Record<AiModel, number>> = {};
     for (const f of files.filter(f => f.selected)) {
       modelCounts[f.model] = (modelCounts[f.model] ?? 0) + 1;
@@ -154,17 +236,27 @@ export class ContextComposer {
     selected: boolean,
   ): ContextFile | null {
     try {
-      // Note: readFileSync is intentional here for the directory-walk phase
-      // (called synchronously within the directory listing loop).
-      // The async findFiles path in step 2 is non-blocking.
-      // TODO: migrate to fs.promises for large workspaces (tracked in CLAUDE.md).
-      const content  = fs.readFileSync(fullPath, 'utf-8');
+      const stat     = fs.statSync(fullPath);
+      const mtime    = stat.mtimeMs;
       const filename = nodePath.basename(fullPath);
       const relPath  = wsRoot && fullPath.startsWith(wsRoot)
         ? vscode.workspace.asRelativePath(fullPath)
-        : fullPath.replace(nodePath.dirname(wsRoot), '').replace(/^[\\/]/, '../');
+        : fullPath.replace(nodePath.dirname(wsRoot || '/'), '').replace(/^[\\/]/, '../');
       const model    = detectModel(filename, relPath);
-      const tokens   = countTokens(content, model);
+
+      // Cache check: skip readFileSync + countTokens if file hasn't changed
+      const cached = _fileCache.get(fullPath);
+      let content: string;
+      let tokens: number;
+      if (cached && cached.mtime === mtime) {
+        content = cached.content;
+        tokens  = cached.tokens;
+      } else {
+        content = fs.readFileSync(fullPath, 'utf-8');
+        tokens  = countTokens(content, model);
+        _fileCache.set(fullPath, { mtime, tokens, content });
+      }
+
       return {
         uri: vscode.Uri.file(fullPath),
         filename, relPath, fullPath, model,
@@ -176,17 +268,28 @@ export class ContextComposer {
   }
 
   /**
-   * Merge selected files into a single context block ready to paste.
-   * Format: each file wrapped with a clear header so the model knows the source.
+   * Merge selected files into a single context block.
+   * Reads from the mtime cache when possible — no redundant disk I/O.
    */
   mergeContext(files: ContextFile[]): string {
     const selected = files.filter(f => f.selected);
     const blocks = selected.map(f => {
       let content = '';
-      try { content = fs.readFileSync(f.fullPath, 'utf-8').trim(); } catch {}
+      try {
+        const stat   = fs.statSync(f.fullPath);
+        const cached = _fileCache.get(f.fullPath);
+        if (cached && cached.mtime === stat.mtimeMs) {
+          content = cached.content.trim();
+        } else {
+          content = fs.readFileSync(f.fullPath, 'utf-8').trim();
+          const model  = detectModel(f.filename, f.relPath);
+          const tokens = countTokens(content, model);
+          _fileCache.set(f.fullPath, { mtime: stat.mtimeMs, tokens, content });
+        }
+      } catch {}
       return `# === ${f.relPath} ===\n\n${content}`;
     });
-    const total = selected.reduce((s, f) => s + f.tokens, 0);
+    const total  = selected.reduce((s, f) => s + f.tokens, 0);
     const header = `# Merged AI context — ${selected.length} files, ${fmtTokens(total)}\n\n`;
     return header + blocks.join('\n\n---\n\n');
   }

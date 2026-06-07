@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as fs from 'fs';
 import { MarkdownPreviewPanel } from './preview';
 import { MarkrExplorerProvider, MarkrFileItem, AI_CONFIG_TEMPLATES } from './markrExplorer';
-
+import { MarkrTokenLensProvider, MarkrTokenDecorations } from './tokenLens';
+import { countTokens, detectModel } from './tokenEngine';
 export async function activate(context: vscode.ExtensionContext) {
 
   // ── Activity Bar Explorer ──────────────────────────────────────────────────
@@ -334,18 +336,79 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // ── Token Lens ────────────────────────────────────────────────────────────────
+  // CodeLens: file-level summary at top (total tokens, model, context %)
+  // Decorations: colored inline text after each heading (section tok, % of file)
+  const tokenLens = new MarkrTokenLensProvider();
+  const tokenDeco = new MarkrTokenDecorations(context);
+
+  context.subscriptions.push(
+    vscode.languages.registerCodeLensProvider(
+      [{ language: 'markdown' }, { pattern: '**/.cursorrules' }, { pattern: '**/.windsurfrules' }],
+      tokenLens,
+    ),
+    vscode.window.onDidChangeActiveTextEditor(editor => {
+      tokenLens.scheduleRefresh();
+      tokenDeco.update(editor);
+    }),
+    vscode.workspace.onDidChangeTextDocument(e => {
+      if (e.document.languageId === 'markdown') {
+        tokenLens.scheduleRefresh();
+        const editor = vscode.window.activeTextEditor;
+        if (editor?.document === e.document) tokenDeco.scheduleUpdate(editor);
+      }
+    }),
+    vscode.workspace.onDidSaveTextDocument(doc => {
+      if (doc.languageId === 'markdown') {
+        tokenLens.scheduleRefresh();
+        const editor = vscode.window.activeTextEditor;
+        if (editor?.document === doc) tokenDeco.update(editor);
+      }
+    }),
+  );
+  // Apply to whatever file is already open when the extension activates
+  tokenDeco.update(vscode.window.activeTextEditor);
+
+  // ── Status bar token count ────────────────────────────────────────────────
+  // Shows ⬡ 8.4K tok in the bottom bar whenever a markdown file is active.
+  // Clicking it opens the file in Markr.
+  const statusBarTok = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 99);
+  statusBarTok.command = 'markr.openPreview';
+  statusBarTok.tooltip = 'Open in Markr';
+  context.subscriptions.push(statusBarTok);
+
+  function updateStatusBar(editor?: vscode.TextEditor) {
+    if (!editor || editor.document.languageId !== 'markdown') {
+      statusBarTok.hide(); return;
+    }
+    const doc    = editor.document;
+    const text   = doc.getText();
+    const model  = detectModel(path.basename(doc.uri.fsPath), vscode.workspace.asRelativePath(doc.uri));
+    const tokens = countTokens(text, model);
+    const fmt    = tokens >= 10_000 ? Math.round(tokens / 1_000) + 'K' : tokens >= 1_000 ? (tokens / 1_000).toFixed(1) + 'K' : String(tokens);
+    statusBarTok.text = `⬡ ${fmt} tok`;
+    statusBarTok.show();
+  }
+
+  context.subscriptions.push(
+    vscode.window.onDidChangeActiveTextEditor(e => updateStatusBar(e)),
+    vscode.workspace.onDidChangeTextDocument(e => {
+      const editor = vscode.window.activeTextEditor;
+      if (editor?.document === e.document) updateStatusBar(editor);
+    }),
+  );
+  updateStatusBar(vscode.window.activeTextEditor);
+
   // ── File watcher ───────────────────────────────────────────────────────────
   const watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
   let refreshTimer: ReturnType<typeof setTimeout> | undefined;
-  const refresh = () => {
+  const debouncedRefresh = () => {
     if (refreshTimer) clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(() => {
-      MarkdownPreviewPanel.refreshFiles();
-      explorerProvider.refresh();  // also refresh the Activity Bar tree
-    }, 300);
+    refreshTimer = setTimeout(() => { MarkdownPreviewPanel.refreshFiles(); }, 400);
   };
-  watcher.onDidCreate(refresh);
-  watcher.onDidDelete(refresh);
+  // Incremental add/remove keeps the Activity Bar responsive (no full re-scan)
+  watcher.onDidCreate(uri => { explorerProvider.addFile(uri);    debouncedRefresh(); });
+  watcher.onDidDelete(uri => { explorerProvider.removeFile(uri); debouncedRefresh(); });
   context.subscriptions.push(watcher);
 }
 

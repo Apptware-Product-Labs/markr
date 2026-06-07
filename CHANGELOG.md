@@ -7,6 +7,26 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [4.6.0] — 2026-06-07
+
+### Added
+- **Token Lens** — live token cost inline in the VS Code text editor. Every heading in your `CLAUDE.md`, `agent.md`, or any AI config file now shows a colored decoration on the same line: `▏ 42 tok · 5%` (green), `▌ 1.8K tok · 22%` (amber), `█ 3.2K tok · 38%` (red). The block character encodes weight visually — thin = light, full = heavy. Percentage is relative to the file total so you instantly see which section dominates. Updates live as you type.
+- **File-level CodeLens** — a summary above line 1 shows total tokens, detected model, and context window usage: `⬡ 8.4K tok · Claude · ▰▰▱▱▱▱▱▱▱▱ 4.2% of context`. Clicking it opens the file in Markr.
+- **Status bar token count** — `⬡ 8.4K tok` appears in the bottom-right status bar whenever a Markdown file is active. Clicking opens the file in Markr.
+- **Smart AI config detection** — 4 detection layers (exact name → filename pattern → folder path → content heuristic). Now auto-detects `review-agent.md`, `backend-skill.md`, anything in `skills/` or `agents/` or `.claude/` folders, and any file with `## Trigger` + `## Instructions` headings.
+
+### Improved
+- **Activity Bar never freezes** — file watcher now uses incremental `addFile`/`removeFile` instead of full re-scan on every create/delete. No more "Scanning workspace…" spinner on file changes.
+- **Activity Bar keeps showing files during refresh** — background rescan no longer clears the tree first. Files stay visible while the update runs.
+- **TOC section click** — now scrolls AND flashes a highlight in the correct visible pane (preview or split-preview). Large files now scroll correctly (was silently doing nothing in edit mode).
+- **File switch scroll reset** — switching to a different file now correctly resets scroll to the top of both the preview and textarea.
+
+### Removed
+- **Context Composer** — removed from the sidebar. Was confusing and added no clear value. The token-per-section data is now surfaced more clearly via Token Lens directly in the editor.
+
+### Fixed
+- Token Lens only shown on AI config files (not on every README/doc)
+
 ## [4.2.0] — 2026-06-06
 
 ### Added

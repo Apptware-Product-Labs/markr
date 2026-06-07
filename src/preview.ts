@@ -7,6 +7,7 @@ import * as os from 'os';
 import * as nodePath from 'path';
 import * as fs from 'fs';
 
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface FileEntry {
@@ -729,8 +730,7 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 body.sb-resizing { cursor: col-resize !important; user-select: none; }
 .sb-section { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0; }
 .sb-section.flex-fill { flex: 1; overflow: hidden; }
-#sec-toc { flex: 1 1 auto; min-height: 150px; overflow: hidden; }
-/* TOC collapsed → shrinks to header only */
+#sec-toc { flex: 1 1 auto; min-height: 120px; overflow: hidden; }
 #sidebar.no-toc #sec-toc { flex: 0 0 auto; min-height: 0; }
 .sb-header {
   display: flex; align-items: center; padding: 0 10px 0 12px; height: 32px;
@@ -1381,10 +1381,30 @@ const SCRIPT = /* javascript */`
       const a = document.createElement('a');
       a.href = '#' + h.id;
       a.textContent = (h.textContent || '').replace(/#\\s*$/, '').trim();
-      a.addEventListener('click', e => {
+      a.addEventListener('click', function(e) {
         e.preventDefault();
-        if (editMode) { scrollEditorToId(h.id); }
-        else { h.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+        var hId = h.id;
+        // In edit mode: scroll the textarea to the heading line
+        if (editMode) { scrollEditorToId(hId); }
+        // Always scroll + highlight in the VISIBLE preview pane.
+        // Do not use the captured h element directly -- in edit mode it lives inside
+        // #scroller which is hidden, so scrollIntoView() silently does nothing.
+        // Instead, look it up by id in whichever pane is currently visible.
+        var previewRoot = editMode ? qs('#split-preview') : qs('#scroller');
+        var targetEl = null;
+        if (previewRoot) {
+          var candidates = previewRoot.querySelectorAll('h1,h2,h3,h4,h5,h6');
+          for (var ci = 0; ci < candidates.length; ci++) {
+            if (candidates[ci].id === hId) { targetEl = candidates[ci]; break; }
+          }
+        }
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          var te = targetEl;
+          te.style.transition = 'background 0.4s';
+          te.style.background = 'var(--accent-bg)';
+          setTimeout(function() { te.style.background = ''; }, 1500);
+        }
       });
       li.appendChild(a);
       body.appendChild(li);
@@ -2404,7 +2424,6 @@ const SCRIPT = /* javascript */`
     sec.querySelector('.sb-header')?.addEventListener('click', e => {
       if (e.target.closest('.sb-action')) return;
       sec.classList.toggle('collapsed');
-      // When TOC collapses, it shrinks to header only.
       if (sec.id === 'sec-toc') {
         qs('#sidebar')?.classList.toggle('no-toc', sec.classList.contains('collapsed'));
       }
@@ -2777,8 +2796,16 @@ const SCRIPT = /* javascript */`
       if (editMode) { const ea = qs('#edit-area'); if (ea) { ea.value = currentMarkdown; updateToolbarState(); } }
       if (msg.isAiConfig && !isAutoEditDismissed(msg.uri)) { if (!editMode) enterEditMode(); }
       else { if (editMode) exitEditMode(false, false, false); }
-      qs('#scroller').scrollTop = 0;
-      qs('#split-preview').scrollTop = 0; // reset split-preview too (was staying at old file's position)
+      // Defer scroll reset so it runs AFTER enterEditMode/exitEditMode settle
+      // (mode switch may focus the textarea which causes the browser to scroll it into view)
+      setTimeout(function() {
+        var sc = qs('#scroller');
+        var sp = qs('#split-preview');
+        var ea = qs('#edit-area');
+        if (sc) sc.scrollTop = 0;
+        if (sp) sp.scrollTop = 0;
+        if (ea) ea.scrollTop = 0;  // textarea itself also needs resetting
+      }, 0);
       buildTOC(); addCopyButtons(); setupHeadingAnchors();
       if (qs('#scroller .language-mermaid')) setupMermaid();
       if (qs('#split-preview .language-mermaid')) setupMermaid();
