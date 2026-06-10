@@ -7,10 +7,11 @@ export const AI_CONFIG_NAMES = new Set([
   'claude.md', 'claude.local.md', 'codex.md', 'agents.md', 'gemini.md',
   'skills.md', 'skill.md', 'system-prompt.md', 'systemprompt.md',
   'copilot-instructions.md', '.cursorrules', 'cursor.md', 'windsurf.md',
-  'aider.md', 'gpt.md', 'openai.md', 'anthropic.md', 'context.md',
+  '.windsurfrules', 'aider.md', 'gpt.md', 'openai.md', 'anthropic.md', 'context.md',
   'instructions.md', 'memory.md', 'rules.md', 'prompt.md', 'prompts.md',
   'deepseek.md', 'kimi.md', 'llama.md', 'mistral.md', 'qwen.md',
 ]);
+
 
 // Filename suffix patterns — e.g. review-agent.md, backend-skill.md
 const AI_NAME_PATTERN_EXP =
@@ -74,7 +75,7 @@ export class MarkrFileItem extends vscode.TreeItem {
         active ? 'eye' : 'star-full',
         active
           ? new vscode.ThemeColor('focusBorder')            // accent highlight when active
-          : new vscode.ThemeColor('charts.yellow'),
+          : new vscode.ThemeColor('charts.orange'),
       );
       this.description = entry.aiKind + (active ? '  ◉' : '');
     } else {
@@ -205,7 +206,7 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
   /** Incrementally add a newly-created file without a full re-scan. */
   addFile(uri: vscode.Uri): void {
     const label = nodePath.basename(uri.fsPath);
-    if (!label.endsWith('.md') && !label.startsWith('.cursorrules') && !label.startsWith('.windsurf')) return;
+    if (!label.endsWith('.md')) return;
     if (this._files.some(f => f.uri.toString() === uri.toString())) return;
     const relPath = vscode.workspace.asRelativePath(uri);
     const dir = nodePath.dirname(relPath) === '.' ? '' : nodePath.dirname(relPath);
@@ -274,17 +275,26 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
         }
       }
 
-      const uris = await vscode.workspace.findFiles('**/*.md', `{${exclude}}`, maxFiles);
-      uris.sort((a, b) =>
+      const EXCLUDED_SEGMENTS = new Set([
+        'node_modules', '.git', '.next', 'dist', 'build', 'out',
+        'coverage', '.turbo', '.cache', 'vendor', 'public',
+        '__pycache__', '.pytest_cache', 'storybook-static', '.svelte-kit',
+        'tmp', 'temp', '.husky',
+      ]);
+
+      const mdUris = await vscode.workspace.findFiles('**/*.md', `{${exclude}}`, maxFiles);
+      const allUris = mdUris.filter(u => !u.fsPath.split(/[/\\]/).some(seg => EXCLUDED_SEGMENTS.has(seg)));
+
+      allUris.sort((a, b) =>
         vscode.workspace.asRelativePath(a).localeCompare(vscode.workspace.asRelativePath(b)),
       );
-      this._files = uris.map(uri => {
-        const label = nodePath.basename(uri.fsPath);
+      this._files = allUris.map(uri => {
+        const label   = nodePath.basename(uri.fsPath);
         const relPath = vscode.workspace.asRelativePath(uri);
-        const dir = nodePath.dirname(relPath) === '.' ? '' : nodePath.dirname(relPath);
-        const lower = label.toLowerCase();
+        const dir     = nodePath.dirname(relPath) === '.' ? '' : nodePath.dirname(relPath);
+        const lower   = label.toLowerCase();
         const isAiConfig = isAiConfigFile(lower, relPath);
-        const aiKind = aiDocKindExplorer(label, relPath);
+        const aiKind     = aiDocKindExplorer(label, relPath);
         return { label, relPath, uri, isAiConfig, aiKind, dir };
       });
     } catch {
@@ -329,7 +339,7 @@ export class MarkrExplorerProvider implements vscode.TreeDataProvider<vscode.Tre
     // ── AI Configs section (flat — these are always at repo root or well-known paths) ──
     if (aiEntries.length > 0) {
       sections.push(new MarkrSectionItem(
-        `AI Configs (${aiEntries.length})`,
+        `AI Config Studio (${aiEntries.length})`,
         aiEntries.map(f => new MarkrFileItem(f, f.uri.toString() === this._activeUri)),
         vscode.TreeItemCollapsibleState.Expanded,
         'star',

@@ -5,6 +5,9 @@ import { MarkdownPreviewPanel } from './preview';
 import { MarkrExplorerProvider, MarkrFileItem, AI_CONFIG_TEMPLATES } from './markrExplorer';
 import { MarkrTokenLensProvider, MarkrTokenDecorations } from './tokenLens';
 import { countTokens, detectModel } from './tokenEngine';
+import { ContextBridgeViewProvider } from './contextBridge';
+import { analyzeAiWorkspace, buildAiConfigBundle, buildAiHealthMarkdown } from './aiConfigAnalyzer';
+
 export async function activate(context: vscode.ExtensionContext) {
 
   // ── Activity Bar Explorer ──────────────────────────────────────────────────
@@ -14,6 +17,102 @@ export async function activate(context: vscode.ExtensionContext) {
     showCollapseAll: true,
   });
   context.subscriptions.push(treeView);
+
+  // ── Context Bridge sidebar view ────────────────────────────────────────────
+  // Lives under markr-sidebar container as a collapsible WebviewView section.
+  // When collapsed → markrExplorer expands to fill the space (Source-Control style).
+  const contextBridgeProvider = new ContextBridgeViewProvider();
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      ContextBridgeViewProvider.viewType,
+      contextBridgeProvider,
+      { webviewOptions: { retainContextWhenHidden: true } },
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('markr.openContextBridge', () => {
+      vscode.commands.executeCommand('markrContextBridge.focus');
+    }),
+    vscode.commands.registerCommand('markr.refreshContextBridge', () => {
+      contextBridgeProvider.refresh();
+    }),
+    vscode.commands.registerCommand('markr.openAiHealth', async () => {
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'Markr: checking AI config health...', cancellable: false },
+        async () => {
+          const report = await analyzeAiWorkspace();
+          await MarkdownPreviewPanel.showClipboard(buildAiHealthMarkdown(report));
+        },
+      );
+    }),
+    vscode.commands.registerCommand('markr.copyAiConfigBundle', async () => {
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'Markr: building AI workspace bundle...', cancellable: false },
+        async () => {
+          const report = await analyzeAiWorkspace();
+          const bundle = await buildAiConfigBundle(report);
+          await vscode.env.clipboard.writeText(bundle);
+          const action = await vscode.window.showInformationMessage(
+            `Markr copied an AI workspace bundle (${bundle.length.toLocaleString()} chars).`,
+            'Preview',
+          );
+          if (action === 'Preview') {
+            await MarkdownPreviewPanel.showClipboard(bundle);
+          }
+        },
+      );
+    }),
+  );
+
+  // ── AI Sessions status bar item ────────────────────────────────────────────
+  // Right side — shows active session count + context-limit warnings.
+  // Click → opens the Context Bridge panel.
+  const sbAi = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 97);
+  sbAi.command  = 'markr.openContextBridge';
+  sbAi.tooltip  = 'AI Sessions — click to open Context Bridge';
+  context.subscriptions.push(sbAi);
+
+  function updateAiStatusBar() {
+    try {
+      const { activeSessions, warnings } = contextBridgeProvider.getStatusSummary();
+      if (activeSessions.length || warnings.length) {
+        const toolLabels = [...new Set(activeSessions.map(s => {
+          const map: Record<string, string> = {
+            'claude-code': 'Claude', codex: 'Codex', cursor: 'Cursor',
+            aider: 'Aider', augment: 'Augment',
+          };
+          return map[s.tool] ?? s.tool;
+        }))];
+        const count = activeSessions.length;
+        sbAi.text = warnings.length
+          ? `$(warning) AI ${count || warnings.length}`
+          : `$(sparkle) AI ${count}`;
+        sbAi.tooltip = [
+          'Markr Context Bridge',
+          count ? `${count} active session${count === 1 ? '' : 's'}${toolLabels.length ? `: ${toolLabels.join(', ')}` : ''}` : '',
+          warnings.length ? `Context warnings: ${warnings.join(', ')}` : '',
+          'Click to open Context Bridge',
+        ].filter(Boolean).join('\n');
+        sbAi.backgroundColor = warnings.length
+          ? new vscode.ThemeColor('statusBarItem.warningBackground')
+          : undefined;
+        sbAi.show();
+      } else {
+        sbAi.hide();
+      }
+    } catch {
+      sbAi.hide();
+    }
+  }
+
+  // Refresh status bar every 30 s to stay in sync with session changes
+  const aiBarTimer = setInterval(updateAiStatusBar, 30_000);
+  context.subscriptions.push({ dispose: () => clearInterval(aiBarTimer) });
+  // Initial update after a short delay (provider needs to load sessions first).
+  // Track the timer so deactivation within 3 s doesn't fire on a disposed context.
+  const aiBarInitTimer = setTimeout(updateAiStatusBar, 3_000);
+  context.subscriptions.push({ dispose: () => clearTimeout(aiBarInitTimer) });
 
   /** Reveal and highlight the given URI in the Activity Bar. Shows the Markr panel. */
   function revealInExplorer(uri: vscode.Uri): void {
@@ -25,7 +124,7 @@ export async function activate(context: vscode.ExtensionContext) {
       const entry = explorerProvider.getFiles().find(f => f.uri.toString() === uriStr);
       if (!entry) return;
       // Pass active=true so the revealed item has the highlight icon
-      treeView.reveal(new MarkrFileItem(entry, true), { select: true, focus: false }).catch(() => {});
+      Promise.resolve(treeView.reveal(new MarkrFileItem(entry, true), { select: true, focus: false })).catch(() => {});
     }, () => {});
   }
 
@@ -85,6 +184,7 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
   // openFile: called from tree view item click or context menu
+  // Handles both markdown AND non-markdown AI configs (mcp.json, .env, etc.)
   context.subscriptions.push(
     vscode.commands.registerCommand('markr.openFile', async (uri: vscode.Uri) => {
       try {
@@ -101,22 +201,26 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('markr.newAiConfig', async () => {
       // Step 1: pick type
-      const typeOptions = Object.entries(AI_CONFIG_TEMPLATES).map(([key, t]) => ({
+      type ConfigPick = vscode.QuickPickItem & {
+        key: string;
+        filename: string;
+        template: string;
+      };
+
+      const typeOptions: ConfigPick[] = Object.entries(AI_CONFIG_TEMPLATES).map(([key, t]) => ({
         label: `$(star) ${t.filename}`,
         description: t.description,
         detail: `Creates ${t.filename} with a starter template`,
         key,
         filename: t.filename,
-        kind: t.kind,
         template: t.template,
       }));
-      const customOption = {
+      const customOption: ConfigPick = {
         label: '$(file-add) Custom name…',
         description: 'Create a new Markdown file with a custom name',
         detail: 'You will be prompted for the filename',
         key: '__custom__',
         filename: '',
-        kind: '',
         template: '',
       };
 
@@ -316,14 +420,12 @@ export async function activate(context: vscode.ExtensionContext) {
   // ── Document listeners ─────────────────────────────────────────────────────
   context.subscriptions.push(
     vscode.workspace.onDidChangeTextDocument(({ document }) => {
-      // Content changed in the SAME file — only re-renders if Markr is showing it
       if (document.languageId === 'markdown') MarkdownPreviewPanel.update(document);
     }),
     vscode.window.onDidChangeActiveTextEditor(editor => {
-      // User switched to a different editor — Markr follows
       if (editor?.document.languageId === 'markdown') {
         MarkdownPreviewPanel.followEditor(editor.document);
-        explorerProvider.setActiveFile(editor.document.uri.toString()); // update ◉ indicator
+        explorerProvider.setActiveFile(editor.document.uri.toString());
       }
     }),
     vscode.window.onDidChangeTextEditorSelection(event => {

@@ -36,6 +36,23 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 
 ## See it in action
 
+<!-- ── NEW in v5.0 — Context Bridge ────────────────────────────────────── -->
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-15-context-bridge.gif" alt="Context Bridge — see every AI session across Claude Code, Cursor, Augment & Codex, then hand off to another tool" width="100%" />
+<p align="center"><sub>✦ <b>NEW in 5.0 (beta) — Context Bridge.</b> See every AI coding session across Claude Code, Cursor, Augment & Codex in one sidebar. Pick one, hand it off to another tool, and Markr writes a <b>Conditional Residual Handoff</b> — decisions, dead-ends, constraints & the uncommitted git diff, not a chat dump.</sub></p>
+
+<br/>
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-16-ai-health.gif" alt="AI Config Health — score your CLAUDE.md / .cursorrules workspace out of 100 with concrete findings" width="100%" />
+<p align="center"><sub>✦ <b>AI Config Health.</b> Score your AI config workspace out of 100 — findings flag missing testing guidance, secrets in config, absent verification commands, with concrete fixes ranked by severity.</sub></p>
+
+<br/>
+
+<img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-17-config-bundle.gif" alt="Copy AI Workspace Bundle — concatenate every AI config into one readiness-scored doc" width="100%" />
+<p align="center"><sub>✦ <b>Copy AI Workspace Bundle.</b> One click concatenates CLAUDE.md, .cursorrules, agent.md & more into a single readiness-scored doc — paste it into any AI to onboard it to your repo instantly.</sub></p>
+
+<br/>
+
 <!-- ── NEW in v4.x ─────────────────────────────────────────────────────── -->
 
 <img src="https://raw.githubusercontent.com/Apptware-Product-Labs/markr/main/images/screenshots/gif-14-token-breakdown.gif" alt="Token section breakdown — click the token count to see which section costs the most" width="100%" />
@@ -148,6 +165,42 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 ---
 
 ## Features
+
+### 🔀 Context Bridge — Switch AI tools without losing context _(NEW in 5.0, beta)_
+
+The **Context Bridge** sidebar reads the session transcripts your AI coding tools already write to disk — **Claude Code, Cursor, Augment, Codex, and Aider** — and shows them all in one place: which project, which task, how many tokens, and which are live right now. No setup, no daemon, nothing sent anywhere — it only reads what's already on your machine.
+
+When you switch tools, pick a session and **hand it off**. Markr generates a **Conditional Residual Handoff (CRH)** — a handoff format built on two proven foundations (Slepian–Wolf conditional source coding + the I-PASS clinical handoff protocol). Instead of dumping the chat, it transmits only what the next tool **can't re-derive by reading your repo**:
+
+- **🧠 Decision log** — the decisions made and *why* (the reasoning behind the current code)
+- **🛑 Dead-ends** — approaches already tried and abandoned, so the next agent doesn't repeat them
+- **📌 Constraints** — the hard requirements you stated
+- **🔀 In-flight diff** — your uncommitted `git` changes (what reading committed code can't show)
+- **📁 Pointers, not payload** — file lists the next tool reads itself, so the handoff stays lean
+- **✅ Receiver synthesis** — the paste-ready prompt makes the next tool restate the task before it acts
+
+Copy it to your clipboard, paste into Claude Code / Cursor / Augment / Codex / ChatGPT, and keep going — no context lost, no browser tab-hopping.
+
+> _Beta:_ decision/dead-end extraction is heuristic and improving. Feedback welcome.
+
+---
+
+### ❤️ AI Config Health — score your agent setup
+
+Click the **pulse** icon in the Markr sidebar to score your AI config workspace out of 100. Markr scans your `CLAUDE.md`, `.cursorrules`, `agent.md` and friends and surfaces findings ranked by severity:
+
+- **Critical / High** — secrets committed in config, missing verification commands
+- **Medium** — no testing guidance, no "what to run before finishing" bar
+- **Score + token total** — how heavy your AI context docs are, at a glance
+- **Prioritized fixes** — what to address first, with concrete recommendations
+
+---
+
+### 📦 Copy AI Workspace Bundle
+
+One click concatenates every AI config file in your workspace — `CLAUDE.md`, `.cursorrules`, `agent.md`, `skill.md`, and more — into a single, readiness-scored Markdown bundle on your clipboard. Paste it into any AI to onboard it to your repo's conventions instantly. (Capped at the first 20 files to stay usable.)
+
+---
 
 ### 🤖 Markr is the Editor for AI Config Files
 
