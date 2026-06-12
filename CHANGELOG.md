@@ -7,6 +7,41 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [5.0.0] — 2026-06-10 _(beta — published as a Marketplace pre-release)_
+
+> **5.0.0 headline: Context Bridge.** See every AI coding session across Claude Code, Cursor, Augment, Codex & Aider in one sidebar, and hand any of them off to another tool with a Conditional Residual Handoff. Published as a pre-release (`vsce publish --pre-release`) — `package.json` stays at the clean semver `5.0.0` because the Marketplace does not accept a `-beta` suffix.
+
+### Added — Context Bridge: Conditional Residual Handoff (CRH) — _beta_
+- **CRH handoff engine** — handoffs now transmit the _residual_ (what the repo can't tell the next agent) rather than re-dumping the chat. Built on two proven foundations: Slepian–Wolf conditional source coding (don't send what the decoder can re-derive) and the I-PASS clinical handoff protocol (receiver synthesis).
+- **🧠 Decision log** — decisions + their rationale mined from the full transcript (the "why" behind the current code, unrecoverable from reading the repo).
+- **🛑 Dead-ends** — failed approaches the next agent must not retry.
+- **📌 Constraints** — hard requirements stated by the user, with a pasted-content reject filter to cut review-bot/log noise.
+- **🔀 In-flight delta** — live `git branch` + `git status` + `git diff --stat HEAD` captured at handoff time (the uncommitted work reading committed code can't show).
+- **Pointers, not payload** — modified-file lists are emitted as "read these" pointers for repo-aware targets; repo-less targets (ChatGPT) get a different framing.
+- **Receiver synthesis** — the paste block ends by requiring the receiver to restate the task + the one constraint before acting.
+
+### Improved
+- **Task de-contamination** — `chooseTask` detects throwaway last messages ("commit msg?", "any change on google app?") and leads with the real task.
+- **Cleaner Claude session titles** — `deriveClaudeTitle` skips the continuation-summary / system preamble and shows the first real instruction line.
+- **Reliable Claude Code coverage** — the session cap is now project-aware: open-workspace sessions are never dropped; the cap (raised 30 → 50) only bounds the long tail of other projects.
+- **Augment activity capture** — tool records (`apply_patch` / `launch-process` / `view`) are keyed by `tool_name`, and both `.log` (WAL) and `.ldb` (SSTable) files are scanned, so modified-file lists are accurate.
+
+### Fixed
+- **Copy-as-image clipping** — tall sections were cut off because the PNG was sized from the live-preview height, not the export height. The renderer now measures the true rendered height off-screen with the export stylesheet, so nothing is clipped.
+
+### Tests
+- Added Vitest unit suite (`src/sessionReader.test.ts`, 24 tests) covering title derivation, task de-contamination, decision/dead-end/constraint mining, and handoff document structure. Run with `npm test`.
+
+## [4.7.0] — 2026-06-07
+
+### Added
+- **MCP Config viewer** — open any `mcp.json` or `.mcp.json` in Markr and see each MCP server rendered as a card showing: name, transport (stdio/SSE), enabled status, command, environment variables (values masked), and tool count.
+- **`.env` file viewer** — open `.env` / `.env.local` / `.env.production` in Markr. Keys shown in plain text, values masked with `••••••`. Click 👁 to reveal individual values.
+- **Generic JSON viewer** — any JSON file opens as a collapsible key-value tree with syntax highlighting (strings, numbers, booleans, null each in distinct colors).
+- **Activity Bar detection** — `mcp.json`, `.mcp.json`, `.env.*`, and `.windsurfrules` files now appear in the Markr file tree with appropriate AI kind badges (MCP, Env).
+- **Editor title icon** — Markr's ◈ icon now appears on `mcp.json`, `.mcp.json`, and `.env` files in the editor tab bar.
+- **`src/webview/jsonRenderer.ts`** — new pure-function module for JSON/MCP/env rendering (no VS Code APIs — fully testable).
+
 ## [4.6.0] — 2026-06-07
 
 ### Added

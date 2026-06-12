@@ -1,8 +1,8 @@
 {
   "name": "markr",
   "displayName": "Markr – AI Config Editor & Markdown Preview",
-  "description": "The AI config editor & Markdown preview for VS Code — auto-opens CLAUDE.md / .cursorrules / agent.md in split-edit mode, real-time Agent Watch (live preview while Claude edits), copy diagrams as PNG, rich copy to Slack, Mermaid, TOC, themes, PDF export",
-  "version": "4.6.0",
+  "description": "The AI config editor & Markdown preview for VS Code — Context Bridge hands off AI sessions between Claude Code, Cursor, Augment & Codex; auto-opens CLAUDE.md / .cursorrules / agent.md in split-edit mode, real-time Agent Watch, copy diagrams as PNG, Mermaid, TOC, themes, PDF export",
+  "version": "5.0.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
@@ -72,13 +72,23 @@
     "ai docs",
     "llm",
     "context window",
-    "token counter"
+    "token counter",
+    "context bridge",
+    "session handoff",
+    "ai handoff",
+    "context handoff",
+    "augment",
+    "codex"
   ],
   "activationEvents": [
     "onLanguage:markdown",
     "onView:markrExplorer",
+    "onView:markrContextBridge",
     "onCommand:markr.newAiConfig",
-    "onCommand:markr.openFile"
+    "onCommand:markr.openFile",
+    "onCommand:markr.openContextBridge",
+    "onCommand:markr.openAiHealth",
+    "onCommand:markr.copyAiConfigBundle"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -96,7 +106,17 @@
         {
           "id": "markrExplorer",
           "name": "Markdown & AI Configs",
-          "contextualTitle": "Markr"
+          "contextualTitle": "Markr",
+          "initialSize": 1,
+          "visibility": "visible"
+        },
+        {
+          "id": "markrContextBridge",
+          "name": "Context Bridge",
+          "type": "webview",
+          "contextualTitle": "Markr — Context Bridge",
+          "initialSize": 1,
+          "visibility": "visible"
         }
       ]
     },
@@ -107,7 +127,7 @@
         "category": "Markr",
         "icon": {
           "light": "images/markr-icon-light.svg",
-          "dark":  "images/markr-icon-dark.svg"
+          "dark": "images/markr-icon-dark.svg"
         }
       },
       {
@@ -145,6 +165,30 @@
         "title": "Search Files",
         "category": "Markr",
         "icon": "$(search)"
+      },
+      {
+        "command": "markr.openContextBridge",
+        "title": "Open Context Bridge",
+        "category": "Markr",
+        "icon": "$(arrow-swap)"
+      },
+      {
+        "command": "markr.openAiHealth",
+        "title": "Open AI Config Health",
+        "category": "Markr",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "markr.copyAiConfigBundle",
+        "title": "Copy AI Workspace Bundle",
+        "category": "Markr",
+        "icon": "$(package)"
+      },
+      {
+        "command": "markr.refreshContextBridge",
+        "title": "Refresh Context Bridge",
+        "category": "Markr",
+        "icon": "$(refresh)"
       }
     ],
     "menus": {
@@ -160,9 +204,24 @@
           "group": "navigation@2"
         },
         {
-          "command": "markr.refreshExplorer",
+          "command": "markr.openAiHealth",
           "when": "view == markrExplorer",
           "group": "navigation@3"
+        },
+        {
+          "command": "markr.copyAiConfigBundle",
+          "when": "view == markrExplorer",
+          "group": "navigation@4"
+        },
+        {
+          "command": "markr.refreshExplorer",
+          "when": "view == markrExplorer",
+          "group": "navigation@5"
+        },
+        {
+          "command": "markr.refreshContextBridge",
+          "when": "view == markrContextBridge",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
@@ -245,14 +304,17 @@
     "vscode:prepublish": "node esbuild.js --minify",
     "build": "node esbuild.js",
     "watch": "node esbuild.js --watch",
-    "package": "npx @vscode/vsce package --no-dependencies"
+    "package": "npx @vscode/vsce package --no-dependencies",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^18.0.0",
     "@types/vscode": "^1.80.0",
     "esbuild": "^0.19.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
     "highlight.js": "^11.9.0",

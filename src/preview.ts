@@ -7,7 +7,6 @@ import * as os from 'os';
 import * as nodePath from 'path';
 import * as fs from 'fs';
 
-
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface FileEntry {
@@ -306,8 +305,8 @@ function buildPdfHtml(content: string, title: string): string {
   .gh-alert.note .gh-alert-title { color: #0969da; }
   .gh-alert.tip { background: rgba(26,127,55,.07); border-color: #1a7f37; }
   .gh-alert.tip .gh-alert-title { color: #1a7f37; }
-  .gh-alert.important { background: rgba(130,80,223,.07); border-color: #8250df; }
-  .gh-alert.important .gh-alert-title { color: #8250df; }
+  .gh-alert.important { background: rgba(249,115,22,.08); border-color: #EA580C; }
+  .gh-alert.important .gh-alert-title { color: #EA580C; }
   .gh-alert.warning { background: rgba(154,103,0,.07); border-color: #9a6700; }
   .gh-alert.warning .gh-alert-title { color: #9a6700; }
   .gh-alert.caution { background: rgba(207,34,46,.07); border-color: #cf222e; }
@@ -337,10 +336,10 @@ function buildPdfHtml(content: string, title: string): string {
 const CSS = /* css */`
 /* === Tokens (Light) ========================================================*/
 [data-m="light"] {
-  --accent:       #F97316;
-  --accent-dim:   #C2570A;
-  --accent-bg:    rgba(249,115,22,0.08);
-  --accent-border: rgba(249,115,22,0.3);
+  --accent:       #EA580C;
+  --accent-dim:   #C2410C;
+  --accent-bg:    rgba(249,115,22,0.10);
+  --accent-border: rgba(249,115,22,0.34);
   --text:         #1c1a17;
   --text-2:       #4a4540;
   --text-muted:   #888178;
@@ -453,9 +452,9 @@ const CSS = /* css */`
 /* === Tokens (Dark) =========================================================*/
 [data-m="dark"] {
   --accent:       #FB923C;
-  --accent-dim:   #EA7E28;
-  --accent-bg:    rgba(251,146,60,0.1);
-  --accent-border: rgba(251,146,60,0.3);
+  --accent-dim:   #F97316;
+  --accent-bg:    rgba(251,146,60,0.12);
+  --accent-border: rgba(251,146,60,0.36);
   --text:         #e8e3dc;
   --text-2:       #b5afa8;
   --text-muted:   #7e7970;
@@ -489,7 +488,10 @@ const CSS = /* css */`
 html { scroll-behavior: smooth; }
 body {
   margin: 0; padding: 0;
-  background: var(--bg); color: var(--text);
+  background:
+    radial-gradient(circle at 0 0, rgba(249,115,22,.10), transparent 28%),
+    var(--bg);
+  color: var(--text);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   font-size: 15px; line-height: 1.6;
   -webkit-font-smoothing: antialiased; overflow: hidden;
@@ -500,15 +502,18 @@ body {
   position: fixed; inset: 0 0 auto 0; height: 42px;
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 8px;
-  background: var(--vscode-editor-background, var(--bg));
-  border-bottom: 1px solid var(--border); z-index: 300; gap: 4px; user-select: none;
+  background:
+    linear-gradient(90deg, rgba(249,115,22,.13), rgba(250,204,21,.05) 36%, transparent 72%),
+    var(--vscode-editor-background, var(--bg));
+  border-bottom: 1px solid var(--accent-border); z-index: 300; gap: 4px; user-select: none;
+  box-shadow: 0 8px 26px rgba(0,0,0,.10);
 }
 .tl { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
 .tr { display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
 .logo-mark {
   display: inline-flex; align-items: center; gap: 5px;
-  font-weight: 700; font-size: 13px; letter-spacing: -0.3px; white-space: nowrap;
-  background: linear-gradient(120deg, #F97316 0%, #EF4444 100%);
+  font-weight: 850; font-size: 13px; letter-spacing: -0.25px; white-space: nowrap;
+  background: linear-gradient(120deg, #F97316 0%, #FACC15 48%, #C2410C 100%);
   -webkit-background-clip: text; -webkit-text-fill-color: transparent;
   background-clip: text; flex-shrink: 0;
 }
@@ -520,10 +525,12 @@ body {
   overflow: hidden; text-overflow: ellipsis; max-width: 200px;
 }
 .ai-badge {
-  display: inline-flex; align-items: center; gap: 2px; font-size: 9.5px;
-  font-weight: 700; letter-spacing: 0.05em; color: var(--accent);
-  background: var(--accent-bg); border: 1px solid var(--accent);
-  border-radius: 3px; padding: 1px 4px; white-space: nowrap; flex-shrink: 0; opacity: 0.85;
+  display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px;
+  font-weight: 850; letter-spacing: 0.07em; color: #fff;
+  background: linear-gradient(135deg, #F97316, #C2410C);
+  border: 1px solid rgba(250,204,21,.45);
+  border-radius: 999px; padding: 2px 7px; white-space: nowrap; flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(249,115,22,.12), 0 6px 16px rgba(194,65,12,.22);
 }
 .stats {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -579,6 +586,8 @@ body {
   font-size: 11px; color: var(--text-muted);
 }
 .tok-panel-total strong { color: var(--accent); font-size: 12.5px; }
+
+
 
 .save-status {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
@@ -670,15 +679,15 @@ body:not(.edit-mode) #btn-save-file { display: none; }
 .sep-v { width: 1px; height: 16px; background: var(--border); margin: 0 3px; flex-shrink: 0; }
 .tb-btn {
   display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px;
-  border: 1px solid var(--border-faint); border-radius: 4px; font-size: 11.5px; font-family: inherit;
-  cursor: pointer; color: var(--vscode-foreground, var(--text)); background: rgba(127,127,127,0.04);
+  border: 1px solid var(--border-faint); border-radius: 7px; font-size: 11.5px; font-family: inherit;
+  cursor: pointer; color: var(--vscode-foreground, var(--text)); background: rgba(127,127,127,0.045);
   white-space: nowrap; transition: background 0.1s, color 0.1s, border-color 0.1s, box-shadow 0.1s; line-height: 1; height: 26px; flex-shrink: 0;
 }
-.tb-btn:hover { background: var(--vscode-toolbar-hoverBackground, var(--bg-hover)); border-color: var(--border); box-shadow: inset 0 0 0 1px var(--border-faint); }
+.tb-btn:hover { background: var(--vscode-toolbar-hoverBackground, var(--bg-hover)); border-color: var(--accent-border); box-shadow: inset 0 0 0 1px var(--border-faint), 0 0 0 3px var(--accent-bg); }
 .tb-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .tb-btn.on { background: var(--accent-bg); color: var(--accent); border-color: var(--accent-border); }
-.tb-btn.accent { background: var(--accent); color: #fff; font-weight: 600; }
-.tb-btn.accent:hover { background: var(--accent-dim); }
+.tb-btn.accent { background: linear-gradient(135deg, #F97316, #C2410C); color: #fff; font-weight: 750; border-color: rgba(250,204,21,.40); box-shadow: 0 6px 16px rgba(194,65,12,.20); }
+.tb-btn.accent:hover { background: linear-gradient(135deg, #FB923C, #EA580C); }
 .tb-btn svg { flex-shrink: 0; }
 
 /* === Format Toolbar ========================================================*/
@@ -730,8 +739,7 @@ body.edit-mode #outer-layout { margin-top: 78px; height: calc(100vh - 78px); }
 body.sb-resizing { cursor: col-resize !important; user-select: none; }
 .sb-section { display: flex; flex-direction: column; border-bottom: 1px solid var(--border); min-height: 0; }
 .sb-section.flex-fill { flex: 1; overflow: hidden; }
-#sec-toc { flex: 1 1 auto; min-height: 120px; overflow: hidden; }
-#sidebar.no-toc #sec-toc { flex: 0 0 auto; min-height: 0; }
+#sec-toc     { flex: 1 1 auto; min-height: 120px; overflow: hidden; }
 .sb-header {
   display: flex; align-items: center; padding: 0 10px 0 12px; height: 32px;
   gap: 4px; flex-shrink: 0; cursor: pointer; user-select: none;
@@ -803,8 +811,8 @@ body.resizing-split #split-resizer { background: var(--accent-bg); }
 .gh-alert.note .gh-alert-title { color: #0969da; }
 .gh-alert.tip       { background: rgba(26,127,55,.07);  border-color: #1a7f37; }
 .gh-alert.tip .gh-alert-title { color: #1a7f37; }
-.gh-alert.important { background: rgba(130,80,223,.07); border-color: #8250df; }
-.gh-alert.important .gh-alert-title { color: #8250df; }
+.gh-alert.important { background: rgba(249,115,22,.08); border-color: #EA580C; }
+.gh-alert.important .gh-alert-title { color: #EA580C; }
 .gh-alert.warning   { background: rgba(154,103,0,.07);  border-color: #9a6700; }
 .gh-alert.warning .gh-alert-title { color: #9a6700; }
 .gh-alert.caution   { background: rgba(207,34,46,.07);  border-color: #cf222e; }
@@ -889,6 +897,10 @@ body.resizing-split #split-resizer { background: var(--accent-bg); }
 .markdown-body h1:first-child,.markdown-body h2:first-child,.markdown-body h3:first-child { margin-top: 0; }
 .markdown-body h1 { font-size: 2em; }
 .markdown-body h2 { font-size: 1.5em; padding-bottom: .35em; border-bottom: 1px solid var(--border); }
+.markdown-body h2::after {
+  content: ""; position: absolute; left: 0; bottom: -1px; width: 54px; height: 2px;
+  border-radius: 999px; background: linear-gradient(90deg, #F97316, #FACC15);
+}
 .markdown-body h3 { font-size: 1.25em; }
 .markdown-body h4 { font-size: 1em; }
 .markdown-body h5 { font-size: .875em; }
@@ -900,6 +912,18 @@ body.resizing-split #split-resizer { background: var(--accent-bg); }
 h1:hover .h-anchor,h2:hover .h-anchor,h3:hover .h-anchor,
 h4:hover .h-anchor,h5:hover .h-anchor,h6:hover .h-anchor { opacity: 1; }
 .h-anchor:hover { color: var(--accent); }
+.section-copy-btn {
+  opacity: .58; margin-left: 8px; padding: 2px 6px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--bg-panel); color: var(--text-muted);
+  font: inherit; font-size: 11px; font-weight: 500; line-height: 1.4;
+  cursor: pointer; vertical-align: middle;
+  transition: opacity 0.15s, color 0.15s, background 0.15s;
+}
+h1:hover .section-copy-btn,h2:hover .section-copy-btn,h3:hover .section-copy-btn,
+h4:hover .section-copy-btn,h5:hover .section-copy-btn,h6:hover .section-copy-btn { opacity: 1; }
+.section-copy-btn:hover { color: var(--text); background: var(--bg-hover); }
+.section-copy-btn.done { color: var(--success); }
 .markdown-body p { margin-top: 0; margin-bottom: 16px; line-height: 1.75; }
 .markdown-body strong { font-weight: 600; }
 .markdown-body em { font-style: italic; }
@@ -907,7 +931,11 @@ h4:hover .h-anchor,h5:hover .h-anchor,h6:hover .h-anchor { opacity: 1; }
 .markdown-body a { color: var(--link); text-decoration: none; }
 .markdown-body a:hover { color: var(--link-hv); text-decoration: underline; }
 .markdown-body code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; font-size: 85%; padding: .2em .4em; background: var(--code-inline); border-radius: 4px; }
-.markdown-body pre { position: relative; margin: 0 0 16px; padding: 16px; overflow: auto; font-size: 84%; line-height: 1.65; background: var(--code-bg); border-radius: 8px; border: 1px solid var(--border); }
+.markdown-body pre {
+  position: relative; margin: 0 0 16px; padding: 16px; overflow: auto; font-size: 84%; line-height: 1.65;
+  background: linear-gradient(180deg, rgba(249,115,22,.035), transparent 60%), var(--code-bg);
+  border-radius: 10px; border: 1px solid var(--border);
+}
 .markdown-body pre code { padding: 0; margin: 0; background: transparent; border-radius: 0; font-size: 100%; white-space: pre; word-break: normal; overflow-wrap: normal; color: inherit; }
 .copy-btn {
   padding: 3px 6px; font-size: 11px; font-family: inherit;
@@ -917,7 +945,12 @@ h4:hover .h-anchor,h5:hover .h-anchor,h6:hover .h-anchor { opacity: 1; }
 }
 .copy-btn:hover { color: var(--text); background: var(--bg-hover); }
 .copy-btn.done { color: var(--success); }
-.markdown-body blockquote { margin: 0 0 16px; padding: 10px 16px; color: var(--text-muted); border-left: 3px solid var(--accent); background: var(--accent-bg); border-radius: 0 6px 6px 0; }
+.markdown-body blockquote {
+  margin: 0 0 16px; padding: 11px 16px; color: var(--text-muted);
+  border-left: 3px solid var(--accent); background: var(--accent-bg);
+  border-radius: 0 10px 10px 0;
+  box-shadow: inset 0 0 0 1px rgba(249,115,22,.07);
+}
 .markdown-body blockquote > :first-child { margin-top: 0; }
 .markdown-body blockquote > :last-child { margin-bottom: 0; }
 .markdown-body ul,.markdown-body ol { margin-top: 0; margin-bottom: 16px; padding-left: 2em; }
@@ -930,14 +963,20 @@ h4:hover .h-anchor,h5:hover .h-anchor,h6:hover .h-anchor { opacity: 1; }
 .markdown-body img { max-width: 100%; border-style: none; border-radius: 6px; }
 .markdown-body hr { height: 1px; padding: 0; margin: 24px 0; background: var(--border); border: 0; }
 .table-wrap { position: relative; margin-bottom: 16px; overflow-x: auto; }
+.rich-copy-wrap { position: relative; margin-bottom: 16px; }
+.rich-copy-wrap > blockquote,
+.rich-copy-wrap > ul,
+.rich-copy-wrap > ol { margin-bottom: 0; }
 /* Button group for table — flex row at top-right, same hover-reveal pattern as Mermaid */
 .el-btn-group {
   position: absolute; top: 5px; right: 5px; z-index: 2;
   display: flex; gap: 3px; align-items: center;
-  opacity: 0; transition: opacity 0.15s;
+  opacity: .72; transition: opacity 0.15s, transform 0.15s;
+  transform: translateY(0);
 }
 .table-wrap:hover .el-btn-group,
-pre:hover .el-btn-group { opacity: 1; }
+.rich-copy-wrap:hover .el-btn-group,
+pre:hover .el-btn-group { opacity: 1; transform: translateY(-1px); }
 /* Buttons inside a group don't need absolute positioning */
 .el-btn-group .copy-btn { position: static; opacity: 1; }
 .img-copy-btn {
@@ -1017,18 +1056,16 @@ pre:hover .el-btn-group { opacity: 1; }
   font-size: 11px; color: var(--text-muted); min-width: 36px; text-align: center;
 }
 .mermaid-modal-body {
-  /* flex-centering keeps every diagram centred; overflow:auto scrolls when zoomed in */
   overflow: auto; padding: 20px; flex: 1;
-  display: flex; justify-content: center; align-items: flex-start;
+  scroll-behavior: auto; overscroll-behavior: contain;
 }
 .mermaid-modal-body .mermaid-zoom-inner {
-  /* pixel-sized by JS (nw*zoom × nh*zoom) — shrinks and grows for real scrollbars */
-  flex-shrink: 0;
+  /* Pixel-sized by JS. margin:auto keeps small diagrams centred without shifting scroll origin. */
+  margin: 0 auto;
+  transform-origin: 0 0;
 }
 .mermaid-modal-body .mermaid-zoom-inner svg {
-  /* pixel size set by JS; viewBox handles aspect-ratio scaling */
-  display: block;
-  transition: width 0.12s ease, height 0.12s ease;
+  display: block; width: 100%; height: 100%;
 }
 .mermaid-modal-close {
   background: none; border: none; font-size: 18px; line-height: 1;
@@ -1138,7 +1175,7 @@ body.has-tabs #fmt-toolbar { top: 78px; }
 
 /* === Print =================================================================*/
 @media print {
-  #toolbar,#fmt-toolbar,#sidebar,#top-btn,.copy-btn,.h-anchor { display: none !important; }
+  #toolbar,#fmt-toolbar,#sidebar,#top-btn,.copy-btn,.h-anchor,.section-copy-btn { display: none !important; }
   body,html { overflow: visible; height: auto; }
   #outer-layout { height: auto; overflow: visible; }
   #scroller { overflow: visible; }
@@ -1380,7 +1417,7 @@ const SCRIPT = /* javascript */`
       li.className = 'toc-item h' + h.tagName[1];
       const a = document.createElement('a');
       a.href = '#' + h.id;
-      a.textContent = (h.textContent || '').replace(/#\\s*$/, '').trim();
+      a.textContent = cleanHeadingText(h).replace(/#\\s*$/, '').trim();
       a.addEventListener('click', function(e) {
         e.preventDefault();
         var hId = h.id;
@@ -1526,6 +1563,85 @@ const SCRIPT = /* javascript */`
     btn.classList.add('done');
     setTimeout(() => { btn.innerHTML = IMG_ICON + ' Image'; btn.classList.remove('done'); }, 2200);
   }
+  async function copyRichElement(btn, el, label) {
+    var html = el.outerHTML;
+    var text = (el.innerText || el.textContent || '').trim();
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html':  new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+        })
+      ]);
+    } catch {
+      await navigator.clipboard.writeText(text);
+    }
+    flashCopyBtn(btn, label);
+  }
+
+  function cleanHeadingText(h) {
+    var clone = h.cloneNode(true);
+    clone.querySelectorAll('.h-anchor,.section-copy-btn').forEach(function(el) { el.remove(); });
+    return (clone.textContent || '').trim();
+  }
+
+  function sectionTextFromHeading(h) {
+    var level = Number(h.tagName.slice(1)) || 1;
+    var lines = [cleanHeadingText(h)];
+    var node = h.nextElementSibling;
+    while (node) {
+      if (/^H[1-6]$/.test(node.tagName)) {
+        var nextLevel = Number(node.tagName.slice(1)) || 1;
+        if (nextLevel <= level) break;
+      }
+      var clone = node.cloneNode(true);
+      clone.querySelectorAll('.el-btn-group,.copy-btn,.img-copy-btn,.section-copy-btn,.h-anchor').forEach(function(el) { el.remove(); });
+      var text = (clone.innerText || clone.textContent || '').trim();
+      if (text) lines.push(text);
+      node = node.nextElementSibling;
+    }
+    return lines.join('\\n\\n').trim();
+  }
+  function sectionHtmlFromHeading(h) {
+    var level = Number(h.tagName.slice(1)) || 1;
+    var container = document.createElement('div');
+    var hClone = h.cloneNode(true);
+    hClone.querySelectorAll('.el-btn-group,.copy-btn,.img-copy-btn,.section-copy-btn,.h-anchor').forEach(function(el) { el.remove(); });
+    container.appendChild(hClone);
+    var node = h.nextElementSibling;
+    while (node) {
+      if (/^H[1-6]$/.test(node.tagName)) {
+        var nextLevel = Number(node.tagName.slice(1)) || 1;
+        if (nextLevel <= level) break;
+      }
+      var clone = node.cloneNode(true);
+      clone.querySelectorAll('.el-btn-group,.copy-btn,.img-copy-btn,.section-copy-btn,.h-anchor').forEach(function(el) { el.remove(); });
+      container.appendChild(clone);
+      node = node.nextElementSibling;
+    }
+    return container.innerHTML;
+  }
+
+  async function copySection(btn, h) {
+    var text = sectionTextFromHeading(h);
+    var html = sectionHtmlFromHeading(h);
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html':  new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+        })
+      ]);
+    } catch {
+      await navigator.clipboard.writeText(text);
+    }
+    btn.textContent = 'Copied';
+    btn.classList.add('done');
+    setTimeout(function() {
+      btn.textContent = 'Copy section';
+      btn.classList.remove('done');
+    }, 1800);
+  }
 
   // Convert an HTML table to tab-separated text (paste into spreadsheets)
   function tableToTsv(table) {
@@ -1544,7 +1660,6 @@ const SCRIPT = /* javascript */`
     var pad  = 20;
     var rect = el.getBoundingClientRect();
     var w    = Math.ceil(rect.width)  + pad * 2;
-    var h    = Math.ceil(rect.height) + pad * 2;
     var scale = 2;
 
     var cs  = getComputedStyle(document.documentElement);
@@ -1562,36 +1677,68 @@ const SCRIPT = /* javascript */`
     var ff = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     var mono = 'ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
 
-    // Build self-contained CSS — no CSS variables (foreignObject can't resolve them)
+    // Self-contained CSS, SCOPED under .markr-exp so the exact same stylesheet
+    // can be used to MEASURE the real content height off-screen before render.
+    // (The old code trusted el.getBoundingClientRect().height, measured under the
+    //  live preview CSS — different spacing than the export CSS — so tall content
+    //  overflowed the fixed-height foreignObject and got clipped at the bottom.)
     var css = '* { box-sizing: border-box; }'
       + 'html, body { margin: 0; padding: 0; background: ' + bg + '; }'
-      + 'body { padding: ' + pad + 'px; font-family: ' + ff + '; font-size: 14px; line-height: 1.6; color: ' + text + '; }'
+      + '.markr-exp { padding: ' + pad + 'px; font-family: ' + ff + '; font-size: 14px; line-height: 1.6; color: ' + text + '; background: ' + bg + '; }'
+      + '.markr-exp h1,.markr-exp h2,.markr-exp h3,.markr-exp h4 { line-height: 1.3; margin: 14px 0 8px; font-weight: 600; }'
+      + '.markr-exp h1:first-child,.markr-exp h2:first-child,.markr-exp h3:first-child { margin-top: 0; }'
+      + '.markr-exp ul,.markr-exp ol { margin: 0 0 8px; padding-left: 22px; }'
+      + '.markr-exp li { margin: 3px 0; }'
+      + '.markr-exp input[type=checkbox] { margin: 0 6px 0 0; vertical-align: middle; }'
+      + '.markr-exp hr { border: none; border-top: 1px solid ' + border + '; margin: 14px 0; }'
+      + '.markr-exp a { color: ' + accent + '; }'
       + (isTable
-          ? 'table { border-spacing: 0; border-collapse: collapse; border-radius: 6px; border: 1px solid ' + border + '; overflow: hidden; }'
-          + 'th { font-weight: 600; padding: 8px 14px; border-bottom: 2px solid ' + border + '; text-align: left; background: ' + bgSubtle + '; color: ' + text + '; white-space: nowrap; }'
-          + 'td { padding: 7px 14px; border-bottom: 1px solid ' + borderFaint + '; color: ' + text + '; }'
-          + 'tr:last-child td { border-bottom: none; }'
-          + 'tr:nth-child(2n) td { background: ' + bgSubtle + '; }'
+          ? '.markr-exp table { border-spacing: 0; border-collapse: collapse; border-radius: 6px; border: 1px solid ' + border + '; overflow: hidden; }'
+          + '.markr-exp th { font-weight: 600; padding: 8px 14px; border-bottom: 2px solid ' + border + '; text-align: left; background: ' + bgSubtle + '; color: ' + text + '; white-space: nowrap; }'
+          + '.markr-exp td { padding: 7px 14px; border-bottom: 1px solid ' + borderFaint + '; color: ' + text + '; }'
+          + '.markr-exp tr:last-child td { border-bottom: none; }'
+          + '.markr-exp tr:nth-child(2n) td { background: ' + bgSubtle + '; }'
           : '')
       + (isPre
-          ? 'pre { margin: 0; padding: 18px; border-radius: 8px; background: ' + codeBg + '; border: 1px solid ' + borderFaint + '; }'
-          + 'code { font-family: ' + mono + '; font-size: 13px; line-height: 1.7; color: ' + text + '; white-space: pre-wrap; }'
+          ? '.markr-exp pre { margin: 0; padding: 18px; border-radius: 8px; background: ' + codeBg + '; border: 1px solid ' + borderFaint + '; }'
+          + '.markr-exp pre code { font-family: ' + mono + '; font-size: 13px; line-height: 1.7; color: ' + text + '; white-space: pre-wrap; word-break: break-word; background: none; border: none; padding: 0; }'
           : '')
-      + 'blockquote { margin: 0; padding: 10px 16px; color: ' + textMuted + '; border-left: 3px solid ' + accent + '; background: rgba(249,115,22,0.06); border-radius: 0 6px 6px 0; }'
-      + 'strong { font-weight: 600; } em { font-style: italic; }'
-      + 'code { font-family: ' + mono + '; font-size: 12px; background: ' + codeBg + '; padding: 1px 4px; border-radius: 3px; border: 1px solid ' + borderFaint + '; }'
-      + 'p { margin: 0 0 8px; } p:last-child { margin-bottom: 0; }';
+      + '.markr-exp blockquote { margin: 0 0 8px; padding: 10px 16px; color: ' + textMuted + '; border-left: 3px solid ' + accent + '; background: rgba(249,115,22,0.06); border-radius: 0 6px 6px 0; }'
+      + '.markr-exp strong { font-weight: 600; } .markr-exp em { font-style: italic; }'
+      + '.markr-exp code { font-family: ' + mono + '; font-size: 12px; background: ' + codeBg + '; padding: 1px 4px; border-radius: 3px; border: 1px solid ' + borderFaint + '; }'
+      + '.markr-exp p { margin: 0 0 8px; } .markr-exp p:last-child { margin-bottom: 0; }';
 
     // For code blocks: use plain text (hljs classes won't resolve inside foreignObject)
     var bodyContent = isPre
       ? '<pre><code>' + escHtml(el.querySelector('code') ? el.querySelector('code').textContent || '' : el.textContent || '') + '</code></pre>'
       : el.outerHTML;
 
+    // ── Measure TRUE rendered height off-screen with the export CSS ───────────
+    // Lay the content out at the export width under the export stylesheet and
+    // read back its real height, so the SVG is sized to fit — never clipped.
+    var h;
+    var measStyle = document.createElement('style');
+    measStyle.textContent = css;
+    var meas = document.createElement('div');
+    meas.className = 'markr-exp';
+    meas.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden;width:' + w + 'px;';
+    meas.innerHTML = bodyContent;
+    document.body.appendChild(measStyle);
+    document.body.appendChild(meas);
+    try {
+      h = Math.ceil(meas.getBoundingClientRect().height) + 2;
+    } finally {
+      document.body.removeChild(meas);
+      document.body.removeChild(measStyle);
+    }
+    // Fallback if measurement failed for any reason
+    if (!h || h < pad * 2) h = Math.ceil(rect.height) + pad * 2;
+
     var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">'
       + '<foreignObject x="0" y="0" width="' + w + '" height="' + h + '">'
       + '<html xmlns="http://www.w3.org/1999/xhtml">'
       + '<head><meta charset="utf-8"/><style>' + css + '</style></head>'
-      + '<body>' + bodyContent + '</body>'
+      + '<body class="markr-exp">' + bodyContent + '</body>'
       + '</html></foreignObject></svg>';
 
     var svgB64  = btoa(unescape(encodeURIComponent(svgStr)));
@@ -1641,6 +1788,22 @@ const SCRIPT = /* javascript */`
   }
 
   function addCopyButtons() {
+    // ── Heading section: copy heading + content until next sibling section ──
+    qsa('.markdown-body h1,.markdown-body h2,.markdown-body h3,.markdown-body h4,.markdown-body h5,.markdown-body h6').forEach(h => {
+      if (h.querySelector('.section-copy-btn')) return;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'section-copy-btn';
+      btn.textContent = 'Copy section';
+      btn.title = 'Copy this section';
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        copySection(btn, h);
+      });
+      h.appendChild(btn);
+    });
+
     // ── Code block: [Copy] [📷 Image] ───────────────────────────────────────
     qsa('pre').forEach(pre => {
       if (pre.querySelector('.copy-btn, .el-btn-group')) return; // already added
@@ -1694,6 +1857,23 @@ const SCRIPT = /* javascript */`
 
       group.appendChild(copyBtn);
       group.appendChild(imgBtn);
+      wrap.appendChild(group);
+    });
+
+    // ── Lists and blockquotes: rich copy for Slack / Google Chat / Docs ─────
+    qsa('.markdown-body blockquote,.markdown-body ul,.markdown-body ol').forEach(el => {
+      if (el.closest('.rich-copy-wrap') || el.closest('li')) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'rich-copy-wrap';
+      el.parentNode?.insertBefore(wrap, el);
+      wrap.appendChild(el);
+
+      const group = document.createElement('div');
+      group.className = 'el-btn-group';
+      const label = el.tagName === 'BLOCKQUOTE' ? 'Copy quote' : 'Copy list';
+      const copyBtn = makeCopyBtn(label);
+      copyBtn.addEventListener('click', () => copyRichElement(copyBtn, el, label));
+      group.appendChild(copyBtn);
       wrap.appendChild(group);
     });
   }
@@ -1781,24 +1961,26 @@ const SCRIPT = /* javascript */`
       "    if (!modal || !inner) return;",
       "    // Capture natural rendered dimensions BEFORE copying (SVG is live in the DOM)",
       "    const rect = svg.getBoundingClientRect();",
-      "    const nw = Math.round(rect.width)  || parseFloat(svg.getAttribute('width'))  || 800;",
-      "    const nh = Math.round(rect.height) || parseFloat(svg.getAttribute('height')) || 400;",
+      "    const vb = (svg.getAttribute('viewBox') || '').split(/\\s+/).map(Number);",
+      "    const vbw = vb.length === 4 && Number.isFinite(vb[2]) ? vb[2] : 0;",
+      "    const vbh = vb.length === 4 && Number.isFinite(vb[3]) ? vb[3] : 0;",
+      "    const nw = Math.round(rect.width)  || parseFloat(svg.getAttribute('width'))  || vbw || 800;",
+      "    const nh = Math.round(rect.height) || parseFloat(svg.getAttribute('height')) || vbh || 400;",
       "    inner.innerHTML = svg.outerHTML;",
       "    inner.dataset.nw = nw;",
       "    inner.dataset.nh = nh;",
+      "    inner.dataset.src = div.dataset.mermaidSrc || '';",
       "    // Ensure the copied SVG has a viewBox so pixel-based zoom scales correctly.",
       "    // Gantt charts often lack a viewBox; without it width/height changes don't scale content.",
       "    const s = inner.querySelector('svg');",
       "    if (s) {",
       "      if (!s.getAttribute('viewBox')) s.setAttribute('viewBox', '0 0 ' + nw + ' ' + nh);",
-      "      s.style.width  = nw + 'px';",
-      "      s.style.height = nh + 'px';",
       "    }",
       "    document.getElementById('mermaid-zoom-level').textContent = '100%';",
       "    modal.classList.add('open');",
-      "    // Reset scroll so the diagram starts at the top-left on every open",
       "    const body = modal.querySelector('.mermaid-modal-body');",
-      "    if (body) { body.scrollTop = 0; body.scrollLeft = 0; }",
+      "    document.dispatchEvent(new CustomEvent('markr-mermaid-opened'));",
+      "    if (body) { requestAnimationFrame(() => { body.scrollLeft = Math.max(0, (inner.offsetWidth - body.clientWidth) / 2); body.scrollTop = 0; }); }",
       "  }",
       "  div.addEventListener('click', openModal);",
       "  zoomBtn.addEventListener('click', openModal);",
@@ -2225,7 +2407,7 @@ const SCRIPT = /* javascript */`
     const md = (currentMarkdown || clipboardMarkdown).trim() ? (currentMarkdown || clipboardMarkdown) : clipboardMarkdown;
     if (md.trim()) vsc.postMessage({ type: 'saveClipboardAs', markdown: md });
   });
-  qs('#btn-dismiss-clipboard')?.addEventListener('click', () => {
+  function dismissClipboardPreview() {
     const banner = qs('#clipboard-banner');
     if (banner) banner.classList.remove('open');
     isClipboardMode = false;
@@ -2248,7 +2430,7 @@ const SCRIPT = /* javascript */`
       }
       updateStats(currentMarkdown);
       buildTOC(); addCopyButtons(); setupHeadingAnchors();
-      if (qs('#scroller .language-mermaid')) setupMermaid();
+      setupMermaid();
       // Restore previous edit state: re-enter edit mode if the previous file had it active
       if (prevTab.isAiConfig && !isAutoEditDismissed(prevTab.uri)) {
         if (!editMode) enterEditMode();
@@ -2257,8 +2439,12 @@ const SCRIPT = /* javascript */`
       }
     }
     prevEditModeBeforeClipboard = false;
+  }
+  qs('#btn-dismiss-clipboard')?.addEventListener('click', () => {
+    const md = (currentMarkdown || clipboardMarkdown).trim() ? (currentMarkdown || clipboardMarkdown) : clipboardMarkdown;
+    vsc.postMessage({ type: 'requestDismissClipboard', markdown: md });
   });
-  qs('#btn-copy-md')?.addEventListener('click', () => vsc.postMessage({ type: 'copyMarkdown' }));
+  qs('#btn-copy-md')?.addEventListener('click', () => vsc.postMessage({ type: 'copyMarkdown', markdown: currentMarkdown }));
   qs('#btn-source')?.addEventListener('click', () => {
     vsc.postMessage({ type: 'openInEditor', uri: activeTabUri });
   });
@@ -2377,6 +2563,7 @@ const SCRIPT = /* javascript */`
     if (!e.target.closest('#tok-panel') && !e.target.closest('#stat-tok')) closeTokPanel();
   });
 
+
   // ── Theme picker ───────────────────────────────────────────────────────────
   function applyTheme(t) {
     document.documentElement.setAttribute('data-m', t);
@@ -2431,7 +2618,7 @@ const SCRIPT = /* javascript */`
   });
 
   // Sync initial state on load
-  if (qs('#sec-toc')?.classList.contains('collapsed')) { qs('#sidebar')?.classList.add('no-toc'); }
+  if (qs('#sec-toc')?.classList.contains('collapsed'))      { qs('#sidebar')?.classList.add('no-toc'); }
 
   // ── Sidebar resize ─────────────────────────────────────────────────────────
   (function() {
@@ -2531,38 +2718,61 @@ const SCRIPT = /* javascript */`
   topBtn?.addEventListener('click', () => scroller?.scrollTo({ top: 0, behavior: 'smooth' }));
 
   // ── Mermaid zoom modal ──────────────────────────────────────────────────────
-  // Width-based zoom: the inner div grows/shrinks; overflow: auto on the body
-  // gives real scrollbars so you can pan the diagram at any zoom level.
+  // Pixel-based zoom keeps Gantt/large diagrams crisp while preserving viewport center.
   let mermaidZoom = 1;
-  function setMermaidZoom(z) {
-    mermaidZoom = Math.min(4, Math.max(0.25, z));
+  function sizeMermaidModal(z, preserveCenter = true) {
+    const body = qs('.mermaid-modal-body');
     const inner = qs('#mermaid-zoom-inner');
-    if (inner) {
-      const nw = parseFloat(inner.dataset.nw || '0');
-      const nh = parseFloat(inner.dataset.nh || '0');
-      const svg = inner.querySelector('svg');
-      if (svg && nw && nh) {
-        // Scale the SVG by setting explicit pixel dimensions.
-        // The SVG's viewBox handles proportional scaling of all content.
-        // The inner (flex-shrink:0) expands/contracts so overflow:auto
-        // on the modal body gives real scrollbars at any zoom level.
-        svg.style.width  = Math.round(nw * mermaidZoom) + 'px';
-        svg.style.height = Math.round(nh * mermaidZoom) + 'px';
-      }
-    }
+    if (!body || !inner) return;
+    const nw = parseFloat(inner.dataset.nw || '0');
+    const nh = parseFloat(inner.dataset.nh || '0');
+    if (!nw || !nh) return;
+
+    const oldZoom = mermaidZoom || 1;
+    const centerX = body.scrollLeft + body.clientWidth / 2;
+    const centerY = body.scrollTop + body.clientHeight / 2;
+    const relX = centerX / oldZoom;
+    const relY = centerY / oldZoom;
+
+    mermaidZoom = Math.min(5, Math.max(0.15, z));
+    inner.style.width  = Math.round(nw * mermaidZoom) + 'px';
+    inner.style.height = Math.round(nh * mermaidZoom) + 'px';
+
     const lbl = qs('#mermaid-zoom-level');
     if (lbl) lbl.textContent = Math.round(mermaidZoom * 100) + '%';
+
+    if (preserveCenter) {
+      requestAnimationFrame(() => {
+        body.scrollLeft = Math.max(0, relX * mermaidZoom - body.clientWidth / 2);
+        body.scrollTop  = Math.max(0, relY * mermaidZoom - body.clientHeight / 2);
+      });
+    }
+  }
+  function setMermaidZoom(z) {
+    sizeMermaidModal(z, true);
+  }
+  function fitMermaidToScreen() {
+    const body = qs('.mermaid-modal-body');
+    const inner = qs('#mermaid-zoom-inner');
+    if (!body || !inner) return;
+    const nw = parseFloat(inner.dataset.nw || '0');
+    const nh = parseFloat(inner.dataset.nh || '0');
+    if (!nw || !nh) return;
+    const fit = Math.min((body.clientWidth - 16) / nw, (body.clientHeight - 16) / nh, 1);
+    sizeMermaidModal(fit, false);
+    requestAnimationFrame(() => {
+      body.scrollLeft = Math.max(0, (inner.offsetWidth - body.clientWidth) / 2);
+      body.scrollTop = 0;
+    });
   }
   function closeMermaidModal() {
     qs('#mermaid-modal')?.classList.remove('open');
     mermaidZoom = 1;
-    // Reset SVG to natural size
     const inner = qs('#mermaid-zoom-inner');
     if (inner) {
-      const nw = parseFloat(inner.dataset.nw || '0');
-      const nh = parseFloat(inner.dataset.nh || '0');
-      const svg = inner.querySelector('svg');
-      if (svg && nw && nh) { svg.style.width = nw + 'px'; svg.style.height = nh + 'px'; }
+      inner.innerHTML = '';
+      inner.style.width = '';
+      inner.style.height = '';
     }
   }
   qs('#mermaid-modal-close')?.addEventListener('click',    closeMermaidModal);
@@ -2570,6 +2780,11 @@ const SCRIPT = /* javascript */`
   qs('#mermaid-zoom-in')?.addEventListener('click',    () => setMermaidZoom(mermaidZoom + 0.25));
   qs('#mermaid-zoom-out')?.addEventListener('click',   () => setMermaidZoom(mermaidZoom - 0.25));
   qs('#mermaid-zoom-reset')?.addEventListener('click', () => setMermaidZoom(1));
+  qs('#mermaid-zoom-fit')?.addEventListener('click', fitMermaidToScreen);
+  document.addEventListener('markr-mermaid-opened', () => {
+    mermaidZoom = 1;
+    sizeMermaidModal(1, false);
+  });
   // Scroll-wheel zoom inside the modal body only (prevent page scroll while interacting)
   qs('.mermaid-modal-body')?.addEventListener('wheel', e => {
     if (!qs('#mermaid-modal')?.classList.contains('open')) return;
@@ -2579,7 +2794,13 @@ const SCRIPT = /* javascript */`
   }, { passive: false });
   // ESC to close
   document.addEventListener('keydown', e => {
+    const modalOpen = qs('#mermaid-modal')?.classList.contains('open');
+    if (!modalOpen) return;
     if (e.key === 'Escape') closeMermaidModal();
+    if (e.key === '+' || e.key === '=') setMermaidZoom(mermaidZoom + 0.25);
+    if (e.key === '-') setMermaidZoom(mermaidZoom - 0.25);
+    if (e.key === '0') setMermaidZoom(1);
+    if (e.key.toLowerCase() === 'f') fitMermaidToScreen();
   });
 
   // ── Mermaid: Copy diagram as PNG ───────────────────────────────────────────
@@ -2659,6 +2880,18 @@ const SCRIPT = /* javascript */`
     if (svg && btn) copyDiagramImage(btn, svg);
   });
 
+  qs('#mermaid-copy-src')?.addEventListener('click', () => {
+    const inner = qs('#mermaid-zoom-inner');
+    const btn = qs('#mermaid-copy-src');
+    const src = inner?.dataset.src || '';
+    if (!src || !btn) return;
+    navigator.clipboard.writeText(src).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = orig; }, 1600);
+    });
+  });
+
   // ── Rich copy: intercept Cmd+C in the preview to include text/html ───────
   // When the user selects content in the markdown preview and copies, we write
   // both text/html and text/plain to the clipboard. Slack, Google Chat, Notion,
@@ -2702,6 +2935,10 @@ const SCRIPT = /* javascript */`
   // ── Messages from extension ────────────────────────────────────────────────
   window.addEventListener('message', ev => {
     const msg = ev.data;
+    if (msg.type === 'clipboardDismissApproved') {
+      dismissClipboardPreview();
+      return;
+    }
     if (msg.type === 'fileLoaded') {
       // ── Clipboard preview: pure overlay — never modify tabs, activeTabUri or currentUri ──
       if (msg.isClipboard) {
@@ -2731,7 +2968,7 @@ const SCRIPT = /* javascript */`
         if (cbSpBody) cbSpBody.innerHTML = msg.html;
         // Set up helpers on the split-preview content (copy buttons, anchors, Mermaid diagrams)
         addCopyButtons(); setupHeadingAnchors();
-        if (qs('#split-preview .language-mermaid')) setupMermaid();
+        setupMermaid();
 
         return; // ← do NOT touch tabs / activeTabUri — no layout shift, no tab bar change
       }
@@ -2792,23 +3029,21 @@ const SCRIPT = /* javascript */`
       // Reset undo/redo history and dirty state whenever a new file is loaded
       resetHistory();
       markClean();
-      // Always sync the textarea content when switching files while already in edit mode.
       if (editMode) { const ea = qs('#edit-area'); if (ea) { ea.value = currentMarkdown; updateToolbarState(); } }
       if (msg.isAiConfig && !isAutoEditDismissed(msg.uri)) { if (!editMode) enterEditMode(); }
       else { if (editMode) exitEditMode(false, false, false); }
-      // Defer scroll reset so it runs AFTER enterEditMode/exitEditMode settle
-      // (mode switch may focus the textarea which causes the browser to scroll it into view)
+
+      // Defer scroll reset so it runs AFTER mode changes settle
       setTimeout(function() {
         var sc = qs('#scroller');
         var sp = qs('#split-preview');
         var ea = qs('#edit-area');
         if (sc) sc.scrollTop = 0;
         if (sp) sp.scrollTop = 0;
-        if (ea) ea.scrollTop = 0;  // textarea itself also needs resetting
+        if (ea) ea.scrollTop = 0;
       }, 0);
       buildTOC(); addCopyButtons(); setupHeadingAnchors();
-      if (qs('#scroller .language-mermaid')) setupMermaid();
-      if (qs('#split-preview .language-mermaid')) setupMermaid();
+      setupMermaid();
       renderTabBar();
     }
     if (msg.type === 'scrollToHeading') {
@@ -2841,12 +3076,12 @@ const SCRIPT = /* javascript */`
       swapWithReveal(sp, msg.html);
       if (spEl) spEl.scrollTop = prevSpST;
       addCopyButtons(); setupHeadingAnchors();
-      if (qs('#split-preview .language-mermaid')) setupMermaid();
+      setupMermaid();
       if (!editMode) {
         const body = qs('#scroller .markdown-body');
         if (body) body.innerHTML = msg.html;
         buildTOC();
-        if (qs('#scroller .language-mermaid')) setupMermaid();
+        setupMermaid();
       }
     }
     if (msg.type === 'agentUpdate') {
@@ -2881,7 +3116,7 @@ const SCRIPT = /* javascript */`
 
       // Re-run helpers on the new content
       addCopyButtons(); setupHeadingAnchors(); buildTOC();
-      if (qs('#scroller .language-mermaid') || qs('#split-preview .language-mermaid')) setupMermaid();
+      setupMermaid();
 
       // ── Live badge: pulse green briefly to signal the agent edited the file ──
       const badge = qs('#live-badge');
@@ -2999,7 +3234,7 @@ const SCRIPT = /* javascript */`
     else { if (editMode) exitEditMode(false, false, false); }
     setTimeout(() => { if (qs('#scroller')) qs('#scroller').scrollTop = tab.scrollTop || 0; }, 40);
     buildTOC(); addCopyButtons(); setupHeadingAnchors();
-    if (qs('#scroller .language-mermaid')) setupMermaid();
+    setupMermaid();
     renderTabBar();
     vsc.postMessage({ type: 'setActiveDoc', uri });
   }
@@ -3167,6 +3402,54 @@ export class MarkdownPreviewPanel {
     });
   }
 
+  private async _saveClipboardMarkdown(markdown: string): Promise<boolean> {
+    const defaultDir = vscode.workspace.workspaceFolders?.[0]?.uri
+      ?? vscode.Uri.file(os.homedir());
+    const saveUri = await vscode.window.showSaveDialog({
+      defaultUri: defaultDir.with({ path: defaultDir.path + '/clipboard.md' }),
+      filters: { 'Markdown files': ['md'] },
+    });
+    if (!saveUri) return false;
+
+    this._clipboardMode = false; // clipboard content is now a real file
+    await vscode.workspace.fs.writeFile(saveUri, Buffer.from(markdown, 'utf-8'));
+
+    // Reload as a real on-disk file (banner will close because isClipboard is absent)
+    const doc = await vscode.workspace.openTextDocument(saveUri);
+    this._document = doc;
+    const rawText = doc.getText();
+    const filename = saveUri.path.split('/').pop() ?? 'untitled.md';
+    const relPath = vscode.workspace.asRelativePath(saveUri);
+    const aiKind = aiDocKind(filename, relPath);
+    const { meta, body } = extractFrontmatter(rawText);
+    const rendered = applyGithubAlerts(marked.parse(body) as string);
+    const stats = docStats(rawText);
+    this._filesCacheValid = false;
+    this._panel.webview.postMessage({
+      type: 'fileLoaded',
+      uri: doc.uri.toString(),
+      filename,
+      html: (meta ? renderFrontmatter(meta) : '') + rendered,
+      markdown: rawText,
+      isAiConfig: !!aiKind,
+      aiKind,
+      isClipboard: false,
+      tokStr: tokenEstimate(stats.chars),
+      statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
+      words: stats.words,
+      readMins: Math.max(1, Math.ceil(stats.words / 200)),
+    });
+
+    // Restore Markr to the foreground — the Save dialog shifts VS Code focus
+    // away from the webview. preserveFocus=true keeps keyboard in the panel.
+    this._panel.reveal(this._panel.viewColumn ?? vscode.ViewColumn.Beside, true);
+    vscode.window.setStatusBarMessage(`$(check) Markr: saved ${filename}`, 3000);
+    this._getWorkspaceFiles().then(files => {
+      this._panel.webview.postMessage({ type: 'updateFiles', files });
+    });
+    return true;
+  }
+
   private constructor(panel: vscode.WebviewPanel, document: vscode.TextDocument) {
     this._panel = panel;
     this._document = document;
@@ -3177,7 +3460,8 @@ export class MarkdownPreviewPanel {
     this._panel.webview.onDidReceiveMessage(async msg => {
       if (msg.type === 'openLink') { vscode.env.openExternal(vscode.Uri.parse(msg.href)); }
       if (msg.type === 'copyMarkdown') {
-        vscode.env.clipboard.writeText(this._document.getText()).then(() =>
+        const text = typeof msg.markdown === 'string' ? msg.markdown : this._document.getText();
+        vscode.env.clipboard.writeText(text).then(() =>
           vscode.window.setStatusBarMessage('$(check) Markr: Markdown copied', 3000)
         );
       }
@@ -3193,47 +3477,25 @@ export class MarkdownPreviewPanel {
         this._sendClipboardPreview(text);
       }
       if (msg.type === 'saveClipboardAs') {
-        const defaultDir = vscode.workspace.workspaceFolders?.[0]?.uri
-          ?? vscode.Uri.file(os.homedir());
-        const saveUri = await vscode.window.showSaveDialog({
-          defaultUri: defaultDir.with({ path: defaultDir.path + '/clipboard.md' }),
-          filters: { 'Markdown files': ['md'] },
-        });
-        if (!saveUri) return;
-        this._clipboardMode = false; // clipboard content is now a real file
-        await vscode.workspace.fs.writeFile(saveUri, Buffer.from(msg.markdown, 'utf-8'));
-        // Reload as a real on-disk file (banner will close because isClipboard is absent)
-        const doc = await vscode.workspace.openTextDocument(saveUri);
-        this._document = doc;
-        const rawText = doc.getText();
-        const filename = saveUri.path.split('/').pop() ?? 'untitled.md';
-        const relPath = vscode.workspace.asRelativePath(saveUri);
-        const aiKind = aiDocKind(filename, relPath);
-        const { meta, body } = extractFrontmatter(rawText);
-        const rendered = applyGithubAlerts(marked.parse(body) as string);
-        const stats = docStats(rawText);
-        this._filesCacheValid = false;
-        this._panel.webview.postMessage({
-          type: 'fileLoaded',
-          uri: doc.uri.toString(),
-          filename,
-          html: (meta ? renderFrontmatter(meta) : '') + rendered,
-          markdown: rawText,
-          isAiConfig: !!aiKind,
-          aiKind,
-          isClipboard: false,
-          tokStr: tokenEstimate(stats.chars),
-          statsTitle: `${stats.words.toLocaleString()} words · ${stats.headings} headings · ${stats.codeBlocks} code blocks`,
-          words: stats.words,
-          readMins: Math.max(1, Math.ceil(stats.words / 200)),
-        });
-        // Restore Markr to the foreground — the Save dialog shifts VS Code focus
-        // away from the webview. preserveFocus=true keeps keyboard in the panel.
-        this._panel.reveal(this._panel.viewColumn ?? vscode.ViewColumn.Beside, true);
-        vscode.window.setStatusBarMessage(`$(check) Markr: saved ${filename}`, 3000);
-        this._getWorkspaceFiles().then(files => {
-          this._panel.webview.postMessage({ type: 'updateFiles', files });
-        });
+        await this._saveClipboardMarkdown(String(msg.markdown ?? ''));
+      }
+      if (msg.type === 'requestDismissClipboard') {
+        const markdown = String(msg.markdown ?? '');
+        const action = await vscode.window.showWarningMessage(
+          'Close pasted preview?',
+          {
+            modal: true,
+            detail: 'This pasted Markdown is not saved to disk yet. Save it, discard it, or cancel to keep editing in Markr.',
+          },
+          'Save as .md',
+          'Discard',
+        );
+        if (action === 'Save as .md') {
+          await this._saveClipboardMarkdown(markdown);
+        } else if (action === 'Discard') {
+          this._clipboardMode = false;
+          this._panel.webview.postMessage({ type: 'clipboardDismissApproved' });
+        }
       }
       if (msg.type === 'openInEditor') {
         const uri = msg.uri ? vscode.Uri.parse(msg.uri) : this._document.uri;
@@ -3340,24 +3602,24 @@ export class MarkdownPreviewPanel {
       if (msg.type === 'exportHtml') { await this._handleExportHtml(); }
       if (msg.type === 'exportPdf')  { await this._handleExportPdf(); }
       if (msg.type === 'print')      { await this._handlePrint(); }
+
     }, null, this._disposables);
   }
 
-  /** Send file content via fileLoaded postMessage — used for switching files.
-   *  Avoids a full HTML rebuild which can have timing issues in VS Code webviews.
-   *  Updates content, edit mode, token counter, and tok panel atomically. */
-  private _sendFileUpdate(): void {
+  /** Send file content via fileLoaded postMessage — used for switching files. */
+  private async _sendFileUpdate(): Promise<void> {
     const rawText  = this._document.getText();
     this._prevMarkdown = rawText;
     this._startFsWatch();
+    const filename = this._document.uri.path.split('/').pop() ?? 'preview';
+    const relPath  = vscode.workspace.asRelativePath(this._document.uri);
+    this._panel.title = `Markr — ${filename}`;
+
     const { meta, body } = extractFrontmatter(rawText);
     const rendered   = applyGithubAlerts(marked.parse(body) as string);
     const stats      = docStats(rawText);
-    const filename   = this._document.uri.path.split('/').pop() ?? 'preview';
-    const relPath    = vscode.workspace.asRelativePath(this._document.uri);
     const aiKind     = aiDocKind(filename, relPath);
     const model      = detectModel(filename, relPath);
-    this._panel.title = `Markr — ${filename}`;
     this._panel.webview.postMessage({
       type:       'fileLoaded',
       uri:        this._document.uri.toString(),
@@ -3381,6 +3643,7 @@ export class MarkdownPreviewPanel {
       clearTimeout(this._renderTimer);
       this._renderTimer = undefined;
     }
+    const filename = this._document.uri.path.split('/').pop() ?? 'preview';
     const rawText = this._document.getText();
     this._prevMarkdown = rawText; // seed baseline for agent-watch diff
     this._startFsWatch();         // (re-)start watching this file on disk
@@ -3388,7 +3651,6 @@ export class MarkdownPreviewPanel {
     const rendered = applyGithubAlerts(marked.parse(mdBody) as string);
     const frontmatterHtml = meta ? renderFrontmatter(meta) : '';
     const stats    = docStats(rawText);
-    const filename = this._document.uri.path.split('/').pop() ?? 'preview';
     this._panel.title = `Markr — ${filename}`;
     const files = this._filesCacheValid ? this._filesCache : [];
     this._panel.webview.html = this._buildPage(frontmatterHtml + rendered, filename, stats, rawText, files, !this._filesCacheValid);
@@ -3477,9 +3739,9 @@ export class MarkdownPreviewPanel {
           }
 
           // ── Phase 2: full deep scan in background ────────────────────────────
-          this._filesScanPromise = vscode.workspace
-            .findFiles('**/*.md', exclude, maxFiles)
-            .then(uris => {
+          this._filesScanPromise = Promise.resolve(
+            vscode.workspace.findFiles('**/*.md', exclude, maxFiles)
+          ).then(uris => {
               this._filesCache     = this._mapUris(uris);
               this._filesCacheValid = true;
               return this._filesCache;
@@ -3814,7 +4076,9 @@ export class MarkdownPreviewPanel {
         <span class="zoom-level" id="mermaid-zoom-level">100%</span>
         <button id="mermaid-zoom-in"  title="Zoom in">+</button>
         <button id="mermaid-zoom-reset" title="Reset zoom">Reset</button>
+        <button id="mermaid-zoom-fit" title="Fit diagram to window">Fit</button>
         <div style="width:1px;height:16px;background:var(--border);margin:0 4px;flex-shrink:0"></div>
+        <button id="mermaid-copy-src" title="Copy Mermaid source">Copy source</button>
         <button id="mermaid-copy-img" title="Copy diagram as PNG image">🖼 Copy image</button>
         <button class="mermaid-modal-close" id="mermaid-modal-close">✕</button>
       </div>

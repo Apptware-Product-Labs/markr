@@ -24,20 +24,15 @@ const CONTEXT_WINDOWS: Record<AiModel, number> = {
   gpt4:     128_000,
   gpt4o:    128_000,
   llama3:   128_000,
-  llama2:     4_096,
-  deepseek: 128_000,
-  kimi:     128_000,
   gemini: 1_000_000,
   mistral:  128_000,
-  qwen:     128_000,
   generic:  128_000,
 };
 
 const MODEL_LABELS: Record<AiModel, string> = {
   claude:   'Claude',   gpt4:   'GPT-4',    gpt4o:    'GPT-4o',
-  llama3:   'Llama 3',  llama2: 'Llama 2',  deepseek: 'DeepSeek',
-  kimi:     'Kimi',     gemini: 'Gemini',   mistral:  'Mistral',
-  qwen:     'Qwen',     generic: 'Generic',
+  llama3:   'Llama 3',  gemini: 'Gemini',   mistral:  'Mistral',
+  generic: 'Generic',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
