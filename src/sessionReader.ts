@@ -1732,10 +1732,11 @@ function compactText(text: string, max = 260): string {
 }
 
 // Targets that can read the repository themselves (agentic IDE/CLI tools).
-// For these, CRH transmits the RESIDUAL + pointers.  Repo-less targets (web
-// ChatGPT) get more inlined payload because the Slepian-Wolf side-information
-// assumption (decoder can read the repo) doesn't hold for them.
-const REPO_AWARE_TARGETS = new Set<TargetTool>(['claude-code', 'cursor', 'codex', 'augment']);
+// For these, CRH transmits the RESIDUAL + pointers.  Only genuinely repo-less
+// targets (web ChatGPT) get the inlined "you don't have the repo" framing.
+// 'clipboard' is treated as repo-aware: a copied handoff is almost always pasted
+// back into a coding tool that DOES have the repo (continuing the same work).
+const REPO_AWARE_TARGETS = new Set<TargetTool>(['claude-code', 'cursor', 'codex', 'augment', 'clipboard']);
 
 /** Pick the single coherent task to continue.
  *  The latest user line is often a throwaway follow-up ("commit msg?", "any

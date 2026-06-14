@@ -77,7 +77,17 @@ describe('scoreboardToMarkdown', () => {
     const md = scoreboardToMarkdown(computeScoreboard(sessions, [], NOW), 'All projects');
     expect(md).toContain('# Markr AI Scoreboard');
     expect(md).toContain('Most-worked projects');
+    expect(md).toContain('<svg');                 // chart kept as inline SVG
+    expect(md).toContain('| Project |');          // and the portable table below
     expect(md).toContain('[REDACTED:anthropic-key]');
     expect(md).not.toContain('LEAKEDsecret1234567890');
+  });
+
+  it('exports chart SVG using the selected scorecard theme palette', () => {
+    const sessions = [sess({ tool: 'codex', tokenCount: 100 }), sess({ tool: 'claude-code', tokenCount: 200 })];
+    const md = scoreboardToMarkdown(computeScoreboard(sessions, [], NOW), 'All projects', 'linear');
+    expect(md).toContain('fill="#15151b"'); // Linear chart panel background
+    expect(md).toContain('fill="#8b92ff"'); // Linear first tool colour
+    expect(md).toContain('fill="#50d774"'); // Linear second tool colour
   });
 });

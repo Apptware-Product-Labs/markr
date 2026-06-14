@@ -7,7 +7,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [Unreleased] — v6
+## [6.0.0] — v6 _(beta — Marketplace pre-release)_
 
 ### Phase 5 — New Tool Readers (audience expansion)
 - **Cline & Roo Code** — reads `globalStorage/<extId>/tasks/<id>/api_conversation_history.json`

@@ -22,7 +22,7 @@ import {
 } from './configSuggester';
 import { PromptRunner } from './promptRunner';
 import { detectModel, countTokens } from './tokenEngine';
-import { computeScoreboard, scoreboardToMarkdown, MemoryFact } from './scoreboard';
+import { computeScoreboard, scoreboardToMarkdown, MemoryFact, ScoreboardTheme } from './scoreboard';
 import { buildScoreboardHtml } from './webview/scoreboardHtml';
 import {
   targetFileFor, upsertHandoffBlock, markBlockConsumed, markWholeConsumed, shapeWholeFile,
@@ -228,6 +228,7 @@ export class ContextBridgeViewProvider implements vscode.WebviewViewProvider {
   // ─── AI Scoreboard panel (markr.openScoreboard) ────────────────────────────
   private _scorePanel?: vscode.WebviewPanel;
   private _scoreScope: 'project' | 'all' = 'all';
+  private _scoreTheme: ScoreboardTheme = 'dark';
 
   public openScoreboard() {
     if (this._scorePanel) {
@@ -243,10 +244,16 @@ export class ContextBridgeViewProvider implements vscode.WebviewViewProvider {
       if (msg.type === 'scope' && (msg.scope === 'project' || msg.scope === 'all')) {
         this._scoreScope = msg.scope;
         this._renderScoreboard();
+      } else if (msg.type === 'theme' && typeof msg.theme === 'string') {
+        // Persist so scope re-renders keep the chosen theme (no flash).
+        this._scoreTheme = msg.theme as ScoreboardTheme;
       } else if (msg.type === 'export') {
         const { data, scopeLabel } = this._scoreboardData();
-        await vscode.env.clipboard.writeText(scoreboardToMarkdown(data, scopeLabel));
-        vscode.window.showInformationMessage('Markr: scoreboard copied as Markdown (secrets redacted).');
+        const md = scoreboardToMarkdown(data, scopeLabel, this._scoreTheme);
+        await vscode.env.clipboard.writeText(md);
+        // Open the report in Markr's preview by default (also on the clipboard).
+        await MarkdownPreviewPanel.showClipboard(md);
+        vscode.window.showInformationMessage('Markr: scoreboard exported (opened in Markr · copied, secrets redacted).');
       }
     });
     this._renderScoreboard();
@@ -279,7 +286,7 @@ export class ContextBridgeViewProvider implements vscode.WebviewViewProvider {
   private _renderScoreboard() {
     if (!this._scorePanel) return;
     const { data, projectName } = this._scoreboardData();
-    this._scorePanel.webview.html = buildScoreboardHtml(data, this._scoreScope, projectName);
+    this._scorePanel.webview.html = buildScoreboardHtml(data, this._scoreScope, projectName, this._scoreTheme);
   }
 
   /** Active session summary for the status-bar item in extension.ts */
@@ -661,26 +668,48 @@ export class ContextBridgeViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  /** Generate a handoff for a session, copy it, record history, and open it in
+   *  Markr's preview — the same destination as the History tab's "View", so the
+   *  notification, the handoff "Preview" button, and History all behave alike. */
+  private async _deliverHandoffPreview(session: SessionInfo) {
+    try {
+      const ctx  = summariseSession(session, this._seedFor(session));
+      const meta: { redactions?: number } = {};
+      const text = generateHandoff(ctx, session.tool, 'clipboard', meta);
+      await vscode.env.clipboard.writeText(text);
+      try {
+        this._memory.addHandoff(session.projectPath, {
+          timestamp: Date.now(), sourceTool: session.tool, target: 'clipboard', text,
+        });
+      } catch { /* history is best-effort */ }
+      await MarkdownPreviewPanel.showClipboard(text);
+    } catch (err) {
+      vscode.window.showErrorMessage(`Markr: could not generate handoff. ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   /** Notify once per session when an active session crosses 75% of its limit. */
   private _checkExhaustion(sessions: SessionInfo[]) {
     for (const s of sessions) {
       if (!s.isActive) continue;
       const limit = CTX_LIMITS[s.tool];
       if (!limit) continue;
-      const pct = Math.round((s.tokenCount / limit) * 100);
-      if (pct < 75) continue;
+      const rawPct = (s.tokenCount / limit) * 100;
+      if (rawPct < 75) continue;
       const notifiedKey = `markr.exhaustNotified.${s.id}`;
       if (this._context.workspaceState.get<boolean>(notifiedKey)) continue;
       const mutedKey = `markr.exhaustMuted.${s.id}`;
       if (this._context.workspaceState.get<boolean>(mutedKey)) continue;
       this._context.workspaceState.update(notifiedKey, true);
-      vscode.window.showWarningMessage(
-        `${TOOL_LABEL[s.tool]} session at ${pct}% of context — prepare a handoff?`,
-        'Generate handoff', 'Mute for this session',
-      ).then(action => {
+      // tokenCount is a rough byte/4 estimate of the whole transcript (incl. all
+      // tool output), so it can exceed the live window — clamp the display and
+      // switch wording past 100% instead of showing "6284%".
+      const msg = rawPct >= 100
+        ? `${TOOL_LABEL[s.tool]} session has likely filled its context window — prepare a handoff?`
+        : `${TOOL_LABEL[s.tool]} session at ${Math.round(rawPct)}% of context — prepare a handoff?`;
+      vscode.window.showWarningMessage(msg, 'Generate handoff', 'Mute for this session').then(action => {
         if (action === 'Generate handoff') {
-          this._post({ type: 'selectSession', id: s.id });
-          vscode.commands.executeCommand('markrContextBridge.focus');
+          this._deliverHandoffPreview(s);
         } else if (action === 'Mute for this session') {
           this._context.workspaceState.update(mutedKey, true);
         }
@@ -823,7 +852,8 @@ body {
   font-family: var(--vscode-font-family, system-ui, sans-serif);
   font-size: var(--vscode-font-size, 13px);
   line-height: 1.4;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;   /* allow Memory / History / long session lists to scroll */
 }
 
 /* ── Brand header ── */

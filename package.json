@@ -1,8 +1,8 @@
 {
   "name": "markr",
   "displayName": "Markr – AI Config Editor & Markdown Preview",
-  "description": "The AI config editor & Markdown preview for VS Code — Context Bridge hands off AI sessions between Claude Code, Cursor, Augment & Codex; auto-opens CLAUDE.md / .cursorrules / agent.md in split-edit mode, real-time Agent Watch, copy diagrams as PNG, Mermaid, TOC, themes, PDF export",
-  "version": "5.0.0",
+  "description": "The memory & control layer for AI coding tools + Markdown preview — Context Bridge hands off sessions between Claude Code, Cursor, Augment, Codex, Cline, Windsurf & Gemini; cross-session memory, self-writing configs, AI Scoreboard; auto-opens CLAUDE.md / .cursorrules in split-edit mode, Agent Watch, Mermaid, TOC, themes, PDF export",
+  "version": "6.0.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
@@ -78,7 +78,12 @@
     "ai handoff",
     "context handoff",
     "augment",
-    "codex"
+    "codex",
+    "cline",
+    "windsurf",
+    "gemini cli",
+    "ai memory",
+    "agent memory"
   ],
   "activationEvents": [
     "onLanguage:markdown",

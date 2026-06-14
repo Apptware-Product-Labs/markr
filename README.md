@@ -166,9 +166,9 @@ Whether you're managing a `CLAUDE.md`, editing `.cursorrules`, writing Copilot w
 
 ## Features
 
-### 🔀 Context Bridge — Switch AI tools without losing context _(NEW in 5.0, beta)_
+### 🔀 Context Bridge — Switch AI tools without losing context _(NEW in 5.0 · expanded in 6.0, beta)_
 
-The **Context Bridge** sidebar reads the session transcripts your AI coding tools already write to disk — **Claude Code, Cursor, Augment, Codex, and Aider** — and shows them all in one place: which project, which task, how many tokens, and which are live right now. No setup, no daemon, nothing sent anywhere — it only reads what's already on your machine.
+The **Context Bridge** sidebar reads the session transcripts your AI coding tools already write to disk — **Claude Code, Cursor, Augment, Codex, Aider, Cline, Roo Code, Windsurf, and Gemini CLI** — and shows them all in one place: which project, which task, how many tokens, and which are live right now. A **tool-health row** confirms what Markr can read (✓ / — / ⚙). No setup, no daemon, nothing sent anywhere — it only reads what's already on your machine.
 
 When you switch tools, pick a session and **hand it off**. Markr generates a **Conditional Residual Handoff (CRH)** — a handoff format built on two proven foundations (Slepian–Wolf conditional source coding + the I-PASS clinical handoff protocol). Instead of dumping the chat, it transmits only what the next tool **can't re-derive by reading your repo**:
 
@@ -182,6 +182,24 @@ When you switch tools, pick a session and **hand it off**. Markr generates a **C
 Copy it to your clipboard, paste into Claude Code / Cursor / Augment / Codex / ChatGPT, and keep going — no context lost, no browser tab-hopping.
 
 > _Beta:_ decision/dead-end extraction is heuristic and improving. Feedback welcome.
+
+---
+
+### 🧠 Cross-Session Memory _(NEW in 6.0, beta)_
+
+The decisions, dead-ends, and constraints Markr mines don't vanish when a session ends — they're **remembered per project**. A **Memory tab** in the Context Bridge groups them by kind with occurrence counts, a dismiss button, and search across all your projects. New handoffs are **seeded from this memory**, so continuity survives across sessions, not just within one. Stored locally; **secrets are redacted before anything is written to disk**.
+
+### ✍️ Configs That Write Themselves _(NEW in 6.0, beta)_
+
+When you tell your agents the same thing across sessions ("always use pnpm", "never touch the public API"), Markr clusters those repeats into an **evidence-backed config suggestion** and offers to add it — one click appends the rule under a `## Learned rules (Markr)` heading in your `CLAUDE.md` / `AGENTS.md` / `.cursorrules` (undoable; never edited without your Accept). It also flags **stale config sections** whose keywords haven't appeared in recent sessions (guardrail sections like Security are always protected). Optional: rewrite rules with your own LLM (`markr.aiEnhance`, off by default).
+
+### ⚡ Ambient Continuity _(NEW in 6.0, beta)_
+
+Markr watches active sessions and warns when one nears its **context limit** so you can hand off before you hit the wall. Handoffs can be delivered straight into the next tool's own convention — a delimited block in **`CLAUDE.local.md`**, a **`.cursor/rules/*.mdc`** rule, or **`HANDOFF.md`** — with a one-time per-workspace confirmation, and marked "consumed" once a new session picks them up. Every handoff is kept in a **History tab** (copy again / view).
+
+### 📊 AI Scoreboard _(NEW in 6.0, beta)_
+
+A dashboard no other tool can build, because nothing else reads all your AI tools at once. **Sessions and tokens per tool per week**, **dead-end rate**, **median session length**, and **most-worked projects** — all computed locally, themeable (Markr Dark / Light / Notion / Linear), with an **Export** that opens a redacted report in Markr.
 
 ---
 
