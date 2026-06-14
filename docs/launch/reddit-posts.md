@@ -1,68 +1,87 @@
-# Reddit launch posts — Markr 5.0 (Context Bridge)
+# Reddit launch posts — Markr v6
 
-Etiquette reminders:
-- Post to ONE subreddit at a time; space them out (don't blast identical text — Reddit flags crossposts).
-- Lead with the problem, disclose you built it, ask for feedback. Don't be salesy.
-- Reply to every comment for the first few hours.
-- r/programming is hostile to launches — skip it. Use the tool/AI subs below.
+Marketplace link: https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr
+(verify the itemName matches your published publisher.name)
 
----
+Etiquette: post ONE sub at a time, space them out, reply to comments in the first
+few hours, don't paste identical text across subs (Reddit flags crossposts),
+skip r/programming. Lead with the problem, disclose you built it, ask for feedback.
 
-## r/ChatGPTCoding  — problem-led (best primary target)
-
-**Title:** I kept losing context every time I switched between Claude Code, Cursor and Augment — so I built a handoff that isn't just a chat dump
-
-**Body:**
-The thing that kills me with multi-tool workflows: I'll do a long session in Claude Code, hit a wall or run out of context, switch to Cursor or Augment… and spend 15 minutes re-explaining what I was doing, what I already tried, and why.
-
-Pasting the old chat doesn't really work — it's huge, and the next tool just re-reads stuff it could've figured out from the repo anyway.
-
-So I built **Context Bridge** (a free VS Code extension, part of Markr). Two ideas behind it:
-
-1. The receiving tool can already read your repo. So the handoff shouldn't transmit your code — it should transmit only what the repo *can't* tell it: the **decisions and why**, the **dead-ends you already tried**, the **constraints you set**, and your **uncommitted git diff**. (This is basically Slepian–Wolf conditional coding applied to handoffs, if you're into information theory.)
-2. It ends the handoff with a line forcing the next tool to restate the task before acting — lifted from the I-PASS medical handoff protocol, which cut hospital handoff errors ~30% in an NEJM study.
-
-It reads sessions from Claude Code, Cursor, Augment, Codex and Aider — all local, nothing leaves your machine.
-
-It's in beta and the decision-extraction is heuristic (regex over the transcript), so I'd genuinely love feedback on where it misses. Does this match how you switch tools, or am I solving a problem only I have?
+Each post has an **Image:** line — attach that gif/screenshot (see
+docs/development/gif-shotlist.md for what to record).
 
 ---
 
-## r/vscode  — feature/announcement
+## r/ChatGPTCoding — primary
 
-**Title:** [Extension] Markr 5.0 — see all your AI coding sessions in one sidebar and hand them off between tools
+**Title:** You know that moment when a long AI session is almost full and you dread starting over? Built a thing for exactly that — want to know if it actually helps
 
 **Body:**
-Markr started as an AI-config editor + Markdown preview (auto-opens CLAUDE.md/.cursorrules in a split-edit view, live preview while an agent edits, copy diagrams/tables as PNG). 5.0 adds the thing I actually use most now: **Context Bridge**.
+The scenario that kills me: I'm hours into a session with Claude Code (or Cursor), it's been going great, and the context window is nearly full. I know quality's about to drop, but starting a fresh session means re-explaining everything — what we decided, what we already tried and ruled out, what's half-done and uncommitted.
 
-It reads the session transcripts your AI tools already write to disk — Claude Code, Cursor, Augment, Codex, Aider — and shows them in one sidebar: which project, what task, token count, which are live. Then you can generate a structured handoff to continue in a different tool (decisions, dead-ends, constraints, uncommitted diff — not a raw chat paste).
+So I made Markr (free VS Code extension). It watches your active sessions and warns you when one's near its limit, then generates a handoff with only the stuff a fresh session can't get from the repo itself — the decisions and *why*, the dead-ends so it doesn't repeat them, your uncommitted git diff. Paste it into a new session (same tool or a different one) and keep going like nothing happened.
 
-Everything is local-only — it just reads files already on your machine.
+Once you've got a few sessions, it starts to compound: it remembers those decisions/dead-ends across sessions (a Memory tab you can search), keeps a history of past handoffs to re-copy, and — the part I didn't expect to like — when you keep telling agents the same rule, it offers to write it into your CLAUDE.md. There's also a little cross-tool dashboard ("Scoreboard") since it can see all your tools at once.
 
-Free, beta. Would love bug reports, especially around session detection across tools. What other tools should it read?
+It reads the session files your tools already write locally — nothing's uploaded. Beta.
+
+What I actually want to know: **when you start a fresh session from one of these handoffs, does it genuinely pick up where you left off, or what's missing?** That's the part I can't judge from my own usage.
+
+https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr
+
+**Image:** gif-18-exhaustion-handoff (near-limit warning → Generate handoff → handoff opens with decisions/dead-ends/diff → paste into fresh session)
 
 ---
 
-## r/ClaudeAI  — Claude-Code-specific angle
+## r/ClaudeAI
 
-**Title:** Made a free tool to carry a Claude Code session into another AI tool (or back) without re-explaining everything
+**Title:** For when a Claude Code session is about to hit the wall — a handoff so the next session isn't starting from zero (feedback wanted)
 
 **Body:**
-Claude Code's `/compact` and resume are great *within* Claude Code. But when I bounce a task to Cursor or Augment (or hand a stuck session to a fresh Claude), I lose the thread — what was decided, what I tried that failed, what's still uncommitted.
+`/compact` helps, but past a point a long session degrades and I want to just start clean — except starting clean means re-explaining the whole thing.
 
-Built **Context Bridge** (free VS Code extension) to fix that. It reads your `~/.claude/projects` sessions (and Cursor/Augment/Codex/Aider), and generates a handoff that carries the *residual* — decisions + reasoning, dead-ends, constraints, and your `git diff` — instead of dumping the whole conversation. The paste-ready prompt makes the receiving model restate the task before it starts.
+Markr (free VS Code extension) reads your `~/.claude/projects` sessions, flags when one's getting close to full, and builds a handoff out of the *residual*: decisions + reasoning, dead-ends, constraints, your git diff — not the whole transcript. Paste into a fresh session and you're back where you were.
 
-Local-only, beta. If you live in Claude Code, I'd love to know whether the decision log actually captures the "why" from your sessions — that's the part I'm tuning.
+It also keeps that as memory across sessions, so a new session can be seeded with what earlier ones decided and ruled out, and past handoffs are kept in a history you can re-copy. Secrets are stripped before anything's written to disk.
+
+Beta, extraction's heuristic. Genuinely want feedback from people who live in Claude Code: **paste one into a fresh session — does it actually carry the thread, or miss the important bits?**
+
+https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr
+
+**Image:** gif-18-exhaustion-handoff, or a still of a generated handoff showing the 🧠 Decision log / 🛑 Dead-ends / 🔀 in-flight diff sections
 
 ---
 
-## r/SideProject  — builder story
+## r/vscode
 
-**Title:** Shipped 5.0 of my VS Code extension — the feature I almost didn't build is now the one people ask about
+**Title:** [Extension] Markr — when an AI session nears its context limit, hand off to a fresh one without re-explaining everything
 
 **Body:**
-I've been building Markr (AI-config editor + Markdown preview for VS Code). For 5.0 I added a "Context Bridge" that lets you hand off an AI coding session from one tool to another without losing context.
+Markr reads the session transcripts your AI coding tools write to disk — Claude Code, Cursor, Augment, Codex, Aider, Cline, Roo, Windsurf, Gemini CLI — shows them in one sidebar, and warns when an active one is filling up. When that happens it generates a handoff (decisions, dead-ends, constraints, uncommitted diff) so the next session continues cleanly.
 
-The interesting part for me was *not* building the obvious thing (mirror the chat). The chat is mostly re-derivable — the next AI can read the repo. So I made it transmit only the irreducible stuff: decisions + why, failed approaches, constraints, and the uncommitted diff. Grounded it in two old, proven ideas (Slepian–Wolf coding + the I-PASS clinical handoff protocol).
+Beyond the handoff it adds a Memory tab (what's been decided/ruled out per project, searchable), a History of past handoffs, config suggestions from things you repeat, and a cross-tool Scoreboard (sessions/tokens per tool, etc.).
 
-Free + beta. Sharing partly to find out if the framing resonates or if I've over-engineered a non-problem. Honest takes welcome.
+All local, no daemon, nothing leaves the machine. Free, beta.
+
+Two things I'd love feedback on: does the handoff actually save you the re-explaining, and is it detecting your tools' sessions correctly?
+
+https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr
+
+**Image:** gif-19-memory + a screenshot of the Context Bridge sidebar showing sessions across tools (or the carousel: handoff, memory, scoreboard)
+
+---
+
+## r/SideProject
+
+**Title:** My VS Code extension hit ~6k installs — the feature it was really about: rescuing a near-full AI session into a fresh one
+
+**Body:**
+Markr started as a Markdown/AI-config previewer, but the thing I actually wanted was continuity. When a long Claude/Cursor session is nearly out of context, it reads your local session files and writes a handoff carrying only what the next session can't re-derive from the repo — decisions, dead-ends, constraints, the uncommitted diff. Paste, continue.
+
+Then it compounds: memory of decisions across sessions, a handoff history, config rules suggested from what you repeat, and a cross-tool scoreboard. All local-only, secrets redacted, never edits a file without your OK.
+
+Free, beta. Sharing partly to figure out if the handoff genuinely helps people or if it's a me-problem — if you try it, I'd love to hear whether it actually saved you the re-explaining.
+
+https://marketplace.visualstudio.com/items?itemName=Apptware-Product-Lab.markr
+
+**Image:** gif-22-scoreboard (or the exhaustion-handoff gif)
