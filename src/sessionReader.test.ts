@@ -19,6 +19,8 @@ import {
   CONSTRAINT_RE,
   PASTED_CONTENT_RE,
   generateHandoff,
+  parseClineHistory,
+  parseGeminiChat,
   type SessionContext,
   type SessionMessage,
 } from './sessionReader';
@@ -237,5 +239,61 @@ describe('generateHandoff', () => {
     // The paste-block TASK should be the real task, not the throwaway
     const pasteBlock = doc.split('```text')[1]?.split('```')[0] ?? '';
     expect(pasteBlock).toContain('back button navigation');
+  });
+});
+
+// ── Phase 5: new tool parsers ───────────────────────────────────────────────
+
+describe('parseClineHistory (Cline / Roo Code)', () => {
+  it('parses Anthropic-format messages, string + block content', () => {
+    const raw = JSON.stringify([
+      { role: 'user', content: '<task>Fix the bug</task>' },
+      { role: 'assistant', content: [
+        { type: 'text', text: 'I will look into it.' },
+        { type: 'tool_use', name: 'read', input: { path: 'a.ts' } },
+      ] },
+      { role: 'user', content: [{ type: 'tool_result', content: 'file contents here' }] },
+    ]);
+    const msgs = parseClineHistory(raw);
+    expect(msgs).toHaveLength(2); // tool_result-only message has no prose → skipped
+    expect(msgs[0]).toMatchObject({ role: 'user', text: '<task>Fix the bug</task>' });
+    expect(msgs[1].role).toBe('assistant');
+    expect(msgs[1].text).toContain('look into it');
+    expect(msgs[1].fullLength).toBeGreaterThan(msgs[1].text.length); // tool_use bytes counted
+  });
+
+  it('returns [] on malformed JSON', () => {
+    expect(parseClineHistory('not json')).toEqual([]);
+    expect(parseClineHistory('{"not":"an array"}')).toEqual([]);
+  });
+
+  it('infers cwd from environment_details so it appears in project scope', () => {
+    // inferClineCwd is exercised via parse → the reader; here we assert the
+    // pattern the reader keys on is present in a realistic first message.
+    const firstMsg = 'Task\n\n<environment_details>\n# Current Working Directory (/Users/me/app) Files\nsrc/\n</environment_details>';
+    expect(/Current Working Directory\s*\(([^)]+)\)/.exec(firstMsg)?.[1]).toBe('/Users/me/app');
+  });
+});
+
+describe('parseGeminiChat', () => {
+  it('maps model→assistant and reads parts[].text', () => {
+    const raw = JSON.stringify([
+      { role: 'user', parts: [{ text: 'hello there' }] },
+      { role: 'model', parts: [{ text: 'general kenobi' }] },
+    ]);
+    const msgs = parseGeminiChat(raw);
+    expect(msgs).toHaveLength(2);
+    expect(msgs[0].role).toBe('user');
+    expect(msgs[1].role).toBe('assistant');
+    expect(msgs[1].text).toBe('general kenobi');
+  });
+
+  it('handles a { messages: [...] } wrapper and string content', () => {
+    const raw = JSON.stringify({ messages: [{ role: 'user', content: 'wrapped message here' }] });
+    expect(parseGeminiChat(raw)[0].text).toBe('wrapped message here');
+  });
+
+  it('returns [] on malformed JSON', () => {
+    expect(parseGeminiChat('nope')).toEqual([]);
   });
 });

@@ -1,0 +1,10 @@
+{
+  "decisions": [
+    "Chose Zod over io-ts"
+  ],
+  "deadEnds": [],
+  "constraints": [
+    "use any",
+    "build stays under 2MB"
+  ]
+}

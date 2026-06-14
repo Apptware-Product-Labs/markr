@@ -21,7 +21,9 @@ export async function activate(context: vscode.ExtensionContext) {
   // ── Context Bridge sidebar view ────────────────────────────────────────────
   // Lives under markr-sidebar container as a collapsible WebviewView section.
   // When collapsed → markrExplorer expands to fill the space (Source-Control style).
-  const contextBridgeProvider = new ContextBridgeViewProvider();
+  // Persistent cross-session memory lives under the extension's globalStorage
+  // (machine-level, cross-workspace) — never written into the user's repo.
+  const contextBridgeProvider = new ContextBridgeViewProvider(context);
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       ContextBridgeViewProvider.viewType,
@@ -36,6 +38,9 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
     vscode.commands.registerCommand('markr.refreshContextBridge', () => {
       contextBridgeProvider.refresh();
+    }),
+    vscode.commands.registerCommand('markr.openScoreboard', () => {
+      contextBridgeProvider.openScoreboard();
     }),
     vscode.commands.registerCommand('markr.openAiHealth', async () => {
       await vscode.window.withProgress(

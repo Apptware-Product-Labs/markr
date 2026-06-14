@@ -1,0 +1,4 @@
+{"type":"user","message":{"content":[{"type":"text","text":"make streaming work"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"That approach does not compile under strict mode."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Rolled back the worker-thread change after the regression."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Couldn't get the SSE proxy to work, so I abandoned it."}]}}

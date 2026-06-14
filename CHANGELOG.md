@@ -7,6 +7,147 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [Unreleased] — v6
+
+### Phase 5 — New Tool Readers (audience expansion)
+- **Cline & Roo Code** — reads `globalStorage/<extId>/tasks/<id>/api_conversation_history.json`
+  (Anthropic message array) for `saoudrizwan.claude-dev` and `rooveterinaryinc.roo-cline`.
+  `parseClineHistory` handles string + block content (text / tool_use / tool_result).
+- **Windsurf** (experimental) — same VS Code-family `state.vscdb` layout as Cursor;
+  the Cursor SQLite reader was extracted into a shared `readVscdbSessions` helper that
+  both now use. Degrades to empty if the prompt keys differ (unverified on this machine).
+- **Gemini CLI** (experimental) — reads `~/.gemini/tmp/<hash>/chats/*.json`
+  (`{role, parts:[{text}]}`); `parseGeminiChat` maps `model`→assistant.
+- All four added to the `AiTool` union, `CTX_LIMITS`, `TOOL_COLOR`, `TOOL_LABEL`,
+  model labels, and the Scoreboard tool set.
+- **Tool-health row** at the bottom of the Context Bridge Sessions view — each tool
+  shows ✓ (sessions found, with count) / — (none) / ⚠ (reader failed). Backed by a new
+  `readAllSessionsWithHealth()` so no reader fails silently.
+- 5 fixture-based unit tests for `parseClineHistory` / `parseGeminiChat`.
+- **Hardening:** Cline/Roo now infer cwd from the task's `environment_details` so they
+  surface in project scope (fall back to global when absent); workspace matching uses a
+  path-segment boundary (`pathWithin`) so `/app` no longer matches sibling `/app-v2`
+  (Cursor/Windsurf vscdb reader + Codex reader); and the tool-health row shows
+  Windsurf as **experimental** (⚙) when it's installed but unread, distinct from a
+  genuine "none".
+
+### Phase 4 — The Scoreboard (cross-tool analytics)
+- **`src/scoreboard.ts` + `src/webview/scoreboardHtml.ts`** — a "AI Scoreboard"
+  webview panel (`markr.openScoreboard`, also a toolbar button on the Context Bridge)
+  computed entirely from data Markr already has locally (SessionInfo + memory):
+  - Sessions per tool per week (last 8 weeks) — stacked bars, inline SVG, no chart lib
+  - Tokens per tool per week — stacked bars
+  - Dead-end rate per tool (deadEnd memory items ÷ sessions), clearly labelled
+    "heuristic estimate"
+  - Median session length (messages) per tool
+  - Most-worked projects (by session count + tokens)
+- **Scope toggle** — this workspace / all projects. **Export as Markdown** copies a
+  shareable report (tables, no SVG) — run through `redactSecrets()` first. Every
+  number shows its source on hover ("from N sessions read locally").
+- 6 unit tests in `src/scoreboard.test.ts` (week bucketing, dead-end rate, medians,
+  project ranking, redacted Markdown export).
+- **Polish:** charts are labelled "last 8 weeks only" and the all-time tables
+  ("all time") so the header count and charts no longer appear to disagree; the panel
+  reuses the sidebar's cached + Claude-normalized session list instead of re-reading
+  every JSONL on open/scope-toggle (so "all projects" shows real folder names, not
+  raw encoded slugs, and the extension host stays responsive).
+
+### Phase 3 — Ambient Continuity (auto-handoff)
+- **Context-exhaustion watch** — when an active session crosses 75% of its tool's
+  context limit, Markr shows a one-time warning ("… session at 78% of context —
+  prepare a handoff?") with [Generate handoff] / [Mute for this session]. One
+  notification per session; mute is remembered in workspaceState.
+- **Native file-based handoff delivery** (`src/handoffTargets.ts`) — after copying,
+  Markr can write the handoff into the target tool's own convention so the next
+  session picks it up with zero clicks: `CLAUDE.local.md` (a delimited
+  `<!-- markr:handoff:start/end -->` block — the rest of the file is never touched),
+  `.cursor/rules/markr-handoff.mdc` (with `alwaysApply` frontmatter), or `HANDOFF.md`
+  for Codex/Augment. **Confirmed once per workspace+target** (remembered after).
+- **Stale-handoff hygiene** — when a new session starts in the target tool after a
+  handoff was written, the written file is marked consumed: the `CLAUDE.local.md`
+  block gets `(consumed <date>)`, the Cursor `.mdc` has `alwaysApply` flipped to
+  `false` (so a stale continuation stops being injected) and is stamped, and
+  `HANDOFF.md` is stamped. Block upsert normalizes only the marker seams, so content
+  outside the block is byte-for-byte untouched. Per-session exhaustion flags are
+  pruned alongside the memory high-water map.
+- **Handoff history** — last 20 handoffs per project persisted in globalStorage; a
+  new **History** tab in the Context Bridge lists them with [Copy again] / [View]
+  (opens in Markr's preview).
+- 9 unit tests in `src/handoffTargets.test.ts` (block upsert/replace, consumed-marking,
+  per-tool file shaping).
+
+### Phase 2 — The Config Feedback Loop ("configs that write themselves")
+- **`src/configSuggester.ts`** — turns repeated user constraints into evidence-backed
+  config rules. Clusters constraint memory by hand-rolled token-set Jaccard (≥0.6),
+  promotes clusters seen across ≥2 distinct sessions to an `add` suggestion with an
+  imperative rewrite (`toRuleText`), target file chosen by precedence
+  (CLAUDE.md > AGENTS.md > .cursorrules > create CLAUDE.md), and a token estimate.
+- **Dead-rule detection** — splits the primary config into sections and flags any
+  whose distinctive keywords never appear across the last ≥10 session transcripts
+  as a `remove` suggestion (with the token saving).
+- **Suggestion UI** — a "Config suggestions" section at the top of the Memory tab,
+  each with an imperative rule, target/token info, an expandable evidence list
+  (raw quotes + tool), and Accept / Dismiss. Plus a once-per-day-per-project
+  VS Code notification when new suggestions appear.
+- **One-click apply** — Accept on an `add` appends the rule under a
+  `## Learned rules (Markr)` heading via a `WorkspaceEdit` (so it's undoable), creating
+  the file if absent, then reports the token delta. `remove` opens a `vscode.diff`
+  preview and applies only on explicit confirm. Never edits a file without Accept.
+- **Opt-in LLM polish (2c)** — `markr.aiEnhance` (default off). When on and a provider
+  key exists, the clustered quotes are rewritten by the cheapest model of the configured
+  provider (10s timeout, silent fallback to the local template). Evidence shown is always
+  the raw local text. No network unless explicitly enabled.
+- **Safety refinements:** dead-rule detection never flags guardrail sections
+  (security/secret/safety/license/deploy/auth/privacy/incident/…); when `aiEnhance`
+  rewrites a rule, the rewrite is shown in a confirm dialog before it's written
+  (accept-what-you-see); suggestion ids are keyed on a stable cluster signature so a
+  dismissed suggestion can't resurrect under new wording; the remove-flow diff uses a
+  temp file that's cleaned up after.
+- 12 unit tests in `src/configSuggester.test.ts` (clustering, imperative rewrite,
+  target-file precedence, dead-rule keyword matching, guardrail protection, stable ids).
+
+### Phase 1 — Persistent Cross-Session Memory
+- **Memory store** (`src/memoryStore.ts`) — mined residuals (decisions, dead-ends,
+  constraints) are now persisted per project under the extension's globalStorage
+  (`memory/<project-hash>.json`), instead of being discarded after each handoff.
+  Deduped on a normalized 60-char key (occurrences + lastSeen bump on re-sighting),
+  capped at 500 items/project (evict oldest-dismissed, then oldest). Local-only.
+  **Secrets are redacted before they are persisted** (`redactSecrets` runs inside
+  `addFromSession`), so memory honours the same at-rest guarantee as handoffs. The
+  per-session high-water map is pruned during eviction so it can't grow unbounded.
+- **Background incremental scan** — after the Context Bridge posts session data, a
+  non-blocking pass mines only sessions whose `lastActive` changed since the last
+  scan (per-session high-water mark in the store) and folds the results into memory.
+- **Memory-seeded handoffs** — `summariseSession()` now merges a project's persisted
+  active dead-ends/constraints (seen ≥2× or in the current session) into the handoff,
+  tagged "(from earlier sessions)", so continuity survives across sessions.
+- **Memory tab** in the Context Bridge sidebar — grouped by kind, per-item tool badge
+  + occurrence count + dismiss, cross-project search. Rendered via `textContent`
+  (no `innerHTML` for user content). All updates via postMessage, no page reloads.
+- 13 unit tests in `src/memoryStore.test.ts` (normalization, dedupe, eviction,
+  high-water-mark incremental scan, per-project isolation).
+
+### Phase 0 — Trust Foundation
+
+#### Added
+- **Secret redaction in handoffs** (`src/redact.ts`) — `redactSecrets()` strips API keys,
+  tokens and connection-string passwords from a handoff as the final step of
+  `generateHandoff()`, before it reaches the clipboard. Catches Anthropic/OpenAI (`sk-…`),
+  GitHub (`ghp_…`, `github_pat_…`), Slack (`xox…`), AWS (`AKIA…`), Google (`AIza…`),
+  `Bearer` tokens, `postgres/mongodb/mysql/redis` connection strings, and generic
+  `key = <12+ chars>` assignments. False-positive guarded (prose "token", UUIDs in
+  paths, short values are never touched). The Context Bridge toast now reports the
+  redaction count ("… — 2 secrets redacted"). 18 unit tests in `src/redact.test.ts`.
+- **CRH mining eval harness** (`eval/`) — labelled fixture corpus (10 Claude-Code-format
+  transcripts) + `eval/run.mjs` computing per-category precision/recall/F1 for the
+  production decision/dead-end/constraint mining, gated against `eval/baseline.json`.
+  `npm run eval` (and `npm run test:full` to run unit tests + eval). This is a
+  **regression gate** for later mining changes — the corpus is synthetic, so F1 here
+  measures "do the regexes still match what they matched before," not real-world
+  accuracy. (A GA accuracy number needs fixtures derived from anonymized real
+  transcripts.) Redaction additionally covers prefixed env names (e.g.
+  `AWS_SECRET_ACCESS_KEY`) and PEM private-key blocks.
+
 ## [5.0.0] — 2026-06-10 _(beta — published as a Marketplace pre-release)_
 
 > **5.0.0 headline: Context Bridge.** See every AI coding session across Claude Code, Cursor, Augment, Codex & Aider in one sidebar, and hand any of them off to another tool with a Conditional Residual Handoff. Published as a pre-release (`vsce publish --pre-release`) — `package.json` stays at the clean semver `5.0.0` because the Marketplace does not accept a `-beta` suffix.

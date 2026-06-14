@@ -1,0 +1,9 @@
+{
+  "decisions": [
+    "off-by-one in the pagination"
+  ],
+  "deadEnds": [],
+  "constraints": [
+    "pagination is 1-indexed"
+  ]
+}

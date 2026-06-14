@@ -1,0 +1,11 @@
+{
+  "decisions": {
+    "f1": 0.95
+  },
+  "deadEnds": {
+    "f1": 0.95
+  },
+  "constraints": {
+    "f1": 0.95
+  }
+}

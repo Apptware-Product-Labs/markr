@@ -1,0 +1,9 @@
+{
+  "decisions": [],
+  "deadEnds": [
+    "does not compile",
+    "Rolled back the worker-thread",
+    "abandoned it"
+  ],
+  "constraints": []
+}

@@ -8,3 +8,6 @@ esbuild.js
 **/*.map
 # GIFs are large — loaded via GitHub raw URLs in README, don't bundle into .vsix
 images/screenshots/*.gif
+
+# eval harness — dev only
+eval/**

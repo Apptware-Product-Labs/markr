@@ -1,0 +1,3 @@
+{"type":"user","message":{"content":[{"type":"text","text":"fix the auth race condition"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"The issue is that the token refresh races with the request, so I serialized them."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Going with optimistic updates to avoid the spinner flash."}]}}
