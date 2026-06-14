@@ -1,0 +1,4 @@
+{"type":"user","message":{"content":[{"type":"text","text":"here are the failing logs, what do you think"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Medium: src/lib/reports/audit.ts (line 17) does not pass a stable targetId."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"ERROR: build failed at webpack.config.js:42 during the production step."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Stack trace: at Object.<anonymous> (/app/server.js:88:12)"}]}}

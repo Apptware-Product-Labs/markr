@@ -88,7 +88,8 @@
     "onCommand:markr.openFile",
     "onCommand:markr.openContextBridge",
     "onCommand:markr.openAiHealth",
-    "onCommand:markr.copyAiConfigBundle"
+    "onCommand:markr.copyAiConfigBundle",
+    "onCommand:markr.openScoreboard"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -189,6 +190,12 @@
         "title": "Refresh Context Bridge",
         "category": "Markr",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "markr.openScoreboard",
+        "title": "Open AI Scoreboard",
+        "category": "Markr",
+        "icon": "$(graph)"
       }
     ],
     "menus": {
@@ -219,9 +226,14 @@
           "group": "navigation@5"
         },
         {
+          "command": "markr.openScoreboard",
+          "when": "view == markrContextBridge",
+          "group": "navigation@1"
+        },
+        {
           "command": "markr.refreshContextBridge",
           "when": "view == markrContextBridge",
-          "group": "navigation"
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
@@ -292,6 +304,11 @@
           "default": false,
           "description": "When enabled, opening CLAUDE.md, .cursorrules, agent.md, or any AI config file automatically opens it in Markr alongside the text editor. Off by default — enable in Settings if you want this behaviour."
         },
+        "markr.aiEnhance": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled (and an API key is configured via the Run button), Markr rewrites config suggestions into a single concise rule using the cheapest model of your configured provider. Off by default — when off, suggestions use a local template rewrite and nothing leaves your machine. Evidence quotes shown to you are always the raw, local text."
+        },
         "markr.showTokenLens": {
           "type": "boolean",
           "default": true,
@@ -306,7 +323,9 @@
     "watch": "node esbuild.js --watch",
     "package": "npx @vscode/vsce package --no-dependencies",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "eval": "node eval/run.mjs",
+    "test:full": "vitest run && node eval/run.mjs"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",

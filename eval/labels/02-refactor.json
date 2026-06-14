@@ -1,0 +1,8 @@
+{
+  "decisions": [
+    "Switched to a discriminated union",
+    "keep the old API"
+  ],
+  "deadEnds": [],
+  "constraints": []
+}

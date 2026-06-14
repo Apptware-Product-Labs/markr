@@ -1,0 +1,5 @@
+{"type":"user","message":{"content":[{"type":"text","text":"Always use pnpm, not npm."}]}}
+{"type":"user","message":{"content":[{"type":"text","text":"You must not change the public API."}]}}
+{"type":"user","message":{"content":[{"type":"text","text":"Make sure every new function has a unit test."}]}}
+{"type":"user","message":{"content":[{"type":"text","text":"Never commit secrets to the repo."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Understood, I will keep to those."}]}}

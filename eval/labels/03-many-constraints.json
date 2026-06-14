@@ -1,0 +1,10 @@
+{
+  "decisions": [],
+  "deadEnds": [],
+  "constraints": [
+    "Always use pnpm",
+    "must not change the public API",
+    "every new function has a unit test",
+    "Never commit secrets"
+  ]
+}

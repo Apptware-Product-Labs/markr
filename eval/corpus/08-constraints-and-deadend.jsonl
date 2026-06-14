@@ -1,0 +1,3 @@
+{"type":"user","message":{"content":[{"type":"text","text":"Always run prettier before committing."}]}}
+{"type":"user","message":{"content":[{"type":"text","text":"The API must stay backward compatible."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Tried the streaming parser but it broke on large payloads."}]}}

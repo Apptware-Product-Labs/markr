@@ -15,10 +15,13 @@ import * as cp   from 'child_process';
 import * as fs   from 'fs';
 import * as path from 'path';
 import * as os   from 'os';
+import { redactSecrets } from './redact';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type AiTool = 'claude-code' | 'codex' | 'aider' | 'cursor' | 'augment';
+export type AiTool =
+  | 'claude-code' | 'codex' | 'aider' | 'cursor' | 'augment'
+  | 'cline' | 'roo-code' | 'windsurf' | 'gemini-cli';
 
 export interface SessionMessage {
   role: 'user' | 'assistant';
@@ -44,6 +47,12 @@ export interface SessionInfo {
 }
 
 // ─── Shared helpers ────────────────────────────────────────────────────────────
+
+/** True if `child` is the same as or nested under `parent`, with a path-segment
+ *  boundary so /Users/me/app does NOT match the sibling /Users/me/app-v2. */
+function pathWithin(child: string, parent: string): boolean {
+  return child === parent || child.startsWith(parent.replace(/\/$/, '') + '/');
+}
 
 /** Convert /Users/foo/bar → human label using last 2 path segments */
 function pathToLabel(fsPath: string): string {
@@ -441,8 +450,8 @@ export function readCodexSessions(workspacePath?: string): SessionInfo[] {
     const { messages, cwd } = parseCodexSession(filePath);
     if (!messages.length) continue;
 
-    // Filter by workspace if provided
-    if (workspacePath && cwd && !cwd.startsWith(workspacePath)) continue;
+    // Filter by workspace if provided (path-segment boundary)
+    if (workspacePath && cwd && !pathWithin(cwd, workspacePath)) continue;
 
     const projectPath = cwd || path.dirname(filePath);
     const firstUser   = messages.find(m => m.role === 'user');
@@ -478,14 +487,6 @@ export function readCodexSessions(workspacePath?: string): SessionInfo[] {
 //   aiService.prompts        → [{text: "...", commandType: N}]  — user messages
 //   aiService.generations    → [{unixMs: N, textDescription: "...", type: "composer"}]
 
-function cursorWorkspaceStoragePath(): string {
-  const p = os.platform();
-  if (p === 'darwin')  return path.join(os.homedir(), 'Library', 'Application Support', 'Cursor', 'User', 'workspaceStorage');
-  if (p === 'linux')   return path.join(os.homedir(), '.config', 'Cursor', 'User', 'workspaceStorage');
-  if (p === 'win32')   return path.join(os.homedir(), 'AppData', 'Roaming', 'Cursor', 'User', 'workspaceStorage');
-  return '';
-}
-
 // Cache whether sqlite3 binary is available — checked once, not on every 30s refresh
 let _sqlite3Available: boolean | undefined;
 function hasSqlite3(): boolean {
@@ -512,33 +513,44 @@ function sqlite3Query(dbPath: string, sql: string): string {
   }
 }
 
-export function readCursorSessions(workspacePath?: string): SessionInfo[] {
-  const storageRoot = cursorWorkspaceStoragePath();
-  if (!storageRoot || !fs.existsSync(storageRoot)) return [];
+/** App-storage workspaceStorage path for a VS Code-family app (Cursor, Windsurf). */
+function vscFamilyWorkspaceStorage(appDir: string): string {
+  const p = os.platform();
+  if (p === 'darwin')  return path.join(os.homedir(), 'Library', 'Application Support', appDir, 'User', 'workspaceStorage');
+  if (p === 'linux')   return path.join(os.homedir(), '.config', appDir, 'User', 'workspaceStorage');
+  if (p === 'win32')   return path.join(os.homedir(), 'AppData', 'Roaming', appDir, 'User', 'workspaceStorage');
+  return '';
+}
 
+function cursorWorkspaceStoragePath(): string { return vscFamilyWorkspaceStorage('Cursor'); }
+
+/**
+ * Shared reader for VS Code-family apps that store chat prompts in
+ * `<workspaceStorage>/<hash>/state.vscdb` (Cursor, Windsurf). Reads the workspace
+ * folder from workspace.json and user prompts via the aiService.* keys.
+ */
+function readVscdbSessions(storageRoot: string, tool: AiTool, workspacePath?: string): SessionInfo[] {
+  if (!storageRoot || !fs.existsSync(storageRoot)) return [];
   if (!hasSqlite3()) return [];
 
   const results: SessionInfo[] = [];
-
   let hashes: string[];
   try { hashes = fs.readdirSync(storageRoot); } catch { return []; }
 
   for (const hash of hashes) {
-    const dbPath      = path.join(storageRoot, hash, 'state.vscdb');
-    const wjPath      = path.join(storageRoot, hash, 'workspace.json');
+    const dbPath = path.join(storageRoot, hash, 'state.vscdb');
+    const wjPath = path.join(storageRoot, hash, 'workspace.json');
     if (!fs.existsSync(dbPath)) continue;
 
-    // Read workspace folder from workspace.json (faster than SQLite)
     let folderUri = '';
     try {
       const wj = JSON.parse(fs.readFileSync(wjPath, 'utf-8'));
       folderUri = typeof wj.folder === 'string' ? wj.folder : '';
-    } catch { /* no workspace.json — skip */ continue; }
+    } catch { continue; }
 
     const projectPath = folderUri.replace(/^file:\/\//, '');
-    if (workspacePath && projectPath && !projectPath.startsWith(workspacePath)) continue;
+    if (workspacePath && projectPath && !pathWithin(projectPath, workspacePath)) continue;
 
-    // Read user prompts from aiService.prompts
     const promptsJson = sqlite3Query(dbPath, 'SELECT value FROM ItemTable WHERE key = \'aiService.prompts\'');
     if (!promptsJson) continue;
 
@@ -546,18 +558,13 @@ export function readCursorSessions(workspacePath?: string): SessionInfo[] {
     try { promptsArr = JSON.parse(promptsJson); } catch { continue; }
     if (!Array.isArray(promptsArr) || !promptsArr.length) continue;
 
-    // Read last-activity timestamp from aiService.generations
     let lastActive = 0;
     const gensJson = sqlite3Query(dbPath, 'SELECT value FROM ItemTable WHERE key = \'aiService.generations\'');
     if (gensJson) {
       try {
         const gens = JSON.parse(gensJson) as Array<{ unixMs?: number }>;
         if (Array.isArray(gens) && gens.length) {
-          // reduce instead of Math.max(...spread) — avoids RangeError on large arrays
-          lastActive = gens.reduce(
-            (max, g) => Math.max(max, typeof g.unixMs === 'number' ? g.unixMs : 0),
-            0,
-          );
+          lastActive = gens.reduce((max, g) => Math.max(max, typeof g.unixMs === 'number' ? g.unixMs : 0), 0);
         }
       } catch { /* ignore */ }
     }
@@ -566,16 +573,14 @@ export function readCursorSessions(workspacePath?: string): SessionInfo[] {
     try { stat = fs.statSync(dbPath); } catch { continue; }
     if (!lastActive) lastActive = stat.mtimeMs;
 
-    // Build message list — Cursor only exposes user prompts from this API surface
     const messages: SessionMessage[] = promptsArr
       .filter(p => typeof p.text === 'string' && p.text.trim().length > 0)
       .map(p => ({ role: 'user' as const, text: (p.text as string).trim() }));
-
     if (!messages.length) continue;
 
     results.push({
-      id:          'cursor-' + hash,
-      tool:        'cursor',
+      id:          `${tool}-${hash}`,
+      tool,
       projectPath,
       projectSlug: projectPath ? pathToLabel(projectPath) : hash.slice(0, 8),
       filePath:    dbPath,
@@ -587,7 +592,188 @@ export function readCursorSessions(workspacePath?: string): SessionInfo[] {
       isActive:    (Date.now() - lastActive) < 2 * 60 * 60 * 1000,
     });
   }
+  return results.sort((a, b) => b.lastActive - a.lastActive);
+}
 
+export function readCursorSessions(workspacePath?: string): SessionInfo[] {
+  return readVscdbSessions(cursorWorkspaceStoragePath(), 'cursor', workspacePath);
+}
+
+/** Windsurf — same VS Code-family state.vscdb layout as Cursor. EXPERIMENTAL:
+ *  the exact prompt keys are unverified on this machine; degrades to [] if absent. */
+export function readWindsurfSessions(workspacePath?: string): SessionInfo[] {
+  return readVscdbSessions(vscFamilyWorkspaceStorage('Windsurf'), 'windsurf', workspacePath);
+}
+
+// ─── Cline / Roo Code reader ────────────────────────────────────────────────
+// Both store one folder per task under a VS Code extension's globalStorage:
+//   globalStorage/<extId>/tasks/<taskId>/api_conversation_history.json
+// The history is an array of Anthropic-format messages ({role, content}).
+
+function vscodeGlobalStoragePath(): string {
+  const p = os.platform();
+  if (p === 'darwin') return path.join(os.homedir(), 'Library', 'Application Support', 'Code', 'User', 'globalStorage');
+  if (p === 'linux')  return path.join(os.homedir(), '.config', 'Code', 'User', 'globalStorage');
+  if (p === 'win32')  return path.join(os.homedir(), 'AppData', 'Roaming', 'Code', 'User', 'globalStorage');
+  return '';
+}
+
+/** Parse a Cline/Roo `api_conversation_history.json` (Anthropic message array). */
+export function parseClineHistory(raw: string): SessionMessage[] {
+  let arr: unknown;
+  try { arr = JSON.parse(raw); } catch { return []; }
+  if (!Array.isArray(arr)) return [];
+  const messages: SessionMessage[] = [];
+  for (const m of arr as Array<Record<string, unknown>>) {
+    if (!m || typeof m !== 'object') continue;
+    const role = m.role === 'assistant' ? 'assistant' : m.role === 'user' ? 'user' : null;
+    if (!role) continue;
+    const content = m.content;
+    let text = '';
+    let toolBytes = 0;
+    if (typeof content === 'string') {
+      text = content;
+    } else if (Array.isArray(content)) {
+      for (const raw2 of content as Array<Record<string, unknown>>) {
+        if (!raw2 || typeof raw2 !== 'object') continue;
+        if (raw2.type === 'text' && typeof raw2.text === 'string') text += raw2.text + '\n';
+        else if (raw2.type === 'tool_use' && raw2.input) toolBytes += JSON.stringify(raw2.input).length;
+        else if (raw2.type === 'tool_result') {
+          const c = raw2.content;
+          if (typeof c === 'string') toolBytes += c.length;
+          else if (Array.isArray(c)) for (const t of c as Array<Record<string, unknown>>) {
+            if (t && t.type === 'text' && typeof t.text === 'string') toolBytes += t.text.length;
+          }
+        }
+      }
+    }
+    text = text.trim();
+    if (!text) continue;
+    messages.push({ role, text, ...(toolBytes > 0 ? { fullLength: text.length + toolBytes } : {}) });
+  }
+  return messages;
+}
+
+/** Best-effort cwd from a Cline/Roo task's injected environment_details, so the
+ *  session can surface in project scope. Returns '' (global) if not present. */
+function inferClineCwd(messages: SessionMessage[]): string {
+  const firstUser = messages.find(m => m.role === 'user');
+  if (!firstUser) return '';
+  const m = firstUser.text.match(/Current Working Directory\s*\(([^)]+)\)/i)
+    ?? firstUser.text.match(/<cwd>\s*([^<\n]+?)\s*<\/cwd>/i);
+  return m && m[1] ? m[1].trim() : '';
+}
+
+function readClineStyleSessions(extId: string, tool: AiTool, label: string): SessionInfo[] {
+  const base = vscodeGlobalStoragePath();
+  if (!base) return [];
+  const tasksDir = path.join(base, extId, 'tasks');
+  if (!fs.existsSync(tasksDir)) return [];
+
+  const results: SessionInfo[] = [];
+  let taskIds: string[];
+  try { taskIds = fs.readdirSync(tasksDir); } catch { return []; }
+
+  for (const taskId of taskIds) {
+    const histFile = path.join(tasksDir, taskId, 'api_conversation_history.json');
+    let stat: fs.Stats;
+    try { stat = fs.statSync(histFile); } catch { continue; }
+    let raw: string;
+    try { raw = fs.readFileSync(histFile, 'utf-8'); } catch { continue; }
+    const messages = parseClineHistory(raw);
+    if (!messages.length) continue;
+
+    const firstUser = messages.find(m => m.role === 'user');
+    const startedAt = /^\d{10,}$/.test(taskId) ? Number(taskId) : (stat.birthtimeMs ?? stat.ctimeMs);
+    // Infer cwd from environment_details so it can appear in project scope; '' = global.
+    const projectPath = inferClineCwd(messages);
+    results.push({
+      id:          `${tool}-${taskId}`,
+      tool,
+      projectPath,
+      projectSlug: projectPath ? pathToLabel(projectPath) : label,
+      filePath:    histFile,
+      messages,
+      startedAt,
+      lastActive:  stat.mtimeMs,
+      title:       firstUser ? firstUser.text.split('\n')[0].slice(0, 80) : `(${label})`,
+      tokenCount:  roughTokens(messages),
+      isActive:    (Date.now() - stat.mtimeMs) < 2 * 60 * 60 * 1000,
+    });
+  }
+  return results.sort((a, b) => b.lastActive - a.lastActive);
+}
+
+export function readClineSessions(): SessionInfo[] {
+  return readClineStyleSessions('saoudrizwan.claude-dev', 'cline', 'Cline');
+}
+export function readRooSessions(): SessionInfo[] {
+  return readClineStyleSessions('rooveterinaryinc.roo-cline', 'roo-code', 'Roo Code');
+}
+
+// ─── Gemini CLI reader (EXPERIMENTAL) ────────────────────────────────────────
+// ~/.gemini/tmp/<hash>/chats/*.json — Gemini "content" format ({role, parts:[{text}]}).
+// Format documented from public docs; verify on disk when available.
+
+export function parseGeminiChat(raw: string): SessionMessage[] {
+  let data: unknown;
+  try { data = JSON.parse(raw); } catch { return []; }
+  const d = data as Record<string, unknown>;
+  const arr: unknown = Array.isArray(data) ? data
+    : Array.isArray(d.messages) ? d.messages
+    : Array.isArray(d.history) ? d.history
+    : [];
+  const messages: SessionMessage[] = [];
+  for (const m of arr as Array<Record<string, unknown>>) {
+    if (!m || typeof m !== 'object') continue;
+    const role = (m.role === 'model' || m.role === 'assistant') ? 'assistant'
+      : m.role === 'user' ? 'user' : null;
+    if (!role) continue;
+    let text = '';
+    if (typeof m.content === 'string') text = m.content;
+    else if (Array.isArray(m.parts)) text = (m.parts as Array<Record<string, unknown>>).map(p => typeof p?.text === 'string' ? p.text : '').join('');
+    else if (typeof m.text === 'string') text = m.text;
+    text = text.trim();
+    if (!text) continue;
+    messages.push({ role, text });
+  }
+  return messages;
+}
+
+export function readGeminiSessions(): SessionInfo[] {
+  const root = path.join(os.homedir(), '.gemini', 'tmp');
+  if (!fs.existsSync(root)) return [];
+  const results: SessionInfo[] = [];
+  let hashes: string[];
+  try { hashes = fs.readdirSync(root); } catch { return []; }
+  for (const hash of hashes) {
+    const chatsDir = path.join(root, hash, 'chats');
+    let files: string[];
+    try { files = fs.readdirSync(chatsDir).filter(f => f.endsWith('.json')); } catch { continue; }
+    for (const f of files) {
+      const fp = path.join(chatsDir, f);
+      let stat: fs.Stats;
+      try { stat = fs.statSync(fp); } catch { continue; }
+      let raw: string;
+      try { raw = fs.readFileSync(fp, 'utf-8'); } catch { continue; }
+      const messages = parseGeminiChat(raw);
+      if (!messages.length) continue;
+      const firstUser = messages.find(m => m.role === 'user');
+      results.push({
+        id:          `gemini-cli-${hash}-${f.replace('.json', '')}`,
+        tool:        'gemini-cli',
+        projectPath: '',
+        projectSlug: 'Gemini CLI',
+        filePath:    fp,
+        messages,
+        startedAt:   stat.birthtimeMs ?? stat.ctimeMs,
+        lastActive:  stat.mtimeMs,
+        title:       firstUser ? firstUser.text.split('\n')[0].slice(0, 80) : '(gemini)',
+        tokenCount:  roughTokens(messages),
+        isActive:    (Date.now() - stat.mtimeMs) < 2 * 60 * 60 * 1000,
+      });
+    }
+  }
   return results.sort((a, b) => b.lastActive - a.lastActive);
 }
 
@@ -857,33 +1043,73 @@ function safeRead<T>(label: string, fn: () => T[]): T[] {
   }
 }
 
-export function readAllSessions(workspacePath?: string, aiderPaths?: string[]): SessionInfo[] {
+/** Per-tool health for the sidebar's tool-health row — no silent failures.
+ *  'experimental' = the tool is installed but Markr's reader for it is unverified
+ *  (distinguishes "can't read yet" from a genuine "no sessions"). */
+export type ToolHealthStatus = 'ok' | 'none' | 'error' | 'experimental';
+export interface ToolHealth { tool: AiTool; status: ToolHealthStatus; count: number; }
+
+/** Run one tool reader, capturing its session count or failure for the health row. */
+function readWithHealth(
+  tool: AiTool, health: ToolHealth[], fn: () => SessionInfo[],
+): SessionInfo[] {
+  try {
+    const r = fn();
+    health.push({ tool, status: r.length ? 'ok' : 'none', count: r.length });
+    return r;
+  } catch (e) {
+    console.error(`[Markr] ${tool} reader failed:`, e);
+    health.push({ tool, status: 'error', count: 0 });
+    return [];
+  }
+}
+
+/** Read all sessions plus per-tool health. */
+export function readAllSessionsWithHealth(
+  workspacePath?: string, aiderPaths?: string[],
+): { sessions: SessionInfo[]; health: ToolHealth[] } {
+  const health: ToolHealth[] = [];
   const sessions: SessionInfo[] = [
-    // Pass open-workspace folders as priority paths so their Claude Code
-    // sessions are never dropped by the session cap.
-    ...safeRead('ClaudeCode',  () => readClaudeCodeSessions(workspacePath, aiderPaths)),
-    ...safeRead('Codex',       () => readCodexSessions(workspacePath)),
-    ...safeRead('Cursor',      () => readCursorSessions(workspacePath)),
-    ...safeRead('Augment',     () => readAugmentSessions(workspacePath)),
+    ...readWithHealth('claude-code', health, () => readClaudeCodeSessions(workspacePath, aiderPaths)),
+    ...readWithHealth('codex',       health, () => readCodexSessions(workspacePath)),
+    ...readWithHealth('cursor',      health, () => readCursorSessions(workspacePath)),
+    ...readWithHealth('augment',     health, () => readAugmentSessions(workspacePath)),
+    ...readWithHealth('cline',       health, () => readClineSessions()),
+    ...readWithHealth('roo-code',    health, () => readRooSessions()),
+    ...readWithHealth('windsurf',    health, () => readWindsurfSessions(workspacePath)),
+    ...readWithHealth('gemini-cli',  health, () => readGeminiSessions()),
   ];
 
-  // Aider: scan the specified workspace, or every path in aiderPaths (e.g. all
-  // open VS Code workspace folders), but never silently skip when both are absent.
-  const pathsForAider: string[] = workspacePath
-    ? [workspacePath]
-    : (aiderPaths ?? []);
+  // Windsurf reader is experimental (prompt schema unverified). If Windsurf is
+  // installed but we found nothing, surface "experimental" — not a clean "none" —
+  // so the user can tell "can't read yet" from "genuinely empty".
+  try {
+    const wsHealth = health.find(h => h.tool === 'windsurf');
+    if (wsHealth && wsHealth.status === 'none' && fs.existsSync(vscFamilyWorkspaceStorage('Windsurf'))) {
+      wsHealth.status = 'experimental';
+    }
+  } catch { /* ignore */ }
+
+  // Aider: scan the specified workspace, or every path in aiderPaths.
+  const pathsForAider: string[] = workspacePath ? [workspacePath] : (aiderPaths ?? []);
+  let aiderCount = 0; let aiderErr = false;
   for (const p of pathsForAider) {
     try {
       const aider = readAiderSession(p);
-      if (aider) sessions.push(aider);
-    } catch { /* skip broken aider file */ }
+      if (aider) { sessions.push(aider); aiderCount++; }
+    } catch { aiderErr = true; }
   }
+  health.push({ tool: 'aider', status: aiderErr ? 'error' : aiderCount ? 'ok' : 'none', count: aiderCount });
 
-  // Active sessions (live, modified <2h) float to the top; then newest-first
-  return sessions.sort((a, b) => {
+  sessions.sort((a, b) => {
     if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
     return b.lastActive - a.lastActive;
   });
+  return { sessions, health };
+}
+
+export function readAllSessions(workspacePath?: string, aiderPaths?: string[]): SessionInfo[] {
+  return readAllSessionsWithHealth(workspacePath, aiderPaths).sessions;
 }
 
 // ─── Tool-activity extractors ─────────────────────────────────────────────────
@@ -1325,7 +1551,43 @@ function inferNextSteps(ctx: {
   return uniqueFirst(steps, 4);
 }
 
-export function summariseSession(session: SessionInfo): SessionContext {
+/**
+ * Mine a session's CRH residuals (decisions / dead-ends / constraints) without
+ * the git capture or activity extraction summariseSession does. Used by the
+ * background memory scan so it stays cheap and never blocks the sidebar.
+ */
+/** Concatenated assistant + user prose for a session (for dead-rule detection). */
+export function gatherSessionText(session: SessionInfo): string {
+  try {
+    const p = gatherProse(session);
+    return [...p.assistant, ...p.user].join('\n');
+  } catch {
+    return '';
+  }
+}
+
+export function mineSessionResiduals(session: SessionInfo): { decisions: string[]; deadEnds: string[]; constraints: string[] } {
+  try {
+    const prose = gatherProse(session);
+    return {
+      decisions:   mineByRegex(prose.assistant, DECISION_RE, 8, PASTED_RE),
+      deadEnds:    mineByRegex(prose.assistant, FAIL_RE, 5, PASTED_RE),
+      constraints: mineByRegex(prose.user, CONSTRAINT_RE, 6, PASTED_RE),
+    };
+  } catch {
+    return { decisions: [], deadEnds: [], constraints: [] };
+  }
+}
+
+/**
+ * @param seed  Persisted residuals from earlier sessions of the same project.
+ *              Merged into the handoff's dead-ends/constraints, tagged
+ *              "(from earlier sessions)", so continuity survives across sessions.
+ */
+export function summariseSession(
+  session: SessionInfo,
+  seed?: { deadEnds?: string[]; constraints?: string[] },
+): SessionContext {
   const userMsgs   = session.messages.filter(m => m.role === 'user');
   const assistMsgs = session.messages.filter(m => m.role === 'assistant');
 
@@ -1370,18 +1632,27 @@ export function summariseSession(session: SessionInfo): SessionContext {
   const MODEL_LABELS: Record<AiTool, string> = {
     'claude-code': 'Claude Code', codex: 'Codex/GPT-4o',
     aider: 'Aider', cursor: 'Cursor', augment: 'Augment',
+    cline: 'Cline', 'roo-code': 'Roo Code', windsurf: 'Windsurf', 'gemini-cli': 'Gemini CLI',
   };
 
   // ── CRH residual extraction (handoff-time only — full transcript + git) ──────
-  let decisions: string[] = [];
-  let failedApproaches: string[] = [];
-  let constraints: string[] = [];
-  try {
-    const prose = gatherProse(session);
-    decisions        = mineByRegex(prose.assistant, DECISION_RE, 8, PASTED_RE);
-    failedApproaches = mineByRegex(prose.assistant, FAIL_RE, 5, PASTED_RE);
-    constraints      = mineByRegex(prose.user, CONSTRAINT_RE, 6, PASTED_RE);
-  } catch { /* mining is best-effort */ }
+  const mined = mineSessionResiduals(session);
+  const decisions        = mined.decisions;
+  const failedApproaches = mined.deadEnds;
+  const constraints      = mined.constraints;
+
+  // Seed from persisted memory of earlier sessions in this project.
+  const mergeSeed = (target: string[], extra: string[] | undefined, cap: number) => {
+    for (const s of extra ?? []) {
+      if (target.length >= cap) break;
+      const key = s.toLowerCase().slice(0, 40);
+      if (!target.some(x => x.toLowerCase().includes(key))) {
+        target.push(`${s} (from earlier sessions)`);
+      }
+    }
+  };
+  mergeSeed(failedApproaches, seed?.deadEnds, 10);
+  mergeSeed(constraints, seed?.constraints, 10);
 
   let gitBranch = '';
   let gitDirtyFiles: string[] = [];
@@ -1424,6 +1695,7 @@ export type TargetTool = 'claude-code' | 'cursor' | 'codex' | 'chatgpt' | 'augme
 const TOOL_LABELS: Record<AiTool, string> = {
   'claude-code': 'Claude Code', codex: 'Codex CLI',
   aider: 'Aider', cursor: 'Cursor', augment: 'Augment',
+  cline: 'Cline', 'roo-code': 'Roo Code', windsurf: 'Windsurf', 'gemini-cli': 'Gemini CLI',
 };
 
 function fmtTokHandoff(n: number): string {
@@ -1531,7 +1803,18 @@ export function firstMeaningfulLine(text: string): string {
   return lines.find(l => l.length > 20 && !FILLER.test(l)) ?? lines[0] ?? '';
 }
 
-export function generateHandoff(ctx: SessionContext, from: AiTool, to: TargetTool): string {
+/**
+ * Build the handoff document.
+ *
+ * @param meta  Optional out-param; if provided, `meta.redactions` is set to the
+ *              number of secrets stripped from the document (for the UI toast).
+ */
+export function generateHandoff(
+  ctx: SessionContext,
+  from: AiTool,
+  to: TargetTool,
+  meta?: { redactions?: number },
+): string {
   const repoAware    = REPO_AWARE_TARGETS.has(to);
   const continuation = fenceSafe(buildContinuationPrompt(ctx, repoAware));
 
@@ -1608,5 +1891,10 @@ ${recentConvo || '_none captured_'}
     chatgpt:     'Please continue helping with this task. Context from my previous AI session is below.',
   };
   const preamble = PREAMBLE[to];
-  return preamble ? `${preamble}\n\n${core}` : core;
+  const doc = preamble ? `${preamble}\n\n${core}` : core;
+
+  // FINAL step: strip any pasted secrets before the handoff leaves the machine.
+  const redacted = redactSecrets(doc);
+  if (meta) meta.redactions = redacted.count;
+  return redacted.text;
 }

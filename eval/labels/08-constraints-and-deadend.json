@@ -1,0 +1,10 @@
+{
+  "decisions": [],
+  "deadEnds": [
+    "broke on large payloads"
+  ],
+  "constraints": [
+    "Always run prettier",
+    "must stay backward compatible"
+  ]
+}

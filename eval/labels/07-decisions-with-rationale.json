@@ -1,0 +1,8 @@
+{
+  "decisions": [
+    "token refresh races",
+    "optimistic updates to avoid"
+  ],
+  "deadEnds": [],
+  "constraints": []
+}

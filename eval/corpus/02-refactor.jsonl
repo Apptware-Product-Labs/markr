@@ -1,0 +1,3 @@
+{"type":"user","message":{"content":[{"type":"text","text":"refactor the allocation service"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Switched to a discriminated union instead of optional fields because it removes the impossible states."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Decided to keep the old API as a thin wrapper so callers don't break."}]}}

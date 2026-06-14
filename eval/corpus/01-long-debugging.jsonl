@@ -1,0 +1,4 @@
+{"type":"user","message":{"content":[{"type":"text","text":"fix the flaky dashboard test"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Let me dig in. The root cause was a missing await in the data handler."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"I chose to memoize the selector because the re-renders were thrashing the grid."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Reverting the cache layer — it didn't work with SSR hydration."}]}}

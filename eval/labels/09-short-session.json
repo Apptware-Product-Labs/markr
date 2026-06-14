@@ -1,0 +1,7 @@
+{
+  "decisions": [
+    "store the theme in localStorage"
+  ],
+  "deadEnds": [],
+  "constraints": []
+}

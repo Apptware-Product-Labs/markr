@@ -1,0 +1,2 @@
+{"type":"user","message":{"content":[{"type":"text","text":"add a dark mode toggle"}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Decided to store the theme in localStorage because it persists across reloads."}]}}

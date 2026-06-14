@@ -1,0 +1,10 @@
+{
+  "decisions": [
+    "root cause was a missing await",
+    "memoize the selector because"
+  ],
+  "deadEnds": [
+    "Reverting the cache layer"
+  ],
+  "constraints": []
+}
