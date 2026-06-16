@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { MarkdownPreviewPanel } from './preview';
-import { MarkrExplorerProvider, MarkrFileItem, AI_CONFIG_TEMPLATES } from './markrExplorer';
+import { MarkrExplorerProvider, MarkrFileItem, AI_CONFIG_TEMPLATES, isAiConfigFile } from './markrExplorer';
 import { MarkrTokenLensProvider, MarkrTokenDecorations } from './tokenLens';
 import { countTokens, detectModel } from './tokenEngine';
 import { ContextBridgeViewProvider } from './contextBridge';
@@ -144,10 +144,17 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('markr.openPreview', async () => {
       const editor = vscode.window.activeTextEditor;
-      if (editor?.document.languageId === 'markdown') {
-        MarkdownPreviewPanel.createOrShow(editor.document);
-        revealInExplorer(editor.document.uri);
-        return;
+      if (editor) {
+        const doc = editor.document;
+        // Open markdown, OR any AI config file (incl. non-markdown like
+        // .cursorrules and custom-named files under .claude/agents, skills/, etc.).
+        const isMd = doc.languageId === 'markdown';
+        const isCfg = isAiConfigFile(path.basename(doc.uri.fsPath), vscode.workspace.asRelativePath(doc.uri));
+        if (isMd || isCfg) {
+          MarkdownPreviewPanel.createOrShow(doc);
+          revealInExplorer(doc.uri);
+          return;
+        }
       }
       // No markdown file active — show workspace picker
       const wsFolders = vscode.workspace.workspaceFolders;

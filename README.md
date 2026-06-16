@@ -346,6 +346,9 @@ Headings, tables, blockquotes, task lists, strikethrough, footnotes, inline code
 ### ➗ Math (KaTeX) _(NEW in 6.3)_
 Inline `$…$` and display `$$…$$` LaTeX renders as real math via KaTeX. Fully **offline** — the fonts ship with the extension, nothing is fetched. `$` in prose ("$5 and $10") and `$` inside code spans are left alone.
 
+### 🔎 Find in Preview _(NEW in 6.4)_
+Press **Cmd/Ctrl+F** in the preview to search the rendered document — highlights all matches, **Enter / Shift+Enter** (or ↑/↓) to step through, live match count, **Esc** to close. Works in both read and split-edit preview.
+
 ### 📑 Live Table of Contents
 Auto-generated from your headings the moment you open the file. Scroll spy highlights the active section in real time. Click any item to jump there. Collapse it with one button.
 

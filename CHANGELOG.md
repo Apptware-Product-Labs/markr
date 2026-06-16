@@ -7,6 +7,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [6.4.0] — Find in Preview
+
+### Added
+- **Find in preview** — `Cmd/Ctrl+F` opens an in-preview search bar that highlights
+  all matches in the rendered document, with Enter / Shift+Enter (or ↑/↓) to step
+  through, a live match count, and Esc to close. Works in read and split-edit
+  preview; resets on file switch. Pure DOM (TreeWalker), no dependencies.
+
+## [6.3.1] — Open AI configs in nested folders
+
+### Fixed
+- `Open in Markr` now opens any AI config regardless of language (e.g. `.cursorrules`),
+  and the editor-title buttons (Open in Markr + AI Config Lab) now appear for
+  custom-named configs under `.claude/`, `.cursor/`, `agents/`, `skills/`, etc.
+
 ## [6.3.0] — Math rendering (KaTeX)
 
 ### Added

@@ -2379,15 +2379,85 @@ const SCRIPT = /* javascript */`
     const inEditor = document.activeElement === qs('#edit-area');
     const inQo     = document.activeElement === qs('#qo-input');
     if (e.key === 'Escape') {
+      if (qs('#find-bar.open'))        { closeFind();      return; }
       if (qs('#quick-open.open'))     { closeQuickOpen();  return; }
       if (qs('#shortcuts-panel.open')) { closeShortcuts(); return; }
       if (editMode) { exitEditMode(); return; }
     }
+    // Cmd+F / Ctrl+F — find in preview
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'f' || e.key === 'F')) { e.preventDefault(); openFind(); return; }
     // Cmd+S / Ctrl+S — explicit save (catches the shortcut when focus is outside the textarea)
     if ((e.metaKey || e.ctrlKey) && e.key === 's' && editMode) { e.preventDefault(); saveFile(); return; }
     if ((e.metaKey || e.ctrlKey) && e.key === 'k' && !inEditor) { e.preventDefault(); openQuickOpen(); return; }
     if (e.key === '?' && !inEditor && !inQo) { e.preventDefault(); openShortcuts(); return; }
   });
+
+  // ── Find in preview (Cmd/Ctrl+F) ────────────────────────────────────────────
+  let findMatches = [], findIdx = -1;
+  function findRoot() {
+    const arts = document.querySelectorAll('.markdown-body');
+    for (let i = 0; i < arts.length; i++) { if (arts[i].offsetParent !== null) return arts[i]; }
+    return arts[0] || document.body;
+  }
+  function clearFind() {
+    findMatches.forEach(m => { const p = m.parentNode; if (p) { p.replaceChild(document.createTextNode(m.textContent), m); p.normalize(); } });
+    findMatches = []; findIdx = -1;
+  }
+  function updateFindCount() {
+    const c = qs('#find-count'); if (!c) return;
+    const has = qs('#find-input') && qs('#find-input').value;
+    c.textContent = findMatches.length ? (findIdx + 1) + ' / ' + findMatches.length : (has ? 'No results' : '');
+  }
+  function focusFindMatch() {
+    findMatches.forEach((m, i) => m.classList.toggle('current', i === findIdx));
+    const cur = findMatches[findIdx];
+    if (cur) cur.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    updateFindCount();
+  }
+  function findStep(d) { if (!findMatches.length) return; findIdx = (findIdx + d + findMatches.length) % findMatches.length; focusFindMatch(); }
+  function runFind(q) {
+    clearFind();
+    if (!q) { updateFindCount(); return; }
+    const root = findRoot(); const needle = q.toLowerCase();
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(n) {
+        if (!n.nodeValue) return NodeFilter.FILTER_REJECT;
+        const pn = n.parentNode && n.parentNode.nodeName;
+        if (pn === 'SCRIPT' || pn === 'STYLE') return NodeFilter.FILTER_REJECT;
+        return n.nodeValue.toLowerCase().indexOf(needle) >= 0 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      }
+    });
+    const nodes = []; let n; while ((n = walker.nextNode())) nodes.push(n);
+    nodes.forEach(node => {
+      const text = node.nodeValue, low = text.toLowerCase(), frag = document.createDocumentFragment();
+      let last = 0, idx;
+      while ((idx = low.indexOf(needle, last)) >= 0) {
+        if (idx > last) frag.appendChild(document.createTextNode(text.slice(last, idx)));
+        const mk = document.createElement('mark'); mk.className = 'mfind'; mk.textContent = text.slice(idx, idx + q.length);
+        frag.appendChild(mk); findMatches.push(mk);
+        last = idx + q.length;
+      }
+      if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+      if (node.parentNode) node.parentNode.replaceChild(frag, node);
+    });
+    if (findMatches.length) { findIdx = 0; focusFindMatch(); } else { updateFindCount(); }
+  }
+  function openFind() {
+    qs('#find-bar').classList.add('open');
+    const input = qs('#find-input');
+    const sel = String(window.getSelection() || '');
+    if (sel && sel.trim() && sel.length < 80) input.value = sel.trim();
+    input.focus(); input.select();
+    if (input.value) runFind(input.value);
+  }
+  function closeFind() { clearFind(); qs('#find-bar').classList.remove('open'); updateFindCount(); }
+  qs('#find-input') && qs('#find-input').addEventListener('input', e => runFind(e.target.value));
+  qs('#find-input') && qs('#find-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); findStep(e.shiftKey ? -1 : 1); }
+  });
+  qs('#find-next')  && qs('#find-next').addEventListener('click', () => findStep(1));
+  qs('#find-prev')  && qs('#find-prev').addEventListener('click', () => findStep(-1));
+  qs('#find-close') && qs('#find-close').addEventListener('click', closeFind);
 
   // ── External links ─────────────────────────────────────────────────────────
   document.addEventListener('click', e => {
@@ -2943,6 +3013,7 @@ const SCRIPT = /* javascript */`
       return;
     }
     if (msg.type === 'fileLoaded') {
+      closeFind();   // reset find when the content changes
       // ── Clipboard preview: pure overlay — never modify tabs, activeTabUri or currentUri ──
       if (msg.isClipboard) {
         prevEditModeBeforeClipboard = editMode; // remember so dismiss can restore
@@ -4052,6 +4123,25 @@ export class MarkdownPreviewPanel {
         <button class="cb-save" id="btn-save-clipboard" title="Save the current content as a .md file">Save as .md</button>
         <button class="cb-dismiss" id="btn-dismiss-clipboard" title="Close clipboard preview and return to your file">Close</button>
       </div>
+    </div>
+    <style>
+    #find-bar { position: fixed; top: 48px; right: 16px; z-index: 900; display: none; align-items: center; gap: 6px;
+      background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+    #find-bar.open { display: flex; }
+    #find-input { background: var(--code-bg); border: 1px solid var(--border); color: var(--text); border-radius: 5px; padding: 3px 8px; font-size: 12px; width: 180px; outline: none; }
+    #find-input:focus { border-color: var(--accent); }
+    #find-count { font-size: 11px; color: var(--text-muted); min-width: 58px; text-align: center; }
+    .find-btn { background: transparent; border: none; color: var(--text-2); cursor: pointer; font-size: 13px; padding: 2px 6px; border-radius: 4px; line-height: 1; }
+    .find-btn:hover { background: var(--bg-hover); color: var(--text); }
+    mark.mfind { background: rgba(250,204,21,.40); color: inherit; border-radius: 2px; }
+    mark.mfind.current { background: var(--accent); color: #fff; }
+    </style>
+    <div id="find-bar">
+      <input id="find-input" type="text" placeholder="Find in preview…" spellcheck="false" autocomplete="off" />
+      <span id="find-count"></span>
+      <button class="find-btn" id="find-prev" title="Previous (Shift+Enter)">↑</button>
+      <button class="find-btn" id="find-next" title="Next (Enter)">↓</button>
+      <button class="find-btn" id="find-close" title="Close (Esc)">✕</button>
     </div>
     <div id="main">
       <div id="scroller"><article class="markdown-body">${body}</article></div>

@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr – AI Config Editor & Markdown Preview",
   "description": "The memory & control layer for AI coding tools + Markdown preview — Context Bridge hands off sessions between Claude Code, Cursor, Augment, Codex, Cline, Windsurf & Gemini; cross-session memory, self-writing configs, AI Scoreboard; auto-opens CLAUDE.md / .cursorrules in split-edit mode, Agent Watch, Mermaid, TOC, themes, PDF export",
-  "version": "6.3.0",
+  "version": "6.4.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
@@ -258,12 +258,12 @@
       "editor/title": [
         {
           "command": "markr.openPreview",
-          "when": "editorLangId == markdown || resourceFilename =~ /^(CLAUDE\\.md|\\.cursorrules|agent\\.md|agents\\.md|skill\\.md|system-prompt\\.md|\\.windsurfrules|copilot-instructions\\.md)$/",
+          "when": "editorLangId == markdown || resourceFilename =~ /^(CLAUDE\\.md|\\.cursorrules|agent\\.md|agents\\.md|skill\\.md|system-prompt\\.md|\\.windsurfrules|copilot-instructions\\.md)$/ || resourcePath =~ /(\\.claude|\\.cursor|\\.github|\\/agents?\\/|\\/skills?\\/|\\/prompts?\\/|\\/rules\\/)/",
           "group": "navigation"
         },
         {
           "command": "markr.openAiConfigLab",
-          "when": "resourceFilename =~ /^(CLAUDE(\\.local)?\\.md|AGENTS?\\.md|agent\\.md|agents\\.md|\\.cursorrules|skill\\.md|system-prompt\\.md|\\.windsurfrules|copilot-instructions\\.md)$/",
+          "when": "resourceFilename =~ /^(CLAUDE(\\.local)?\\.md|AGENTS?\\.md|agent\\.md|agents\\.md|\\.cursorrules|skill\\.md|system-prompt\\.md|\\.windsurfrules|copilot-instructions\\.md)$/ || resourcePath =~ /(\\.claude|\\.cursor|\\/agents?\\/|\\/skills?\\/|\\/prompts?\\/|\\/rules\\/)/ && resourceExtname == .md",
           "group": "navigation"
         }
       ],
