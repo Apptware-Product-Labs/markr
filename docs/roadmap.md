@@ -2,6 +2,15 @@
 
 ## Shipped ✅
 
+### v6.1.0 — AI Config Lab
+- AI Config Lab: test your `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, and Copilot
+  instructions with lightweight prompt test cases directly inside Markr.
+- Run a test prompt against the config (config = instruction, prompt = user message),
+  stream the response, and get deterministic pass/fail from must-include /
+  must-not-include checks.
+- Tests stored locally in `.markr/config-tests.json`; config files never modified;
+  secrets redacted before sending; nothing sent without an explicit Run.
+
 ### v3.9.0 — Agent Editor Release
 - Markr IS the editor for AI config files (auto-open + close text editor)
 - Agent Watch — `fs.watch` real-time preview without save
@@ -23,22 +32,40 @@
 
 ---
 
+## Strategy 🎯
+
+Markr is now two products under one name: a **Markdown/AI-config previewer** and an
+**AI-config workbench** (Context Bridge handoffs, Memory, self-writing configs,
+Scoreboard, Config Lab). Markdown preview is commoditized; the workbench is the moat.
+
+Direction: **make Markdown a boringly-excellent substrate, then invest the roadmap in
+the AI-config workbench.** Reframe the identity around *"the workbench for AI agent
+instructions — edit, test, hand off,"* with Markdown as the base.
+
 ## Planned 🗓
 
-### Next — Token Budget Warnings
-- Colour-coded thresholds: green → yellow → orange → red
-- Section-level token breakdown (which heading costs the most)
-- Warning when approaching 32k / 128k limits
+### v6.2 — Config Lab depth + Markdown credibility
+- **Config Lab: regression-on-edit** — remember each test's last result + the config
+  it ran against; flag tests as *stale* when the config changes, and surface
+  pass→fail *regressions* after a re-run. _(in progress)_
+- **Richer assertions** — beyond substring: regex, "must refuse / must ask first,"
+  and an opt-in LLM-as-judge for the expected-behavior note.
+- ✅ **KaTeX math** (`$…$` / `$$…$$`) — shipped in 6.3, offline (fonts inlined).
+- Markdown completeness: footnotes, `<details>` collapsibles, emoji shortcodes.
 
-### Coming — JSON + ENV Support
-- Preview `.cursor/settings.json` as formatted key-value
-- Preview `.env` files with description annotations
-- Preview `mcp.json` (MCP server configuration)
+### v7 — Workbench as infrastructure
+- **`markr test` CLI / CI mode** — run `.markr/config-tests.json` in CI so a bad
+  config edit fails the PR. Turns Config Lab from a toy into team infra.
+- **Multi-model compare** — run one test across Claude/GPT/Gemini side-by-side.
+- **Shared webview design system** — one theme token set + components across
+  Preview / Context Bridge / Scoreboard / Config Lab (currently inconsistent).
+- **First-run onboarding** + clearer Marketplace positioning.
 
-### Future — Session Diff
-- Track what the agent changed across a session
-- "What did Claude write today?" diff view
-- Simple audit trail for your AI config files
+### Non-goals (explicitly out of scope)
+- Markdown publishing / static-site generation.
+- Full WYSIWYG editing.
+- More standalone dashboards.
+- Chasing feature parity with general Markdown-preview extensions.
 
 ---
 

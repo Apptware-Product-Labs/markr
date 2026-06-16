@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { marked, Renderer, type MarkedExtension } from 'marked';
 import { markedHighlight } from 'marked-highlight';
+import { katexExtension } from './katexMath';
+import { KATEX_CSS } from './katexAssets';
 import hljs from 'highlight.js';
 import * as cp from 'child_process';
 import * as os from 'os';
@@ -66,6 +68,7 @@ renderer.heading = function (text: string, depth: number) {
   return `<h${depth} id="${id}">${t}<a class="h-anchor" href="#${id}" title="Copy link">#</a></h${depth}>\n`;
 };
 marked.use({ gfm: true, breaks: false, renderer });
+marked.use(katexExtension());   // $…$ / $$…$$ math via KaTeX (offline)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -3922,11 +3925,13 @@ export class MarkdownPreviewPanel {
 <meta http-equiv="Content-Security-Policy"
   content="default-src 'none';
            style-src 'unsafe-inline';
+           font-src data:;
            img-src https: data: ${this._panel.webview.cspSource};
            script-src 'nonce-${nonce}' https://cdn.jsdelivr.net;
            connect-src https://cdn.jsdelivr.net;">
 <title>Markr</title>
 <style>${CSS}</style>
+<style>${KATEX_CSS}</style>
 </head>
 <body>
 

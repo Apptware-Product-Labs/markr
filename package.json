@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr – AI Config Editor & Markdown Preview",
   "description": "The memory & control layer for AI coding tools + Markdown preview — Context Bridge hands off sessions between Claude Code, Cursor, Augment, Codex, Cline, Windsurf & Gemini; cross-session memory, self-writing configs, AI Scoreboard; auto-opens CLAUDE.md / .cursorrules in split-edit mode, Agent Watch, Mermaid, TOC, themes, PDF export",
-  "version": "6.0.0",
+  "version": "6.3.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
@@ -94,7 +94,8 @@
     "onCommand:markr.openContextBridge",
     "onCommand:markr.openAiHealth",
     "onCommand:markr.copyAiConfigBundle",
-    "onCommand:markr.openScoreboard"
+    "onCommand:markr.openScoreboard",
+    "onCommand:markr.openAiConfigLab"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -201,6 +202,12 @@
         "title": "Open AI Scoreboard",
         "category": "Markr",
         "icon": "$(graph)"
+      },
+      {
+        "command": "markr.openAiConfigLab",
+        "title": "Open AI Config Lab",
+        "category": "Markr",
+        "icon": "$(beaker)"
       }
     ],
     "menus": {
@@ -252,6 +259,11 @@
         {
           "command": "markr.openPreview",
           "when": "editorLangId == markdown || resourceFilename =~ /^(CLAUDE\\.md|\\.cursorrules|agent\\.md|agents\\.md|skill\\.md|system-prompt\\.md|\\.windsurfrules|copilot-instructions\\.md)$/",
+          "group": "navigation"
+        },
+        {
+          "command": "markr.openAiConfigLab",
+          "when": "resourceFilename =~ /^(CLAUDE(\\.local)?\\.md|AGENTS?\\.md|agent\\.md|agents\\.md|\\.cursorrules|skill\\.md|system-prompt\\.md|\\.windsurfrules|copilot-instructions\\.md)$/",
           "group": "navigation"
         }
       ],
@@ -334,6 +346,7 @@
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
+    "@types/katex": "^0.16.8",
     "@types/node": "^18.0.0",
     "@types/vscode": "^1.80.0",
     "esbuild": "^0.19.0",
@@ -342,6 +355,7 @@
   },
   "dependencies": {
     "highlight.js": "^11.9.0",
+    "katex": "^0.16.47",
     "marked": "^9.0.0",
     "marked-highlight": "^2.0.0"
   }

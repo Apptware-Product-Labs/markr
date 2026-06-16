@@ -7,6 +7,8 @@ import { MarkrTokenLensProvider, MarkrTokenDecorations } from './tokenLens';
 import { countTokens, detectModel } from './tokenEngine';
 import { ContextBridgeViewProvider } from './contextBridge';
 import { analyzeAiWorkspace, buildAiConfigBundle, buildAiHealthMarkdown } from './aiConfigAnalyzer';
+import { PromptRunner } from './promptRunner';
+import { ConfigLabPanel } from './configLabRunner';
 
 export async function activate(context: vscode.ExtensionContext) {
 
@@ -41,6 +43,9 @@ export async function activate(context: vscode.ExtensionContext) {
     }),
     vscode.commands.registerCommand('markr.openScoreboard', () => {
       contextBridgeProvider.openScoreboard();
+    }),
+    vscode.commands.registerCommand('markr.openAiConfigLab', () => {
+      ConfigLabPanel.show(context, new PromptRunner(context.secrets));
     }),
     vscode.commands.registerCommand('markr.openAiHealth', async () => {
       await vscode.window.withProgress(

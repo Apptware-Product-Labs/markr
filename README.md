@@ -220,6 +220,18 @@ One click concatenates every AI config file in your workspace — `CLAUDE.md`, `
 
 ---
 
+### 🧪 AI Config Lab — test your AI config like a notebook _(NEW in 6.1, beta)_
+
+You write `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, and Copilot instructions blind — there's no way to check whether the rules actually steer a model the way you intended. **AI Config Lab** lets you test them directly inside Markr.
+
+Open the Lab on any AI config file (🧪 in the editor title bar, or `Markr: Open AI Config Lab`) and create lightweight test cases: a name, a user prompt, an expected-behavior note, and optional **must-include** / **must-not-include** checks. Click **Run** — Markr uses the config file as the model's instruction and your prompt as the user message, streams the response, and shows **pass/fail** from the deterministic include/exclude checks.
+
+Example tests: *"Uses project test command"* (prompt: "I changed sessionReader.ts — what should I run?" → must include `npm test`), *"Avoids unsafe actions"*, *"Respects the package manager"*.
+
+- Uses your existing provider keys (Anthropic / OpenAI / Google) from SecretStorage — nothing is sent until you click Run.
+- **Secrets are redacted** from the config and prompt before anything leaves the machine; raw `.env` values are never sent.
+- Tests are stored locally in `.markr/config-tests.json`. Your config files are never modified.
+
 ### 🤖 Markr is the Editor for AI Config Files
 
 Opening CLAUDE.md, `.cursorrules`, `agent.md`, `skill.md`, `copilot-instructions.md`, `.windsurfrules`, or any AI config file from **anywhere** in VS Code (Explorer double-click, `Ctrl+P`, terminal, git checkout) now opens it **exclusively in Markr**. The VS Code text editor tab closes automatically — Markr's split-edit view becomes the full editor for these files.
@@ -330,6 +342,9 @@ All AI config files open automatically in **split edit mode** — preview on the
 
 ### 📄 GitHub-Style Rendering
 Headings, tables, blockquotes, task lists, strikethrough, footnotes, inline code, fenced code blocks — all rendered exactly as GitHub does. Automatically switches between light and dark with your VS Code theme.
+
+### ➗ Math (KaTeX) _(NEW in 6.3)_
+Inline `$…$` and display `$$…$$` LaTeX renders as real math via KaTeX. Fully **offline** — the fonts ship with the extension, nothing is fetched. `$` in prose ("$5 and $10") and `$` inside code spans are left alone.
 
 ### 📑 Live Table of Contents
 Auto-generated from your headings the moment you open the file. Scroll spy highlights the active section in real time. Click any item to jump there. Collapse it with one button.

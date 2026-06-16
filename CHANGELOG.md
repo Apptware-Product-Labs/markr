@@ -7,6 +7,53 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [6.3.0] — Math rendering (KaTeX)
+
+### Added
+- **Math rendering** — inline `$…$` and display `$$…$$` LaTeX now render via KaTeX
+  in the preview. Rendered server-side (`src/katexMath.ts`, a marked extension);
+  the stylesheet + woff2 fonts are inlined (`src/katexAssets.ts`) so it works
+  **fully offline** — no CDN, no external assets. Prose dollar signs and `$` inside
+  code spans are left alone; malformed math renders as an inline error, never a
+  crash. (`marked-katex`-style, hand-rolled — only adds the `katex` dependency.)
+  5 unit tests in `src/katexMath.test.ts`. Regenerate the inlined CSS with
+  `node scripts/gen-katex-css.js` after bumping katex.
+
+## [6.2.0] — Config Lab: regression-on-edit _(beta)_
+
+### Added
+- **Regression-on-edit for AI Config Lab** — each test now remembers its last
+  result and the config it ran against. After you edit the config, tests that ran
+  on the old version show a **stale** badge, and a re-run surfaces **regressions**
+  (a test that was passing and now fails) inline and in a **Run all** summary
+  banner ("N regressed / M fixed"). Closes the edit → re-test → confidence loop.
+  Pure helpers (`hashConfig`, `isStale`, `regressionDelta`) added with unit tests.
+
+### Docs
+- Roadmap reframed around the strategy: Markdown as a boringly-excellent substrate,
+  roadmap energy on the AI-config **workbench** (Config Lab depth, `markr test` CLI/CI,
+  multi-model compare, shared webview design system; KaTeX pending a size decision).
+
+## [6.1.0] — AI Config Lab _(beta)_
+
+### Added
+- **AI Config Lab** — test your AI config files (`AGENTS.md`, `CLAUDE.md`,
+  `.cursorrules`, Copilot instructions) with lightweight prompt test cases inside
+  Markr. Open it from the 🧪 editor-title button or `Markr: Open AI Config Lab`.
+  - A test case has a name, user prompt, optional expected-behavior note, and
+    optional **must-include** / **must-not-include** checks, plus provider/model.
+  - **Run** uses the config file as the model's instruction and the prompt as the
+    user message, streams the response, and shows deterministic pass/fail from the
+    include/exclude checks (expected-behavior is a manual note in v1).
+  - Tests are stored locally in `.markr/config-tests.json`; **config files are never
+    modified**.
+  - Uses existing provider keys (Anthropic/OpenAI/Google) from SecretStorage;
+    **nothing is sent until you click Run**, and the config + prompt are
+    **redacted** (`redactSecrets`) before sending — raw `.env` values never leave.
+  - New modules: `src/configLab.ts`, `src/configLabStore.ts`, `src/configLabRunner.ts`,
+    `src/webview/configLabHtml.ts`. 18 unit tests for the pure logic (suite storage,
+    include/exclude checks, prompt construction, outbound redaction).
+
 ## [6.0.0] — v6 _(beta — Marketplace pre-release)_
 
 ### Phase 5 — New Tool Readers (audience expansion)
