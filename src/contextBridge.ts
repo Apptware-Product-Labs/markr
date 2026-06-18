@@ -830,7 +830,7 @@ function fmtTok(n: number): string {
 
 // ─── Static shell HTML (set once, never replaced) ────────────────────────────
 
-function buildShellHtml(): string {
+export function buildShellHtml(): string {
   const toolColors = JSON.stringify(TOOL_COLOR);
   const toolLabels = JSON.stringify(TOOL_LABEL);
 
@@ -1155,6 +1155,21 @@ body {
   border-radius: 2px;
 }
 
+/* ── Keyboard focus rings (whole panel is keyboard-navigable) ── */
+.card, .quick-btn, .hbtn, .view-tab, .scope-btn, .tab, .time-btn, .bridge-action { outline: none; }
+.card:focus-visible {
+  border-color: #F97316;
+  box-shadow: 0 0 0 1px rgba(249,115,22,.75), 0 0 0 4px rgba(249,115,22,.14);
+}
+.quick-btn:focus-visible, .hbtn:focus-visible, .view-tab:focus-visible,
+.scope-btn:focus-visible, .tab:focus-visible, .time-btn:focus-visible, .bridge-action:focus-visible {
+  outline: 2px solid #F97316; outline-offset: 1px; border-radius: 4px;
+}
+/* Subtle fade when switching Sessions / Memory / History */
+@keyframes view-fade { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.view-fade { animation: view-fade .16s ease; }
+@media (prefers-reduced-motion: reduce) { .view-fade { animation: none; } }
+
 /* ── View tabs (Sessions | Memory) ── */
 .view-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border, rgba(127,127,127,.2)); }
 .view-tab {
@@ -1239,10 +1254,10 @@ body {
   <span class="markr-sub" id="header-count"></span>
 </div>
 
-<div class="view-tabs" id="view-tabs">
-  <button class="view-tab active" data-view="sessions">Sessions</button>
-  <button class="view-tab" data-view="memory">Memory</button>
-  <button class="view-tab" data-view="history">History</button>
+<div class="view-tabs" id="view-tabs" role="tablist" aria-label="Context Bridge views">
+  <button class="view-tab active" data-view="sessions" role="tab" aria-selected="true">Sessions</button>
+  <button class="view-tab" data-view="memory" role="tab" aria-selected="false" tabindex="-1">Memory</button>
+  <button class="view-tab" data-view="history" role="tab" aria-selected="false" tabindex="-1">History</button>
 </div>
 
 <div class="toolbar">
@@ -1339,6 +1354,7 @@ body {
   let timeFilter = _saved.timeFilter || 'all';
   let query      = _saved.query  || '';
   let selId      = null;
+  let kbFocusId  = null;   // card to restore keyboard focus to after a re-render
   let projectName = '';
 
   function saveState() { vsc.setState({ filter, scope, timeFilter, query }); }
@@ -1555,13 +1571,32 @@ body {
       html += '</div>';
       root.innerHTML = html;
 
-      root.querySelectorAll('.card').forEach(function (card) {
-        card.addEventListener('click', function () {
-          var id = card.getAttribute('data-id');
-          selId = (selId === id) ? null : id;
-          render();
+      var cards = Array.prototype.slice.call(root.querySelectorAll('.card'));
+      cards.forEach(function (card, idx) {
+        var id = card.getAttribute('data-id');
+        // Make each card a real, keyboard-reachable control.
+        card.tabIndex = 0;
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-pressed', selId === id ? 'true' : 'false');
+        var titleEl = card.querySelector('.title');
+        card.setAttribute('aria-label', 'Session' + (titleEl ? ': ' + titleEl.textContent : '') + ' — Enter to select, ↑↓ to move');
+        function toggle() { selId = (selId === id) ? null : id; kbFocusId = id; render(); }
+        card.addEventListener('click', toggle);
+        card.addEventListener('focus', function () { kbFocusId = id; });
+        card.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+          else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            e.preventDefault();
+            var next = cards[idx + (e.key === 'ArrowDown' ? 1 : -1)];
+            if (next) next.focus();
+          }
         });
       });
+      // Restore keyboard focus after the list re-renders (e.g. on select toggle).
+      if (kbFocusId) {
+        var keep = root.querySelector('.card[data-id="' + (window.CSS && CSS.escape ? CSS.escape(kbFocusId) : kbFocusId) + '"]');
+        if (keep) keep.focus();
+      }
       root.querySelectorAll('[data-action="handoff"]').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
           e.preventDefault();
@@ -1653,7 +1688,10 @@ body {
   function switchView(v) {
     currentView = v;
     document.querySelectorAll('.view-tab').forEach(function (b) {
-      b.classList.toggle('active', b.getAttribute('data-view') === v);
+      var on = b.getAttribute('data-view') === v;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.tabIndex = on ? 0 : -1;            // roving tabindex
     });
     var sessions = (v === 'sessions');
     document.querySelector('.toolbar').style.display = sessions ? '' : 'none';
@@ -1662,9 +1700,25 @@ body {
     document.getElementById('tool-health').style.display = sessions ? '' : 'none';
     document.getElementById('memory-view').style.display = (v === 'memory') ? 'block' : 'none';
     document.getElementById('history-view').style.display = (v === 'history') ? 'block' : 'none';
+    // Subtle fade-in of the now-visible view.
+    var shown = sessions ? document.getElementById('list-root')
+      : document.getElementById(v === 'memory' ? 'memory-view' : 'history-view');
+    if (shown) { shown.classList.remove('view-fade'); void shown.offsetWidth; shown.classList.add('view-fade'); }
     if (v === 'memory') vsc.postMessage({ type: 'getMemory' });
     if (v === 'history') vsc.postMessage({ type: 'getHistory' });
   }
+
+  // Arrow-key navigation across the view tabs (ARIA tablist pattern).
+  document.getElementById('view-tabs').addEventListener('keydown', function (e) {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    var views = ['sessions', 'memory', 'history'];
+    var i = views.indexOf(currentView);
+    var ni = e.key === 'ArrowRight' ? (i + 1) % views.length : (i - 1 + views.length) % views.length;
+    switchView(views[ni]);
+    var t = document.querySelector('.view-tab[data-view="' + views[ni] + '"]');
+    if (t) t.focus();
+    e.preventDefault();
+  });
 
   function renderHistory(entries) {
     var root = document.getElementById('history-root');

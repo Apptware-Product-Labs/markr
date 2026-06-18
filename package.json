@@ -1,8 +1,8 @@
 {
   "name": "markr",
   "displayName": "Markr – AI Config Editor & Markdown Preview",
-  "description": "The memory & control layer for AI coding tools + Markdown preview — Context Bridge hands off sessions between Claude Code, Cursor, Augment, Codex, Cline, Windsurf & Gemini; cross-session memory, self-writing configs, AI Scoreboard; auto-opens CLAUDE.md / .cursorrules in split-edit mode, Agent Watch, Mermaid, TOC, themes, PDF export",
-  "version": "6.4.0",
+  "description": "The memory & control layer for AI coding tools + Markdown preview — Context Bridge hands off sessions between Claude Code, Cursor, Augment, Codex, Cline, Windsurf & Gemini; cross-session memory, self-writing configs, AI Scoreboard; AI Agent Map for multi-agent .claude/ repos, Config Lab to test your configs; auto-opens CLAUDE.md / .cursorrules in split-edit mode, Agent Watch, Mermaid, TOC, themes, PDF export",
+  "version": "6.5.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
@@ -83,7 +83,14 @@
     "windsurf",
     "gemini cli",
     "ai memory",
-    "agent memory"
+    "agent memory",
+    "agent map",
+    "agent graph",
+    "multi-agent",
+    "subagents",
+    "ai config lab",
+    "agent visualization",
+    "claude agents"
   ],
   "activationEvents": [
     "onLanguage:markdown",
@@ -95,7 +102,8 @@
     "onCommand:markr.openAiHealth",
     "onCommand:markr.copyAiConfigBundle",
     "onCommand:markr.openScoreboard",
-    "onCommand:markr.openAiConfigLab"
+    "onCommand:markr.openAiConfigLab",
+    "onCommand:markr.openAgentMap"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -111,10 +119,18 @@
     "views": {
       "markr-sidebar": [
         {
+          "id": "markrWorkbench",
+          "name": "Workbench",
+          "type": "webview",
+          "contextualTitle": "Markr — Workbench",
+          "initialSize": 2,
+          "visibility": "visible"
+        },
+        {
           "id": "markrExplorer",
           "name": "Markdown & AI Configs",
           "contextualTitle": "Markr",
-          "initialSize": 1,
+          "initialSize": 5,
           "visibility": "visible"
         },
         {
@@ -122,7 +138,7 @@
           "name": "Context Bridge",
           "type": "webview",
           "contextualTitle": "Markr — Context Bridge",
-          "initialSize": 1,
+          "initialSize": 5,
           "visibility": "visible"
         }
       ]
@@ -208,6 +224,12 @@
         "title": "Open AI Config Lab",
         "category": "Markr",
         "icon": "$(beaker)"
+      },
+      {
+        "command": "markr.openAgentMap",
+        "title": "Open AI Agent Map",
+        "category": "Markr",
+        "icon": "$(type-hierarchy)"
       }
     ],
     "menus": {
@@ -218,24 +240,29 @@
           "group": "navigation@1"
         },
         {
-          "command": "markr.searchFiles",
+          "command": "markr.pastePreview",
           "when": "view == markrExplorer",
           "group": "navigation@2"
         },
         {
-          "command": "markr.openAiHealth",
+          "command": "markr.searchFiles",
           "when": "view == markrExplorer",
           "group": "navigation@3"
         },
         {
-          "command": "markr.copyAiConfigBundle",
+          "command": "markr.openAiHealth",
           "when": "view == markrExplorer",
           "group": "navigation@4"
         },
         {
-          "command": "markr.refreshExplorer",
+          "command": "markr.copyAiConfigBundle",
           "when": "view == markrExplorer",
           "group": "navigation@5"
+        },
+        {
+          "command": "markr.refreshExplorer",
+          "when": "view == markrExplorer",
+          "group": "navigation@6"
         },
         {
           "command": "markr.openScoreboard",
@@ -288,12 +315,6 @@
         "key": "ctrl+shift+m",
         "mac": "cmd+shift+m",
         "when": "editorLangId == markdown"
-      },
-      {
-        "command": "markr.pastePreview",
-        "key": "ctrl+shift+p",
-        "mac": "cmd+shift+p",
-        "when": "!editorFocus"
       }
     ],
     "configuration": {

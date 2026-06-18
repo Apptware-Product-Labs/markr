@@ -66,6 +66,7 @@ textarea { resize: vertical; min-height: 38px; }
 <div class="bar">
   <button class="btn" id="add">+ Add test</button>
   <button class="btn secondary" id="run-all">Run all</button>
+  <button class="btn secondary" id="add-key">🔑 API key</button>
   <span class="spacer"></span>
   <span class="muted" id="provider-info"></span>
 </div>
@@ -105,7 +106,10 @@ textarea { resize: vertical; min-height: 38px; }
     notice.textContent = '';
     if(!STATE.providers.length){
       var n = el('div','notice');
-      n.textContent = 'No AI provider key is configured. Add one via the ▶ Run button in a Markr preview (keys are stored in VS Code SecretStorage). Until then, Markr will not send anything — you can still create and edit test cases.';
+      n.appendChild(el('div', null, 'No AI provider key configured — Markr won’t send anything yet. Add a key (stored encrypted in VS Code SecretStorage, never in your repo) to run tests. You can still create and edit test cases.'));
+      var nb = el('button','btn','🔑 Add API key'); nb.style.marginTop = '10px';
+      nb.addEventListener('click', function(){ vsc.postMessage({ type:'addKey' }); });
+      n.appendChild(nb);
       notice.appendChild(n);
     }
 
@@ -214,6 +218,7 @@ textarea { resize: vertical; min-height: 38px; }
 
   document.getElementById('add').addEventListener('click', function(){ vsc.postMessage({ type:'addTest' }); });
   document.getElementById('run-all').addEventListener('click', function(){ vsc.postMessage({ type:'runAll' }); });
+  document.getElementById('add-key').addEventListener('click', function(){ vsc.postMessage({ type:'addKey' }); });
 
   vsc.postMessage({ type:'ready' });
 }());

@@ -9,6 +9,8 @@ import { ContextBridgeViewProvider } from './contextBridge';
 import { analyzeAiWorkspace, buildAiConfigBundle, buildAiHealthMarkdown } from './aiConfigAnalyzer';
 import { PromptRunner } from './promptRunner';
 import { ConfigLabPanel } from './configLabRunner';
+import { AgentMapPanel } from './agentMapRunner';
+import { WorkbenchViewProvider } from './workbenchView';
 
 export async function activate(context: vscode.ExtensionContext) {
 
@@ -19,6 +21,16 @@ export async function activate(context: vscode.ExtensionContext) {
     showCollapseAll: true,
   });
   context.subscriptions.push(treeView);
+
+  // ── Workbench launcher (top of sidebar) ────────────────────────────────────
+  // A compact, theme-respecting button grid that launches every workbench tool.
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      WorkbenchViewProvider.viewType,
+      new WorkbenchViewProvider(),
+      { webviewOptions: { retainContextWhenHidden: true } },
+    )
+  );
 
   // ── Context Bridge sidebar view ────────────────────────────────────────────
   // Lives under markr-sidebar container as a collapsible WebviewView section.
@@ -44,8 +56,14 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('markr.openScoreboard', () => {
       contextBridgeProvider.openScoreboard();
     }),
-    vscode.commands.registerCommand('markr.openAiConfigLab', () => {
-      ConfigLabPanel.show(context, new PromptRunner(context.secrets));
+    vscode.commands.registerCommand('markr.openAiConfigLab', async () => {
+      const runner = new PromptRunner(context.secrets);
+      const target = await resolveConfigLabTarget(explorerProvider);
+      if (target === 'cancelled') return;        // user dismissed the picker
+      ConfigLabPanel.show(context, runner, target);
+    }),
+    vscode.commands.registerCommand('markr.openAgentMap', () => {
+      AgentMapPanel.show(context);
     }),
     vscode.commands.registerCommand('markr.openAiHealth', async () => {
       await vscode.window.withProgress(
@@ -532,3 +550,41 @@ export async function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {}
+
+/**
+ * Decide which file the Config Lab should test when launched from a button
+ * (no editor context). Returns a Uri to use, `undefined` to fall back to the
+ * active editor, or 'cancelled' if the user dismissed the picker.
+ *
+ *  - active editor is an AI config file → use it (no prompt)
+ *  - exactly one AI config in the workspace → use it
+ *  - several → quick-pick
+ *  - none → offer to create one
+ */
+async function resolveConfigLabTarget(
+  explorer: MarkrExplorerProvider,
+): Promise<vscode.Uri | undefined | 'cancelled'> {
+  const active = vscode.window.activeTextEditor?.document.uri;
+  if (active?.scheme === 'file' &&
+      isAiConfigFile(path.basename(active.fsPath), vscode.workspace.asRelativePath(active))) {
+    return active;
+  }
+
+  const configs = explorer.getFiles().filter(f => f.isAiConfig);
+  if (configs.length === 1) return configs[0].uri;
+  if (configs.length > 1) {
+    const pick = await vscode.window.showQuickPick(
+      configs.map(c => ({ label: c.label, description: c.relPath, uri: c.uri })),
+      { title: 'AI Config Lab', placeHolder: 'Pick a config file to test' },
+    );
+    return pick ? pick.uri : 'cancelled';
+  }
+
+  // None found — guide the user instead of dead-ending on a warning.
+  const choice = await vscode.window.showInformationMessage(
+    'Markr: no AI config files found in this workspace. Create one to test in Config Lab?',
+    'New Config…',
+  );
+  if (choice === 'New Config…') vscode.commands.executeCommand('markr.newAiConfig');
+  return 'cancelled';
+}

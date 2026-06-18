@@ -35,13 +35,15 @@ export class ConfigLabPanel {
     panel.webview.onDidReceiveMessage(m => this._onMessage(m));
   }
 
-  static show(context: vscode.ExtensionContext, runner: PromptRunner) {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.uri.scheme !== 'file') {
+  static show(context: vscode.ExtensionContext, runner: PromptRunner, target?: vscode.Uri) {
+    // Prefer an explicit target (e.g. the Workbench picker); otherwise the active file.
+    const cfgUri = target ?? (vscode.window.activeTextEditor?.document.uri.scheme === 'file'
+      ? vscode.window.activeTextEditor!.document.uri
+      : undefined);
+    if (!cfgUri) {
       vscode.window.showInformationMessage('Markr: open an AI config file (CLAUDE.md, AGENTS.md, .cursorrules…) first, then run AI Config Lab.');
       return;
     }
-    const cfgUri = editor.document.uri;
     const folder = vscode.workspace.getWorkspaceFolder(cfgUri) ?? vscode.workspace.workspaceFolders?.[0];
     const root = folder?.uri.fsPath ?? path.dirname(cfgUri.fsPath);
     const cfgPath = path.relative(root, cfgUri.fsPath).replace(/\\/g, '/');
@@ -61,6 +63,44 @@ export class ConfigLabPanel {
     ConfigLabPanel.current = new ConfigLabPanel(panel, runner, root, cfgUri, cfgPath);
   }
 
+  /** Prompt for a provider + API key (or removal) and store it in SecretStorage. */
+  private async _addKey() {
+    const PROVS: Array<{ id: Provider; label: string; ph: string }> = [
+      { id: 'anthropic', label: 'Anthropic (Claude)', ph: 'sk-ant-…' },
+      { id: 'openai',    label: 'OpenAI (GPT)',       ph: 'sk-…' },
+      { id: 'google',    label: 'Google (Gemini)',    ph: 'AIza…' },
+    ];
+    const configured = await this.runner.configuredProviders();
+    const pick = await vscode.window.showQuickPick(
+      PROVS.map(p => ({ label: p.label, description: configured.includes(p.id) ? '• configured' : '', prov: p })),
+      { title: 'AI Config Lab — API key', placeHolder: 'Which provider?' },
+    );
+    if (!pick) return;
+
+    const key = await vscode.window.showInputBox({
+      title: `${pick.prov.label} API key`,
+      password: true,
+      ignoreFocusOut: true,
+      placeHolder: pick.prov.ph,
+      prompt: 'Stored encrypted in VS Code SecretStorage — never written to your repo. Leave blank to remove an existing key.',
+    });
+    if (key === undefined) return;  // cancelled
+
+    if (key.trim() === '') {
+      if (configured.includes(pick.prov.id)) {
+        const yes = await vscode.window.showWarningMessage(`Remove the ${pick.prov.label} key?`, 'Remove');
+        if (yes === 'Remove') {
+          await this.runner.deleteKey(pick.prov.id);
+          vscode.window.showInformationMessage(`Markr: ${pick.prov.label} key removed.`);
+        }
+      }
+    } else {
+      await this.runner.setKey(pick.prov.id, key);
+      vscode.window.showInformationMessage(`Markr: ${pick.prov.label} key saved.`);
+    }
+    this._sendState();
+  }
+
   // ── Messages ────────────────────────────────────────────────────────────
   private async _onMessage(msg: Record<string, unknown>) {
     try {
@@ -71,6 +111,7 @@ export class ConfigLabPanel {
         case 'deleteTest':  return this._deleteTest(String(msg.id));
         case 'runTest':     return this._runTest(String(msg.id), String(msg.provider), String(msg.model));
         case 'runAll':      return this._runAll();
+        case 'addKey':      return this._addKey();
       }
     } catch (e) {
       vscode.window.showErrorMessage(`Markr Config Lab: ${e instanceof Error ? e.message : String(e)}`);
@@ -139,7 +180,7 @@ export class ConfigLabPanel {
 
     const providers = await this.runner.configuredProviders();
     if (!providers.length) {
-      this._post({ type: 'runError', id, error: 'No AI provider key configured. Add one via the ▶ Run button in a Markr preview.' });
+      this._post({ type: 'runError', id, error: 'No AI provider key configured. Click "🔑 API key" above to add one.' });
       return null;
     }
     const prov = (providers.includes(provider as Provider) ? provider : providers[0]) as Provider;

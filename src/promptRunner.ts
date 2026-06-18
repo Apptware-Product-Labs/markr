@@ -114,7 +114,7 @@ export class PromptRunner {
   ): Promise<void> {
     const key = await this.getKey(opts.provider);
     if (!key) {
-      onError(`No API key configured for ${opts.provider}. Add it via the ▶ Run button.`);
+      onError(`No API key configured for ${opts.provider}. Add it via the "🔑 API key" button in AI Config Lab.`);
       return;
     }
     try {
