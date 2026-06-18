@@ -228,9 +228,25 @@ Open the Lab on any AI config file (🧪 in the editor title bar, or `Markr: Ope
 
 Example tests: *"Uses project test command"* (prompt: "I changed sessionReader.ts — what should I run?" → must include `npm test`), *"Avoids unsafe actions"*, *"Respects the package manager"*.
 
-- Uses your existing provider keys (Anthropic / OpenAI / Google) from SecretStorage — nothing is sent until you click Run.
+- **Add a provider key right in the Lab** — click **🔑 API key** to add Anthropic / OpenAI / Google; it's stored in VS Code SecretStorage, never written to your repo. Nothing is sent until you click Run.
 - **Secrets are redacted** from the config and prompt before anything leaves the machine; raw `.env` values are never sent.
 - Tests are stored locally in `.markr/config-tests.json`. Your config files are never modified.
+
+---
+
+### 🗺 AI Agent Map — see how your multi-agent repo is wired _(NEW in 6.5)_
+
+Multi-agent repos (a `.claude/` folder with `agents/`, `capabilities.yml`, `schemas/`) are a typed system spread across many files — easy to break in ways no single file shows. **AI Agent Map** (`Markr: Open AI Agent Map`, or the Workbench button) turns it into an **interactive map**.
+
+- **A pan/zoom wiring canvas** — _Capabilities → Agents → Schemas_ drawn as nodes with connectors (capability→agent colored by tier; agent→schema as the output contract). **Scroll to zoom, drag to pan, fit/reset**; **hover a node** to highlight its connections; **click a node** to open that file.
+- **Works for any layout** — columns are dynamic, so a repo with only `agents/` (no `capabilities.yml` or `schemas/`) still renders a clean single-column map.
+- **An agent roster** that leads with each agent's plain-English description (model + tier) — orient yourself in a new repo in seconds.
+- **Consistency check** — a "Needs attention" list of real contract breaks (a capability pointing at a missing agent/schema, frontmatter gaps), while a disabled capability is shown as "planned," not an error.
+- Themeable (Markr Dark / Light / Notion / Linear). **Read-only — it never modifies your project.**
+
+### 🧰 Workbench launcher
+
+A compact panel pinned to the top of the Markr sidebar with one-click buttons for the agent tooling — **Agent Map · Config Lab · Config Health** — so the workbench is always one click away.
 
 ### 🤖 Markr is the Editor for AI Config Files
 

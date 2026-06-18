@@ -53,6 +53,19 @@ instructions — edit, test, hand off,"* with Markdown as the base.
 - ✅ **KaTeX math** (`$…$` / `$$…$$`) — shipped in 6.3, offline (fonts inlined).
 - Markdown completeness: footnotes, `<details>` collapsibles, emoji shortcodes.
 
+### v6.5 — Agent project tooling (multi-agent repos) ✅ shipped
+- ✅ **AI Agent Map** — interactive pan/zoom wiring map for `.claude/` projects
+  (capabilities → agents → schemas, hover-highlight, click-to-open), description-led
+  roster + consistency check; dynamic columns so agents-only repos work too.
+- ✅ **Workbench launcher** — sidebar buttons for Agent Map · Config Lab · Config Health.
+- ✅ **Config Lab: API-key entry in the UI** + smart launch (picker / create) instead of
+  a dead-end warning.
+- ✅ **Context Bridge keyboard & a11y** — focusable session cards (↑/↓, Enter), ARIA
+  tablist views (←/→), focus rings; 50/50 sidebar split.
+- **Next:** schema-aware Config Lab assertion ("output must validate against
+  `<schema>.json`") so agents that emit structured JSON can be tested for contract
+  conformance; agent frontmatter lint folded into AI Config Health.
+
 ### v7 — Workbench as infrastructure
 - **`markr test` CLI / CI mode** — run `.markr/config-tests.json` in CI so a bad
   config edit fails the PR. Turns Config Lab from a toy into team infra.

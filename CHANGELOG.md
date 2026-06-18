@@ -7,6 +7,49 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [6.5.0] — AI Agent Map + Workbench
+
+### Added
+- **AI Agent Map** (`Markr: Open AI Agent Map`) — an interactive **wiring map** for
+  `.claude/` multi-agent projects (agents/, capabilities.yml, schemas/). Renders the
+  system as a **pan/zoom canvas** — _Capabilities → Agents → Schemas_ — with connectors
+  (capability→agent colored by tier, agent→schema as the output contract), **scroll to
+  zoom, drag to pan, fit/reset** controls, **hover a node** to highlight its connections,
+  and **click a node** to open its file. Columns are dynamic, so a repo with only
+  `agents/` (no capabilities.yml or schemas/) still renders a clean single-column map.
+  Below the map, an **agent roster** leads with each agent's plain-English description
+  (model + tier), plus a consistency check ("Needs attention") for real contract breaks
+  (missing agent/schema, frontmatter gaps). Themed with Markr's own palette
+  (Dark / Light / Notion / Linear) via a picker. Read-only — never modifies the project.
+  Pure analyzer in `src/agentMap.ts` (hand-rolled parsers, no deps) with unit tests,
+  validated against a real multi-agent repo.
+- **Workbench launcher** — a compact, theme-respecting panel pinned to the top of the
+  Markr sidebar with one-click buttons for the agent tooling: **Agent Map · Config Lab ·
+  Config Health**. Responsive single-column list that reads cleanly at any sidebar width.
+- **AI Config Lab — API key entry in the UI** — add a provider key (Anthropic / OpenAI /
+  Google) right from Config Lab via the **🔑 API key** button; the key is stored in VS
+  Code SecretStorage (never written to your repo). Leaving the field blank removes a key.
+  Replaces the old dead-end "add a key via the Run button" message.
+
+### Changed
+- **Config Lab launch** — opening Config Lab with no editor focused now resolves a target
+  intelligently (active config → the one detected config → a quick-pick → an offer to
+  create one) instead of dead-ending on a warning.
+- **Context Bridge — keyboard & accessibility** — the sidebar is now fully keyboard-
+  navigable: session cards are real controls (`tabindex`/`role`/`aria-label`) with
+  **↑/↓** to move and **Enter/Space** to select; the **Sessions / Memory / History** tabs
+  follow the ARIA tablist pattern (**←/→** to switch); visible focus rings throughout; a
+  subtle fade on view switch (respects `prefers-reduced-motion`).
+- **Sidebar layout** — the AI-config tree and Context Bridge now split the available
+  height 50/50 below the Workbench launcher.
+
+### Fixed
+- Removed a default keybinding that bound **Paste & Preview** to `Cmd/Ctrl+Shift+P`,
+  which hijacked the VS Code Command Palette. Paste & Preview is now a button in the
+  Markr sidebar title bar instead.
+- Agent Map node clicks now reliably open the file (dropped a pointer-capture that was
+  swallowing the click); dragging to pan no longer triggers an accidental open.
+
 ## [6.4.0] — Find in Preview
 
 ### Added
