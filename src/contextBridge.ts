@@ -24,6 +24,7 @@ import { PromptRunner } from './promptRunner';
 import { detectModel, countTokens } from './tokenEngine';
 import { computeScoreboard, scoreboardToMarkdown, MemoryFact, ScoreboardTheme } from './scoreboard';
 import { buildScoreboardHtml } from './webview/scoreboardHtml';
+import { HandoffEditorPanel } from './handoffEditor';
 import {
   targetFileFor, upsertHandoffBlock, markBlockConsumed, markWholeConsumed, shapeWholeFile,
 } from './handoffTargets';
@@ -191,28 +192,11 @@ export class ContextBridgeViewProvider implements vscode.WebviewViewProvider {
           const ctx  = summariseSession(session, seed);
           const meta: { redactions?: number } = {};
           const text = generateHandoff(ctx, session.tool, target, meta);
-          await vscode.env.clipboard.writeText(text);
-          const redactions = meta.redactions ?? 0;
-          this._post({ type: 'handoffDone', id: session.id, target, chars: text.length, redactions });
-
-          // Phase 3: record to history + offer native file delivery.
-          try { this._memory.addHandoff(session.projectPath, { timestamp: Date.now(), sourceTool: session.tool, target, text }); } catch { /* best-effort */ }
-          await this._writeHandoffToTarget(target, text);
-
-          const LABELS: Record<string, string> = {
-            cursor: 'Cursor', 'claude-code': 'Claude Code',
-            codex: 'Codex CLI', chatgpt: 'ChatGPT', augment: 'Augment', clipboard: 'Clipboard',
-          };
-          const redMsg = redactions > 0
-            ? ` — ${redactions} secret${redactions > 1 ? 's' : ''} redacted`
-            : '';
-          const action = await vscode.window.showInformationMessage(
-            `Markr handoff copied for ${LABELS[target] ?? target}${redMsg}`,
-            'Preview',
-          );
-          if (action === 'Preview') {
-            await MarkdownPreviewPanel.showClipboard(text);
-          }
+          // Open the handoff for review/edit BEFORE it's copied or delivered —
+          // extraction is heuristic, so the user trims it and the edited text is
+          // what gets finalized (clipboard + history + native file).
+          this._openHandoffEditor(session, target, text, meta.redactions ?? 0);
+          this._post({ type: 'handoffDraft', id: session.id, target });
         } catch (err) {
           const error = err instanceof Error ? err.message : String(err);
           this._post({ type: 'handoffFailed', id: session.id, error });
@@ -600,6 +584,40 @@ export class ContextBridgeViewProvider implements vscode.WebviewViewProvider {
 
   /** Write a handoff into the target tool's native file (zero-click continuity).
    *  Confirms once per workspace+target, then remembers via workspaceState. */
+  /** Human label for a handoff target (covers non-tool targets like clipboard). */
+  private _targetLabel(t: string): string {
+    const L: Record<string, string> = {
+      clipboard: 'Clipboard', 'claude-code': 'Claude Code', cursor: 'Cursor',
+      codex: 'Codex CLI', chatgpt: 'ChatGPT', augment: 'Augment',
+    };
+    return L[t] ?? TOOL_LABEL[t as AiTool] ?? t;
+  }
+
+  /**
+   * Open a generated handoff in the editable review panel. The user trims it,
+   * then Copy / Deliver — the EDITED text is finalized here: clipboard write,
+   * history record, and (on Deliver) the target's native file.
+   */
+  private _openHandoffEditor(session: SessionInfo, target: TargetTool, text: string, redactions: number) {
+    HandoffEditorPanel.show({
+      text,
+      sourceLabel: TOOL_LABEL[session.tool] ?? session.tool,
+      targetLabel: this._targetLabel(target),
+      isClipboard: target === 'clipboard',
+      redactions,
+      onFinalize: async (edited, mode) => {
+        await vscode.env.clipboard.writeText(edited);
+        try {
+          this._memory.addHandoff(session.projectPath, {
+            timestamp: Date.now(), sourceTool: session.tool, target, text: edited,
+          });
+        } catch { /* history is best-effort */ }
+        if (mode === 'deliver') await this._writeHandoffToTarget(target, edited);
+        this._post({ type: 'handoffDone', id: session.id, target, chars: edited.length, redactions });
+      },
+    });
+  }
+
   private async _writeHandoffToTarget(target: TargetTool, text: string) {
     const spec = targetFileFor(target);
     if (!spec) return; // chatgpt / clipboard have no native file
@@ -676,13 +694,8 @@ export class ContextBridgeViewProvider implements vscode.WebviewViewProvider {
       const ctx  = summariseSession(session, this._seedFor(session));
       const meta: { redactions?: number } = {};
       const text = generateHandoff(ctx, session.tool, 'clipboard', meta);
-      await vscode.env.clipboard.writeText(text);
-      try {
-        this._memory.addHandoff(session.projectPath, {
-          timestamp: Date.now(), sourceTool: session.tool, target: 'clipboard', text,
-        });
-      } catch { /* history is best-effort */ }
-      await MarkdownPreviewPanel.showClipboard(text);
+      // Open it for review/edit; copy + history happen when the user finalizes.
+      this._openHandoffEditor(session, 'clipboard', text, meta.redactions ?? 0);
     } catch (err) {
       vscode.window.showErrorMessage(`Markr: could not generate handoff. ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -1930,6 +1943,9 @@ body {
       switchView('sessions');
       selId = msg.id;
       render();
+    }
+    if (msg.type === 'handoffDraft') {
+      showStatus('Opened the handoff to review & edit — trim it, then Copy from there.', false);
     }
     if (msg.type === 'handoffDone') {
       var n = msg.redactions || 0;
