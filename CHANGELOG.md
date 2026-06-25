@@ -7,6 +7,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [6.6.0] — Review & edit handoffs
+
+### Changed
+- **Context Bridge handoffs now open in a "Review & edit" panel before they're
+  copied.** Extraction is heuristic, so instead of copying blind you get the
+  generated brief in an editable view — trim what the next agent can re-derive from
+  the repo, watch a live char/token count, then **Copy** (or **Deliver** to the
+  target's native file: `CLAUDE.local.md`, a `.cursor/rules/*.mdc`, `HANDOFF.md`).
+  The **edited** text is what gets finalized (clipboard + History + native file).
+  The context-exhaustion notification path routes through the same editor.
+  New pure builder `src/webview/handoffEditorHtml.ts` (5 unit tests) + panel glue.
+
+---
+
 ## [6.5.0] — AI Agent Map + Workbench
 
 ### Added

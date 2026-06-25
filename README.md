@@ -179,9 +179,9 @@ When you switch tools, pick a session and **hand it off**. Markr generates a **C
 - **📁 Pointers, not payload** — file lists the next tool reads itself, so the handoff stays lean
 - **✅ Receiver synthesis** — the paste-ready prompt makes the next tool restate the task before it acts
 
-Copy it to your clipboard, paste into Claude Code / Cursor / Augment / Codex / ChatGPT, and keep going — no context lost, no browser tab-hopping.
+Every handoff opens in a **Review & edit** panel first — trim anything the next agent can re-derive from the repo, then **Copy** or **Deliver** it straight into the target's native file (`CLAUDE.local.md`, a `.cursor/rules/*.mdc`, `HANDOFF.md`). Your edits are what get sent. Paste into Claude Code / Cursor / Augment / Codex / ChatGPT and keep going — no context lost, no browser tab-hopping.
 
-> _Beta:_ decision/dead-end extraction is heuristic and improving. Feedback welcome.
+> _Beta:_ decision/dead-end extraction is heuristic and improving — which is exactly why you review & edit before sending. Feedback welcome.
 
 ---
 
