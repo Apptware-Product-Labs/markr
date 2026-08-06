@@ -14,6 +14,9 @@ restrained accent (Markr orange), not gradient-everywhere.
 ---
 
 ## Phase 0 — Design foundation (build once; everything inherits it)
+✅ Extracted the Raycast tokens → `src/webview/markrUI.ts` (MARKR_UI_TOKENS + MARKR_UI_COMPONENTS).
+   Original todo below.
+
 ☐ Extract the Raycast tokens (already prototyped inline in the Context Bridge) into
 a shared module `src/webview/markrUI.ts`:
 - **Tokens:** layered surfaces `--s0/1/2`, lines `--line`/`--line-soft`, radii
@@ -29,9 +32,10 @@ This is the single biggest "it's one premium product" lever.
 
 ## Batches (each: build → screenshot-verify → install → react)
 
-- ◐ **Batch 1 — Context Bridge.** *(slice done: surfaces, header, cards, action
-  buttons; remaining: scope toggle → segmented control, filter chips, tabs, search
-  input, Memory + History items, tool-health row, handoff panel.)*
+- ✅ **Batch 1 — Context Bridge.** Migrated onto `markrUI`: surfaces, header,
+  session cards, action buttons, segmented scope toggle, filter chips, search
+  input, view tabs. (Memory/History/tool-health/handoff-panel inherit the tokens;
+  fine-polish deferred if needed.)
 - ☐ **Batch 2 — Preview (biggest, most-seen).**
   - Chrome: toolbar → a clean grouped **command bar**; find as a floating pill; TOC
     as a refined rail.

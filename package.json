@@ -2,7 +2,7 @@
   "name": "markr",
   "displayName": "Markr – AI Config Editor & Markdown Preview",
   "description": "The memory & control layer for AI coding tools + Markdown preview — Context Bridge hands off sessions between Claude Code, Cursor, Augment, Codex, Cline, Windsurf & Gemini; cross-session memory, self-writing configs, AI Scoreboard; AI Agent Map for multi-agent .claude/ repos, Config Lab to test your configs; auto-opens CLAUDE.md / .cursorrules in split-edit mode, Agent Watch, Mermaid, TOC, themes, PDF export",
-  "version": "6.6.1",
+  "version": "6.7.0",
   "publisher": "Apptware-Product-Lab",
   "author": {
     "name": "Apptware Labs Pvt Ltd",
