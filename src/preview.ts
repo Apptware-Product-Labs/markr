@@ -3532,6 +3532,7 @@ export class MarkdownPreviewPanel {
     vscode.window.onDidChangeActiveColorTheme(() => this._render(), null, this._disposables);
 
     this._panel.webview.onDidReceiveMessage(async msg => {
+     try {
       if (msg.type === 'openLink') { vscode.env.openExternal(vscode.Uri.parse(msg.href)); }
       if (msg.type === 'copyMarkdown') {
         const text = typeof msg.markdown === 'string' ? msg.markdown : this._document.getText();
@@ -3676,7 +3677,11 @@ export class MarkdownPreviewPanel {
       if (msg.type === 'exportHtml') { await this._handleExportHtml(); }
       if (msg.type === 'exportPdf')  { await this._handleExportPdf(); }
       if (msg.type === 'print')      { await this._handlePrint(); }
-
+     } catch (err) {
+       // A throw here would otherwise reject into the extension host and can crash
+       // it (terminating ALL of Markr). Contain every toolbar action instead.
+       vscode.window.showErrorMessage(`Markr: action failed. ${err instanceof Error ? err.message : String(err)}`);
+     }
     }, null, this._disposables);
   }
 
@@ -3898,6 +3903,7 @@ export class MarkdownPreviewPanel {
   }
 
   private async _handleExportPdf(): Promise<void> {
+   try {
     const rawText  = this._document.getText();
     const filename = this._document.uri.path.split('/').pop()?.replace(/\.md$/i, '.pdf') ?? 'export.pdf';
     const dir      = this._document.uri.with({ path: this._document.uri.path.replace(/[^/]*$/, '') });
@@ -3930,40 +3936,45 @@ export class MarkdownPreviewPanel {
 
     const statusHandle = vscode.window.setStatusBarMessage('$(loading~spin) Markr: generating PDF…', 60000);
 
+    // Spawn headless Chrome to print the file → PDF. Fully self-contained: any
+    // spawn failure, error, or hang resolves to `false` (never throws), so it can
+    // never escape as an unhandled rejection and crash the extension host.
     const tryChrome = (headlessFlag: string): Promise<boolean> =>
-      new Promise(resolve => {
-        const args = [
-          headlessFlag,
-          '--no-sandbox',
-          '--disable-gpu',
-          '--disable-dev-shm-usage',
-          `--print-to-pdf=${saveUri.fsPath}`,
-          '--no-pdf-header-footer',
-          fileUrl,
-        ];
-        const proc = cp.spawn(chromePath, args);
-        proc.on('close', code => resolve(code === 0));
-        proc.on('error', () => resolve(false));
+      new Promise<boolean>(resolve => {
+        let settled = false;
+        const done = (v: boolean) => { if (!settled) { settled = true; resolve(v); } };
+        try {
+          const proc = cp.spawn(chromePath, [
+            headlessFlag, '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+            `--print-to-pdf=${saveUri.fsPath}`, '--no-pdf-header-footer', fileUrl,
+          ]);
+          const killer = setTimeout(() => { try { proc.kill(); } catch { /* ignore */ } done(false); }, 45000);
+          proc.on('close', code => { clearTimeout(killer); done(code === 0); });
+          proc.on('error', () => { clearTimeout(killer); done(false); });
+        } catch { done(false); }
       });
 
-    await new Promise<void>(async resolve => {
-      let ok = await tryChrome('--headless=new');
+    let ok = false;
+    try {
+      ok = await tryChrome('--headless=new');
       if (!ok) ok = await tryChrome('--headless');
-
+    } finally {
       try { fs.unlinkSync(tmpFile); } catch { /* ignore */ }
       statusHandle.dispose();
+    }
 
-      if (ok) {
-        vscode.window.showInformationMessage(`Markr: PDF saved → ${saveUri.fsPath.split('/').pop()}`);
-        vscode.window.setStatusBarMessage('$(check) Markr: PDF exported', 3000);
-      } else {
-        vscode.window.showWarningMessage('Markr: Chrome PDF failed — opening in browser for manual Save as PDF.');
-        const fallback = nodePath.join(os.tmpdir(), `markr-print-${Date.now()}.html`);
-        fs.writeFileSync(fallback, fullHtml, 'utf-8');
-        vscode.env.openExternal(vscode.Uri.file(fallback));
-      }
-      resolve();
-    });
+    if (ok) {
+      vscode.window.showInformationMessage(`Markr: PDF saved → ${saveUri.fsPath.split('/').pop()}`);
+      vscode.window.setStatusBarMessage('$(check) Markr: PDF exported', 3000);
+    } else {
+      vscode.window.showWarningMessage('Markr: Chrome PDF failed — opening in browser for manual Save as PDF.');
+      const fallback = nodePath.join(os.tmpdir(), `markr-print-${Date.now()}.html`);
+      fs.writeFileSync(fallback, fullHtml, 'utf-8');
+      vscode.env.openExternal(vscode.Uri.file(fallback));
+    }
+   } catch (err) {
+     vscode.window.showErrorMessage(`Markr: PDF export failed. ${err instanceof Error ? err.message : String(err)}`);
+   }
   }
 
   private _buildPage(body: string, filename: string, stats: ReturnType<typeof docStats>, text: string, files: FileEntry[], filesLoading: boolean): string {

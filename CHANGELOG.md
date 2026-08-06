@@ -7,6 +7,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [6.6.1] — Fix: PDF export could crash the extension host
+
+### Fixed
+- **Exporting a Markdown file to PDF could terminate the extension host** (VS Code
+  would report "Extension host terminated unexpectedly," and after 3 crashes it
+  stops restarting — so the whole Markr toolbar goes dead until reload). Root cause:
+  the PDF path threw/rejected without a guard (including a `new Promise(async …)`
+  executor that leaked rejections), and an unhandled rejection can crash the host.
+  Now the PDF export is fully guarded (never throws), the headless-Chrome spawn is
+  self-contained with a 45s kill-timeout, and the **entire preview toolbar message
+  handler is wrapped** so no toolbar action (PDF / HTML / print / paste / copy) can
+  ever crash the host again — a failure shows an error message instead.
+
+---
+
 ## [6.6.0] — Review & edit handoffs
 
 ### Changed
