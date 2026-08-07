@@ -36,12 +36,11 @@ This is the single biggest "it's one premium product" lever.
   session cards, action buttons, segmented scope toggle, filter chips, search
   input, view tabs. (Memory/History/tool-health/handoff-panel inherit the tokens;
   fine-polish deferred if needed.)
-- ☐ **Batch 2 — Preview (biggest, most-seen).**
-  - Chrome: toolbar → a clean grouped **command bar**; find as a floating pill; TOC
-    as a refined rail.
-  - Content: typography pass (measure, heading rhythm, 4px spacing grid); softer
-    **code blocks** with hover-copy; cleaner **tables** (subtle borders / zebra);
-    refined callouts / blockquotes; rounded images with soft shadow.
+- ◐ **Batch 2 — Preview (biggest, most-seen).** *(done: theme-safe structural pass
+  — calmer toolbar chrome; softer rounded code blocks (10px + subtle shadow);
+  rounded tables; rounded images w/ soft shadow; refined blockquotes; inline-code
+  radius. Deferred: a deeper per-theme typography/color pass — needs theme-by-theme
+  verification since the preview is a 4.3k-line themed surface.)*
 - ☐ **Batch 3 — Config Lab + Handoff editor.** Test cards, inputs, run buttons,
   result panels → the system. (Handoff editor is already close; align tokens.)
 - ☐ **Batch 4 — Agent Map + Scoreboard.** Already Markr-themed → retune node

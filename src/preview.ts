@@ -277,19 +277,19 @@ function buildPdfHtml(content: string, title: string): string {
   em { font-style: italic; }
   del { text-decoration: line-through; color: #6a737d; }
   a { color: #0b6e99; text-decoration: none; }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 85%; padding: .2em .4em; background: rgba(110,104,96,.12); border-radius: 4px; }
-  pre { position: relative; margin: 0 0 16px; padding: 16px; overflow: auto; font-size: 13px; line-height: 1.65; background: #f6f8fa; border-radius: 6px; border: 1px solid #e1e4e8; page-break-inside: avoid; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 85%; padding: .2em .4em; background: rgba(110,104,96,.12); border-radius: 5px; }
+  pre { position: relative; margin: 0 0 16px; padding: 16px; overflow: auto; font-size: 13px; line-height: 1.65; background: #f6f8fa; border-radius: 10px; border: 1px solid #e1e4e8; box-shadow: 0 1px 2px rgba(0,0,0,.05); page-break-inside: avoid; }
   pre code { padding: 0; background: transparent; border-radius: 0; font-size: 100%; }
-  blockquote { margin: 0 0 16px; padding: 10px 16px; color: #6a737d; border-left: 3px solid #F97316; background: rgba(249,115,22,.07); border-radius: 0 6px 6px 0; }
+  blockquote { margin: 0 0 16px; padding: 10px 16px; color: #6a737d; border-left: 3px solid #F97316; background: rgba(249,115,22,.07); border-radius: 0 8px 8px 0; }
   blockquote > :first-child { margin-top: 0; } blockquote > :last-child { margin-bottom: 0; }
   ul,ol { margin: 0 0 16px; padding-left: 2em; }
   ul ul,ul ol,ol ul,ol ol { margin: 0; }
   li + li { margin-top: .25em; }
   .task-list-item { list-style-type: none; }
   .task-list-item input[type="checkbox"] { margin: 0 .5em 0 -1.6em; vertical-align: middle; }
-  img { max-width: 100%; border-radius: 6px; }
-  hr { height: 1px; padding: 0; margin: 24px 0; background: #e1e4e8; border: 0; }
-  table { border-spacing: 0; border-collapse: collapse; display: block; width: max-content; max-width: 100%; overflow: auto; margin-bottom: 16px; border: 1px solid #e1e4e8; border-radius: 6px; page-break-inside: avoid; }
+  img { max-width: 100%; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  hr { height: 1px; padding: 0; margin: 28px 0; background: #e1e4e8; border: 0; }
+  table { border-spacing: 0; border-collapse: collapse; display: block; width: max-content; max-width: 100%; overflow: auto; margin-bottom: 16px; border: 1px solid #e1e4e8; border-radius: 10px; page-break-inside: avoid; }
   th { font-weight: 600; padding: 8px 14px; border-bottom: 2px solid #e1e4e8; text-align: left; background: #f6f8fa; }
   td { padding: 7px 14px; border-bottom: 1px solid #eaecef; }
   tr:last-child td { border-bottom: none; }
@@ -505,11 +505,9 @@ body {
   position: fixed; inset: 0 0 auto 0; height: 42px;
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 8px;
-  background:
-    linear-gradient(90deg, rgba(249,115,22,.13), rgba(250,204,21,.05) 36%, transparent 72%),
-    var(--vscode-editor-background, var(--bg));
-  border-bottom: 1px solid var(--accent-border); z-index: 300; gap: 4px; user-select: none;
-  box-shadow: 0 8px 26px rgba(0,0,0,.10);
+  background: var(--vscode-editor-background, var(--bg));
+  border-bottom: 1px solid var(--border-faint); z-index: 300; gap: 4px; user-select: none;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
 }
 .tl { display: flex; align-items: center; gap: 4px; flex: 1; min-width: 0; overflow: hidden; }
 .tr { display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
