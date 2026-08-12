@@ -15,6 +15,8 @@ export interface HandoffEditorView {
   redactions:  number;
 }
 
+import { MARKR_UI_TOKENS } from './markrUI';
+
 function esc(v: string): string {
   return v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -36,38 +38,41 @@ export function buildHandoffEditorHtml(v: HandoffEditorView): string {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';">
 <style>
   * { box-sizing: border-box; }
+  ${MARKR_UI_TOKENS}
   html, body { height: 100%; }
-  body { font-family: var(--vscode-font-family, system-ui); color: var(--vscode-foreground);
-    background: var(--vscode-editor-background); margin: 0; padding: 16px 20px 14px;
+  body { font-family: var(--vscode-font-family, system-ui); color: var(--ui-fg);
+    background: var(--ui-bg); margin: 0; padding: 16px 20px 14px;
     display: flex; flex-direction: column; font-size: 13px; }
   h1 { font-size: 15px; margin: 0 0 2px; }
-  .sub { color: var(--vscode-descriptionForeground); font-size: 12px; margin-bottom: 10px; }
-  .red { color: var(--vscode-charts-orange, #e0843a); }
-  .hint { font-size: 11.5px; color: var(--vscode-descriptionForeground);
-    background: var(--vscode-textBlockQuote-background, rgba(127,127,127,.08));
-    border-left: 3px solid var(--vscode-textLink-foreground, #4a9eff);
-    padding: 7px 10px; border-radius: 0 6px 6px 0; margin-bottom: 10px; line-height: 1.45; }
+  .sub { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  .red { color: var(--accent); }
+  .hint { font-size: 11.5px; color: var(--muted);
+    background: var(--s1); border: 1px solid var(--line-soft);
+    border-left: 3px solid var(--accent);
+    padding: 8px 11px; border-radius: 0 var(--r-sm) var(--r-sm) 0; margin-bottom: 10px; line-height: 1.45; }
   textarea { flex: 1; width: 100%; resize: none; min-height: 220px;
-    background: var(--vscode-input-background, var(--vscode-editor-background));
-    color: var(--vscode-input-foreground, var(--vscode-foreground));
-    border: 1px solid var(--vscode-input-border, rgba(127,127,127,.3)); border-radius: 8px;
+    background: var(--s1); color: var(--ui-fg);
+    border: 1px solid var(--line); border-radius: var(--r);
     padding: 11px 13px; font-family: var(--vscode-editor-font-family, ui-monospace, monospace);
-    font-size: 12.5px; line-height: 1.5; outline: none; }
-  textarea:focus { border-color: var(--vscode-focusBorder, #4a9eff); }
+    font-size: 12.5px; line-height: 1.5; outline: none;
+    transition: border-color var(--ease), box-shadow var(--ease); }
+  textarea:focus { border-color: color-mix(in srgb, var(--accent) 60%, transparent); box-shadow: var(--ring); }
   .bar { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-  .count { color: var(--vscode-descriptionForeground); font-size: 11px;
+  .count { color: var(--muted); font-size: 11px;
     font-family: var(--vscode-editor-font-family, monospace); }
   .toast { color: var(--vscode-charts-green, #3fb950); font-size: 11.5px; font-weight: 600;
     opacity: 0; transition: opacity .15s; }
   .toast.show { opacity: 1; }
   .spacer { flex: 1; }
-  .btn { padding: 5px 13px; border-radius: 6px; cursor: pointer; font-size: 12px;
-    border: 1px solid var(--vscode-button-border, transparent);
-    background: var(--vscode-button-secondaryBackground, rgba(127,127,127,.14));
-    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground)); }
-  .btn:hover { background: var(--vscode-button-secondaryHoverBackground, rgba(127,127,127,.24)); }
-  .btn.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-color: transparent; }
-  .btn.primary:hover { background: var(--vscode-button-hoverBackground, var(--vscode-button-background)); }
+  .btn { padding: 6px 13px; border-radius: var(--r-sm); cursor: pointer; font-size: 12px;
+    border: 1px solid var(--line); color: var(--ui-fg); background: var(--s2);
+    transition: background var(--ease), transform .08s; }
+  .btn:hover { background: var(--s3); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: var(--accent-fg);
+    border-color: transparent; font-weight: 650;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-2) 35%, transparent); }
+  .btn.primary:hover { background: linear-gradient(135deg, #FDBA74, var(--accent)); }
 </style></head><body>
   <h1>Review &amp; edit handoff</h1>
   <div class="sub">${escAttr(v.sourceLabel)} → ${escAttr(v.targetLabel)}${redNote}</div>

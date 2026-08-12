@@ -41,8 +41,9 @@ This is the single biggest "it's one premium product" lever.
   rounded tables; rounded images w/ soft shadow; refined blockquotes; inline-code
   radius. Deferred: a deeper per-theme typography/color pass — needs theme-by-theme
   verification since the preview is a 4.3k-line themed surface.)*
-- ☐ **Batch 3 — Config Lab + Handoff editor.** Test cards, inputs, run buttons,
-  result panels → the system. (Handoff editor is already close; align tokens.)
+- ✅ **Batch 3 — Config Lab + Handoff editor.** Both migrated onto `markrUI`:
+  refined notice/test cards + result panels, gradient primary buttons, ring-focus
+  inputs; the handoff editor's hint/textarea/buttons aligned. Verified dark + light.
 - ☐ **Batch 4 — Agent Map + Scoreboard.** Already Markr-themed → retune node
   cards / chips / toolbar / legend and Scoreboard panels + chart palette.
 - ☐ **Batch 5 — Workbench launcher + sidebar.** Refined rows, consistent
