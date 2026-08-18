@@ -3,6 +3,7 @@ import { marked, Renderer, type MarkedExtension } from 'marked';
 import { markedHighlight } from 'marked-highlight';
 import { katexExtension } from './katexMath';
 import { KATEX_CSS } from './katexAssets';
+import { rewriteImageSources, parentDirs, toDataUri, type ResolveContext } from './localImages';
 import hljs from 'highlight.js';
 import * as cp from 'child_process';
 import * as os from 'os';
@@ -222,6 +223,16 @@ function applyGithubAlerts(html: string): string {
       return `<div class="gh-alert ${type.toLowerCase()}"><p class="gh-alert-title">${icon} ${label}</p><p>${body}</div>`;
     }
   );
+}
+
+/** Where local image paths in this document should be resolved from. */
+function imageContext(docUri: vscode.Uri): ResolveContext {
+  const folder = vscode.workspace.getWorkspaceFolder(docUri) ?? vscode.workspace.workspaceFolders?.[0];
+  return {
+    // Untitled/clipboard docs have no folder of their own — fall back to the workspace.
+    docDir:        docUri.scheme === 'file' ? nodePath.dirname(docUri.fsPath) : undefined,
+    workspaceRoot: folder?.uri.scheme === 'file' ? folder.uri.fsPath : undefined,
+  };
 }
 
 // Parses YAML frontmatter at start of document
@@ -3373,6 +3384,10 @@ export class MarkdownPreviewPanel {
   private _fsWatcher: fs.FSWatcher | null = null;
   private _prevMarkdown = '';
   private _lastFsChange = 0;
+  // ── Local image access ────────────────────────────────────────────────────
+  /** Directories the webview is allowed to load images from (cumulative). */
+  private _extraRoots: string[] = [];
+  private _rootsKey = '';
 
   public static createOrShow(document: vscode.TextDocument, options?: { column?: vscode.ViewColumn }): void {
     // When called from the auto-open (agent config), open in the ACTIVE column so
@@ -3457,7 +3472,7 @@ export class MarkdownPreviewPanel {
     this._clipboardMode = true;
     const rawText = text;
     const { meta, body } = extractFrontmatter(rawText);
-    const rendered = applyGithubAlerts(marked.parse(body) as string);
+    const rendered = this._renderBody(body);
     const stats = docStats(rawText);
     this._panel.webview.postMessage({
       type: 'fileLoaded',
@@ -3494,7 +3509,7 @@ export class MarkdownPreviewPanel {
     const relPath = vscode.workspace.asRelativePath(saveUri);
     const aiKind = aiDocKind(filename, relPath);
     const { meta, body } = extractFrontmatter(rawText);
-    const rendered = applyGithubAlerts(marked.parse(body) as string);
+    const rendered = this._renderBody(body);
     const stats = docStats(rawText);
     this._filesCacheValid = false;
     this._panel.webview.postMessage({
@@ -3587,7 +3602,7 @@ export class MarkdownPreviewPanel {
         this._editMode = true;
         // Clipboard mode: just re-render, never write to the real document on disk
         if (this._clipboardMode) {
-          const html = applyGithubAlerts(marked.parse(msg.content) as string);
+          const html = this._renderBody(msg.content);
           this._panel.webview.postMessage({ type: 'updateSplitPreview', html });
           return;
         }
@@ -3605,7 +3620,7 @@ export class MarkdownPreviewPanel {
         // Without this guard, VS Code marks the file as modified (shows ●) even when
         // the webview sends the initial content on first load with no user changes.
         if (msg.content === doc.getText()) {
-          const html = applyGithubAlerts(marked.parse(msg.content) as string);
+          const html = this._renderBody(msg.content);
           this._panel.webview.postMessage({ type: 'updateSplitPreview', html });
           return;
         }
@@ -3613,7 +3628,7 @@ export class MarkdownPreviewPanel {
         edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), msg.content);
         await vscode.workspace.applyEdit(edit); // keep VS Code document in sync (shows ● dot)
         // No workspace.save() here — user must press ⌘S or click the Save button
-        const html = applyGithubAlerts(marked.parse(msg.content) as string);
+        const html = this._renderBody(msg.content);
         this._panel.webview.postMessage({ type: 'updateSplitPreview', html });
       }
       if (msg.type === 'dismissClipboard') {
@@ -3647,7 +3662,7 @@ export class MarkdownPreviewPanel {
           const relPath = vscode.workspace.asRelativePath(doc.uri);
           const aiKind = aiDocKind(filename, relPath);
           const { meta, body } = extractFrontmatter(rawText);
-          const rendered = applyGithubAlerts(marked.parse(body) as string);
+          const rendered = this._renderBody(body);
           const stats = docStats(rawText);
           // No `files` here — webview updates active state from msg.uri (no full list re-render)
           this._panel.webview.postMessage({
@@ -3693,7 +3708,7 @@ export class MarkdownPreviewPanel {
     this._panel.title = `Markr — ${filename}`;
 
     const { meta, body } = extractFrontmatter(rawText);
-    const rendered   = applyGithubAlerts(marked.parse(body) as string);
+    const rendered   = this._renderBody(body);
     const stats      = docStats(rawText);
     const aiKind     = aiDocKind(filename, relPath);
     const model      = detectModel(filename, relPath);
@@ -3715,6 +3730,59 @@ export class MarkdownPreviewPanel {
     });
   }
 
+  /** Markdown → webview HTML: GitHub alerts, then local images rewritten to
+   *  webview URIs. Without the rewrite a relative `src` resolves against
+   *  `vscode-webview://<guid>/` and the image never loads. */
+  private _renderBody(markdown: string): string {
+    const html = applyGithubAlerts(marked.parse(markdown) as string);
+    const docUri = this._document.uri;
+    const webview = this._panel.webview;
+    const { html: out, files } = rewriteImageSources(
+      html,
+      abs => webview.asWebviewUri(vscode.Uri.file(abs)).toString(),
+      imageContext(docUri),
+    );
+    // Must widen the roots BEFORE this HTML reaches the webview.
+    this._allowResourceDirs([
+      ...(docUri.scheme === 'file' ? [nodePath.dirname(docUri.fsPath)] : []),
+      ...parentDirs(files),
+    ]);
+    return out;
+  }
+
+  /** Markdown → standalone HTML for export/print, where webview URIs mean
+   *  nothing. Images are inlined when asked (keeps exported HTML portable),
+   *  otherwise pointed at absolute `file://` URLs. */
+  private _renderBodyForExport(markdown: string, inline: boolean): string {
+    const html = applyGithubAlerts(marked.parse(markdown) as string);
+    return rewriteImageSources(
+      html,
+      abs => (inline ? toDataUri(abs) : undefined) ?? vscode.Uri.file(abs).toString(),
+      imageContext(this._document.uri),
+    ).html;
+  }
+
+  /** Widen `localResourceRoots` so the webview may read these directories.
+   *  Cumulative, because previously rendered tabs stay live in the webview. */
+  private _allowResourceDirs(dirs: string[]): void {
+    for (const d of dirs) {
+      if (d && !this._extraRoots.includes(d)) this._extraRoots.push(d);
+    }
+    if (this._extraRoots.length > 64) this._extraRoots.splice(0, this._extraRoots.length - 64);
+
+    const roots = [
+      ...(vscode.workspace.workspaceFolders ?? []).filter(f => f.uri.scheme === 'file').map(f => f.uri.fsPath),
+      ...this._extraRoots,
+    ];
+    const key = roots.join('\n');
+    if (key === this._rootsKey) return;
+    this._rootsKey = key;
+    this._panel.webview.options = {
+      ...this._panel.webview.options,
+      localResourceRoots: roots.map(p => vscode.Uri.file(p)),
+    };
+  }
+
   private _render(): void {
     if (this._renderTimer) {
       clearTimeout(this._renderTimer);
@@ -3725,7 +3793,7 @@ export class MarkdownPreviewPanel {
     this._prevMarkdown = rawText; // seed baseline for agent-watch diff
     this._startFsWatch();         // (re-)start watching this file on disk
     const { meta, body: mdBody } = extractFrontmatter(rawText);
-    const rendered = applyGithubAlerts(marked.parse(mdBody) as string);
+    const rendered = this._renderBody(mdBody);
     const frontmatterHtml = meta ? renderFrontmatter(meta) : '';
     const stats    = docStats(rawText);
     this._panel.title = `Markr — ${filename}`;
@@ -3853,7 +3921,7 @@ export class MarkdownPreviewPanel {
   private async _handleExportHtml(): Promise<void> {
     const rawText  = this._document.getText();
     const { meta, body } = extractFrontmatter(rawText);
-    const content  = (meta ? renderFrontmatter(meta) : '') + applyGithubAlerts(marked.parse(body) as string);
+    const content  = (meta ? renderFrontmatter(meta) : '') + this._renderBodyForExport(body, true);
     const filename = this._document.uri.path.split('/').pop()?.replace(/\.md$/i, '.html') ?? 'export.html';
     const dir      = this._document.uri.with({ path: this._document.uri.path.replace(/[^/]*$/, '') });
     const saveUri  = await vscode.window.showSaveDialog({
@@ -3869,7 +3937,7 @@ export class MarkdownPreviewPanel {
     const rawText = this._document.getText();
     const { meta, body } = extractFrontmatter(rawText);
     const fullHtml = buildPdfHtml(
-      (meta ? renderFrontmatter(meta) : '') + applyGithubAlerts(marked.parse(body) as string),
+      (meta ? renderFrontmatter(meta) : '') + this._renderBodyForExport(body, false),
       this._document.uri.path.split('/').pop()?.replace(/\.md$/i, '') ?? 'document'
     );
     const tmpFile = nodePath.join(os.tmpdir(), `markr-print-${Date.now()}.html`);
@@ -3914,7 +3982,7 @@ export class MarkdownPreviewPanel {
 
     const { meta, body } = extractFrontmatter(rawText);
     const fullHtml = buildPdfHtml(
-      (meta ? renderFrontmatter(meta) : '') + applyGithubAlerts(marked.parse(body) as string),
+      (meta ? renderFrontmatter(meta) : '') + this._renderBodyForExport(body, false),
       filename.replace('.pdf', '')
     );
 
@@ -4303,7 +4371,7 @@ export class MarkdownPreviewPanel {
       this._prevMarkdown = rawText;
 
       const { meta, body } = extractFrontmatter(rawText);
-      const rendered = applyGithubAlerts(marked.parse(body) as string);
+      const rendered = this._renderBody(body);
       const stats    = docStats(rawText);
       const tokDelta = Math.round(stats.chars / 4) - Math.round(docStats(prevBlocks.join('\n\n')).chars / 4);
 
