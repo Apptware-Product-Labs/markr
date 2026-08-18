@@ -7,6 +7,32 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [6.7.0] — Design system + local images
+
+### Added
+- **Shared Raycast-flavored design system** (`src/webview/markrUI.ts`) — adaptive
+  tokens (layered surfaces, soft shadows, radii, accent, motion) + component
+  classes, so Markr's webviews share one premium, cohesive look in light and dark.
+
+### Changed
+- **UI modernization (rollout in progress):** Context Bridge, the Markdown
+  Preview chrome/content, AI Config Lab, and the Handoff editor now run on the
+  design system — soft-elevation cards, gradient primary buttons, ring-focus
+  inputs, a segmented scope toggle, calmer chrome, softer rounded code blocks /
+  tables / images. (Agent Map, Scoreboard, and the Workbench launcher follow in
+  a 6.7.x pass — see `docs/design/ui-modernization.md`.)
+
+### Fixed
+- **Local images now render in the preview** (#29) — `![](./images/x.png)` and
+  `<img src="images/x.png">` showed a broken image before (only remote URLs
+  worked); the same defect in Export HTML / Print / Export PDF is fixed too.
+  New `src/localImages.ts` resolves local `src` values to real files (relative,
+  root-relative, `~`, `file://`, Windows drives, percent-escapes, entities) and
+  the preview rewrites them to webview URIs (widening `localResourceRoots`);
+  exported HTML inlines images as data URIs so the file stays portable. 25 tests.
+
+---
+
 ## [6.6.1] — Fix: PDF export could crash the extension host
 
 ### Fixed
